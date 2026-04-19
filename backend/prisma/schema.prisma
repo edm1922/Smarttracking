@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(uuid())
+  username     String        @unique
+  password     String
+  role         String        @default("viewer") // admin, staff, viewer
+  createdAt    DateTime      @default(now())
+  ActivityLog  ActivityLog[]
+}
+
+model Item {
+  id           String            @id @default(uuid())
+  slug         String            @unique // format: TEL-XXXXX
+  name         String?
+  description  String?
+  status       String            @default("Available") // Keep for backward compatibility
+  statusId     String?           // New structured status
+  categoryId   String?
+  batchId      String?
+  imageUrl     String?
+  locked       Boolean           @default(false)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  fieldValues  ItemFieldValue[]
+  ActivityLog  ActivityLog[]
+  category     Category?         @relation(fields: [categoryId], references: [id])
+  batch        Batch?            @relation(fields: [batchId], references: [id])
+  statusRef    Status?           @relation(fields: [statusId], references: [id])
+  tags         ItemTag[]
+}
+
+model Category {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  items     Item[]
+}
+
+model Tag {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  items     ItemTag[]
+}
+
+model ItemTag {
+  itemId String
+  tagId  String
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, tagId])
+}
+
+model Batch {
+  id          String   @id @default(uuid())
+  batchCode   String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  items       Item[]
+}
+
+model Status {
+  id             String             @id @default(uuid())
+  name           String             @unique
+  orderIndex     Int                @default(0)
+  items          Item[]
+  fromTransition StatusTransition[] @relation("FromStatus")
+  toTransition   StatusTransition[] @relation("ToStatus")
+}
+
+model StatusTransition {
+  id           String @id @default(uuid())
+  fromStatusId String
+  toStatusId   String
+  fromStatus   Status @relation("FromStatus", fields: [fromStatusId], references: [id], onDelete: Cascade)
+  toStatus     Status @relation("ToStatus", fields: [toStatusId], references: [id], onDelete: Cascade)
+
+  @@unique([fromStatusId, toStatusId])
+}
+
+model CustomField {
+  id          String            @id @default(uuid())
+  name        String
+  fieldType   String            // text, textarea, number, dropdown, date
+  options     Json?             // array of strings for dropdown
+  required    Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+  fieldValues ItemFieldValue[]
+}
+
+model ItemFieldValue {
+  id        String      @id @default(uuid())
+  itemId    String
+  fieldId   String
+  value     Json        // Stores the actual value
+  item      Item        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  field     CustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now())
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String
+  itemId    String?
+  action    String   // CREATE_ITEM, UPDATE_ITEM, LOCK_ITEM, UNLOCK_ITEM
+  changes   Json?    // { status: { old: 'Available', new: 'Used' } }
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  item      Item?    @relation(fields: [itemId], references: [id])
+}
