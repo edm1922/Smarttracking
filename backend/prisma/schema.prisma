@@ -8,32 +8,37 @@ datasource db {
 }
 
 model User {
-  id           String        @id @default(uuid())
-  username     String        @unique
-  password     String
-  role         String        @default("viewer") // admin, staff, viewer
-  createdAt    DateTime      @default(now())
-  ActivityLog  ActivityLog[]
+  id          String        @id @default(uuid())
+  username    String        @unique
+  password    String
+  role        String        @default("viewer")
+  createdAt          DateTime             @default(now())
+  ActivityLog        ActivityLog[]
+  ProductTransaction ProductTransaction[]
 }
 
 model Item {
-  id           String            @id @default(uuid())
-  slug         String            @unique // format: TEL-XXXXX
+  id           String           @id @default(uuid())
+  slug         String           @unique
   name         String?
   description  String?
-  status       String            @default("Available") // Keep for backward compatibility
-  statusId     String?           // New structured status
-  categoryId   String?
-  batchId      String?
+  status       String           @default("Available")
+  locked       Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
   imageUrl     String?
-  locked       Boolean           @default(false)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  fieldValues  ItemFieldValue[]
+  batchId      String?
+  categoryId   String?
+  statusId     String?
+  isLegacy     Boolean          @default(false)
+  supplierId   String?
+  unit         String?          @default("pcs")
+  trackingType String           @default("INDIVIDUAL")
   ActivityLog  ActivityLog[]
-  category     Category?         @relation(fields: [categoryId], references: [id])
-  batch        Batch?            @relation(fields: [batchId], references: [id])
-  statusRef    Status?           @relation(fields: [statusId], references: [id])
+  batch        Batch?           @relation(fields: [batchId], references: [id])
+  category     Category?        @relation(fields: [categoryId], references: [id])
+  statusRef    Status?          @relation(fields: [statusId], references: [id])
+  fieldValues  ItemFieldValue[]
   tags         ItemTag[]
 }
 
@@ -61,11 +66,12 @@ model ItemTag {
 }
 
 model Batch {
-  id          String   @id @default(uuid())
-  batchCode   String   @unique
-  description String?
-  createdAt   DateTime @default(now())
-  items       Item[]
+  id           String        @id @default(uuid())
+  batchCode    String        @unique
+  description  String?
+  createdAt    DateTime      @default(now())
+  items        Item[]
+  customFields CustomField[]
 }
 
 model Status {
@@ -88,32 +94,124 @@ model StatusTransition {
 }
 
 model CustomField {
-  id          String            @id @default(uuid())
+  id          String           @id @default(uuid())
   name        String
-  fieldType   String            // text, textarea, number, dropdown, date
-  options     Json?             // array of strings for dropdown
-  required    Boolean           @default(false)
-  createdAt   DateTime          @default(now())
+  fieldType   String
+  options     Json?
+  required    Boolean          @default(false)
+  batchId     String?
+  createdAt   DateTime         @default(now())
   fieldValues ItemFieldValue[]
+  batch       Batch?           @relation(fields: [batchId], references: [id])
 }
 
 model ItemFieldValue {
   id        String      @id @default(uuid())
   itemId    String
   fieldId   String
-  value     Json        // Stores the actual value
-  item      Item        @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  field     CustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  value     Json
   createdAt DateTime    @default(now())
+  field     CustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  item      Item        @relation(fields: [itemId], references: [id], onDelete: Cascade)
 }
 
 model ActivityLog {
   id        String   @id @default(uuid())
   userId    String
   itemId    String?
-  action    String   // CREATE_ITEM, UPDATE_ITEM, LOCK_ITEM, UNLOCK_ITEM
-  changes   Json?    // { status: { old: 'Available', new: 'Used' } }
+  action    String
+  changes   Json?
   createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
   item      Item?    @relation(fields: [itemId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Location {
+  id           String               @id @default(uuid())
+  name         String               @unique
+  description  String?
+  createdAt        DateTime             @default(now())
+  stocks           ProductStock[]
+  transactions     ProductTransaction[]
+  internalRequests InternalRequest[]
+}
+
+model Product {
+  id           String               @id @default(uuid())
+  sku          String               @unique
+  name         String
+  description  String?
+  unit         String               @default("PCS")
+  price        Float                @default(0)
+  threshold    Float                @default(0)
+  createdAt    DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  stocks           ProductStock[]
+  transactions     ProductTransaction[]
+  internalRequests InternalRequest[]
+}
+
+model ProductStock {
+  id         String   @id @default(uuid())
+  productId  String
+  locationId String
+  quantity   Int      @default(0)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, locationId])
+}
+
+model ProductTransaction {
+  id         String   @id @default(uuid())
+  productId  String
+  locationId String
+  type       String   // "IN" | "OUT"
+  quantity   Int
+  remarks    String?
+  createdAt  DateTime @default(now())
+  userId     String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  location   Location @relation(fields: [locationId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model PurchaseRequest {
+  id              String   @id @default(uuid())
+  prNo            String
+  date            DateTime @default(now())
+  department      String
+  endUser         String
+  position        String?
+  sourceSupplier  String?
+  subTitle        String?
+  items           Json     // [{name, unit, quantity, estimatedCost}]
+  remarks         String?
+  signatoryConfig Json?    // {preparedBy: boolean, checkedBy: boolean, receivedBy: boolean, approvedBy: boolean}
+  preparedBy      String?
+  checkedBy       String?
+  receivedBy      String?
+  approvedBy      String?
+  status          String   @default("PENDING")
+  createdAt       DateTime @default(now())
+}
+
+model InternalRequest {
+  id              String   @id @default(uuid())
+  requestNo       String   @unique
+  date            DateTime @default(now())
+  employeeName    String
+  employeeRole    String
+  departmentArea  String
+  shift           String
+  supervisor      String
+  locationId      String
+  productId       String
+  quantity        Int
+  status          String   @default("PENDING") // PENDING, APPROVED, FULFILLED, REJECTED
+  remarks         String?
+  createdAt       DateTime @default(now())
+  
+  location        Location @relation(fields: [locationId], references: [id])
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 }

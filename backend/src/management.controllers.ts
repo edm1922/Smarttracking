@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
 import { CategoriesService } from './categories/categories.service';
 import { TagsService } from './tags/tags.service';
 import { BatchesService } from './batches/batches.service';
@@ -52,4 +52,6 @@ export class WorkflowController {
 export class ReportsController {
   constructor(private readonly service: ReportsService) {}
   @Get('summary') getSummary() { return this.service.getSummary(); }
+  @Get('analytics') getAnalytics(@Query('locationId') locationId?: string) { return this.service.getAnalytics(locationId); }
+  @Get('report-data') getReportData(@Query('type') type: string, @Query('productId') productId?: string) { return this.service.getReportData(type, { productId }); }
 }

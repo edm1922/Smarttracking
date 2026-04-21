@@ -23,12 +23,18 @@ export class ItemsService {
       if (!existing) isUnique = true;
     }
 
-    const { fieldValues, tagIds, ...itemData } = data;
+    const { fieldValues, tagIds, categoryId, batchId, ...itemData } = data;
+
+    const finalData: any = {
+      ...itemData,
+      slug,
+      categoryId: categoryId || null,
+      batchId: batchId || null,
+    };
 
     const item = await this.prisma.item.create({
       data: {
-        ...itemData,
-        slug,
+        ...finalData,
         fieldValues: {
           create: fieldValues ? fieldValues.map((fv: any) => ({
             fieldId: fv.fieldId,
@@ -52,10 +58,11 @@ export class ItemsService {
     return item;
   }
 
-  async findAll() {
+  async findAll(batchId?: string) {
     return this.prisma.item.findMany({
+      where: batchId ? { batchId } : {},
       include: { 
-        fieldValues: true, 
+        fieldValues: { include: { field: true } }, 
         tags: { include: { tag: true } },
         category: true,
         batch: true,
@@ -77,6 +84,31 @@ export class ItemsService {
       },
     });
     if (!item) throw new NotFoundException('Item not found');
+
+    // Always include relevant custom fields for this item's batch so they are viewable even if empty
+    const relevantFields = await this.prisma.customField.findMany({
+      where: {
+        OR: [
+          { batchId: item.batchId || 'GLOBAL_FIELDS' },
+          { batchId: null }
+        ]
+      }
+    });
+
+    // Filter out fields that already have values to avoid duplicates
+    const existingFieldIds = new Set(item.fieldValues.map(fv => fv.fieldId));
+    const newFieldValues = relevantFields
+      .filter(f => !existingFieldIds.has(f.id))
+      .map(f => ({
+        id: `temp-${f.id}`,
+        itemId: item.id,
+        fieldId: f.id,
+        value: null,
+        field: f
+      }));
+
+    (item as any).fieldValues = [...item.fieldValues, ...newFieldValues];
+
     return item;
   }
 
@@ -87,7 +119,13 @@ export class ItemsService {
       throw new BadRequestException('Item is locked. Only admins can edit it.');
     }
 
-    const { fieldValues, tagIds, ...itemData } = data;
+    const { fieldValues, tagIds, categoryId, batchId, ...itemData } = data;
+    
+    const finalData: any = {
+      ...itemData,
+      categoryId: categoryId === undefined ? item.categoryId : (categoryId || null),
+      batchId: batchId === undefined ? item.batchId : (batchId || null),
+    };
     
     // Validate Status Transition
     if (itemData.statusId && itemData.statusId !== item.statusId) {
@@ -113,7 +151,7 @@ export class ItemsService {
     const updatedItem = await this.prisma.item.update({
       where: { slug },
       data: {
-        ...itemData,
+        ...finalData,
         fieldValues: fieldValues ? {
           deleteMany: {},
           create: fieldValues.map((fv: any) => ({
@@ -139,6 +177,28 @@ export class ItemsService {
     }
 
     return updatedItem;
+  }
+
+  async submitForm(slug: string, data: any) {
+    const item = await this.findOne(slug);
+    if (item.locked) throw new BadRequestException('This form has already been submitted and is locked.');
+
+    const { fieldValues } = data;
+    
+    return this.prisma.item.update({
+      where: { slug },
+      data: {
+        locked: true, // Automatically lock upon submission
+        fieldValues: fieldValues ? {
+          deleteMany: {},
+          create: fieldValues.map((fv: any) => ({
+            fieldId: fv.fieldId,
+            value: fv.value,
+          })),
+        } : undefined,
+      },
+      include: { fieldValues: true },
+    });
   }
 
   async toggleLock(slug: string, userId: string, userRole: string) {

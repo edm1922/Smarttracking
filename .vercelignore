@@ -1,0 +1,7 @@
+node_modules
+dist
+.next
+out
+*.xlsx
+error_log.txt
+backend/error_log.txt

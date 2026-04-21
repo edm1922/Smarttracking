@@ -36,7 +36,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-md space-y-8 rounded-xl bg-white p-10 shadow-lg border border-gray-100">
         <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">QR Tracker</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Smart Tracking</h1>
           <p className="mt-2 text-sm text-gray-600">Enter your credentials to access the system</p>
         </div>
         

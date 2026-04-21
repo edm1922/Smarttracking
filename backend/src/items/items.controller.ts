@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, UseInterceptors, UploadedFile, Query } from '@nestjs/common';
 import { ItemsService } from './items.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -10,12 +10,12 @@ export class ItemsController {
   @UseGuards(AuthGuard)
   @Post()
   create(@Body() data: any, @Request() req: any) {
-    return this.itemsService.create(data, req.user.id);
+    return this.itemsService.create(data, req.user.sub);
   }
 
   @Get()
-  findAll() {
-    return this.itemsService.findAll();
+  findAll(@Query('batchId') batchId?: string) {
+    return this.itemsService.findAll(batchId);
   }
 
   @Get(':slug')
@@ -23,23 +23,28 @@ export class ItemsController {
     return this.itemsService.findOne(slug);
   }
 
+  @Post(':slug/submit-form')
+  submitForm(@Param('slug') slug: string, @Body() data: any) {
+    return this.itemsService.submitForm(slug, data);
+  }
+
   @UseGuards(AuthGuard)
   @Patch(':slug')
   update(@Param('slug') slug: string, @Body() data: any, @Request() req: any) {
-    return this.itemsService.update(slug, data, req.user.id, req.user.role);
+    return this.itemsService.update(slug, data, req.user.sub, req.user.role);
   }
 
   @UseGuards(AuthGuard)
   @Patch(':slug/lock')
   toggleLock(@Param('slug') slug: string, @Request() req: any) {
-    return this.itemsService.toggleLock(slug, req.user.id, req.user.role);
+    return this.itemsService.toggleLock(slug, req.user.sub, req.user.role);
   }
 
   @UseGuards(AuthGuard)
   @Post(':slug/image')
   @UseInterceptors(FileInterceptor('image'))
   uploadImage(@Param('slug') slug: string, @UploadedFile() file: any, @Request() req: any) {
-    return this.itemsService.uploadImage(slug, file, req.user.id);
+    return this.itemsService.uploadImage(slug, file, req.user.sub);
   }
 
   @UseGuards(AuthGuard)

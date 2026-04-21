@@ -10,10 +10,15 @@ interface CustomField {
   fieldType: string;
   options: any;
   required: boolean;
+  batchId?: string;
+  batch?: {
+    batchCode: string;
+  };
 }
 
 export default function CustomFieldsPage() {
   const [fields, setFields] = useState<CustomField[]>([]);
+  const [batches, setBatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingField, setEditingField] = useState<CustomField | null>(null);
@@ -23,12 +28,17 @@ export default function CustomFieldsPage() {
     fieldType: 'text',
     optionsString: '',
     required: false,
+    batchCode: '',
   });
 
   const fetchFields = async () => {
     try {
-      const response = await api.get('/custom-fields');
-      setFields(response.data);
+      const [fieldsRes, batchesRes] = await Promise.all([
+        api.get('/custom-fields'),
+        api.get('/batches')
+      ]);
+      setFields(fieldsRes.data);
+      setBatches(batchesRes.data);
     } catch (err) {
       console.error('Failed to fetch custom fields', err);
     } finally {
@@ -48,6 +58,7 @@ export default function CustomFieldsPage() {
         fieldType: field.fieldType,
         optionsString: Array.isArray(field.options) ? field.options.join(', ') : '',
         required: field.required,
+        batchCode: field.batch?.batchCode || '',
       });
     } else {
       setEditingField(null);
@@ -56,6 +67,7 @@ export default function CustomFieldsPage() {
         fieldType: 'text',
         optionsString: '',
         required: false,
+        batchCode: '',
       });
     }
     setIsModalOpen(true);
@@ -64,7 +76,10 @@ export default function CustomFieldsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const data = {
-      ...formData,
+      name: formData.name,
+      fieldType: formData.fieldType,
+      required: formData.required,
+      batchCode: formData.batchCode.trim(),
       options: formData.optionsString ? formData.optionsString.split(',').map(o => o.trim()) : [],
     };
     try {
@@ -112,8 +127,8 @@ export default function CustomFieldsPage() {
             <tr>
               <th className="table-cell font-semibold">Field Name</th>
               <th className="table-cell font-semibold">Type</th>
+              <th className="table-cell font-semibold">Assignment (Batch)</th>
               <th className="table-cell font-semibold">Required</th>
-              <th className="table-cell font-semibold">Options</th>
               <th className="table-cell font-semibold text-right">Actions</th>
             </tr>
           </thead>
@@ -127,10 +142,18 @@ export default function CustomFieldsPage() {
                 <tr key={field.id} className="table-row">
                   <td className="table-cell font-medium">{field.name}</td>
                   <td className="table-cell capitalize">{field.fieldType}</td>
-                  <td className="table-cell">{field.required ? 'Yes' : 'No'}</td>
-                  <td className="table-cell text-gray-500 italic">
-                    {Array.isArray(field.options) && field.options.length > 0 ? field.options.join(', ') : '-'}
+                  <td className="table-cell">
+                    {field.batch ? (
+                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 border border-blue-100">
+                        Batch: {field.batch.batchCode}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 border border-gray-100 italic">
+                        Global (All Items)
+                      </span>
+                    )}
                   </td>
+                  <td className="table-cell">{field.required ? 'Yes' : 'No'}</td>
                   <td className="table-cell text-right">
                     <button onClick={() => handleOpenModal(field)} className="p-1 text-gray-400 hover:text-primary mr-2">
                       <Edit2 className="h-4 w-4" />
@@ -189,7 +212,18 @@ export default function CustomFieldsPage() {
                   />
                 </div>
               )}
-              <div className="flex items-center">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Assign to Batch (Template Code)</label>
+                <input
+                  type="text"
+                  value={formData.batchCode}
+                  onChange={(e) => setFormData({...formData, batchCode: e.target.value.toUpperCase()})}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:ring-1 focus:ring-primary outline-none"
+                  placeholder="e.g. TELA"
+                />
+                <p className="mt-1 text-[10px] text-gray-400 italic">Leave empty for "Global". Typing a new code will automatically create that template.</p>
+              </div>
+              <div className="flex items-center pt-2">
                 <input
                   id="required"
                   type="checkbox"

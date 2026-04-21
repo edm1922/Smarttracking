@@ -17,6 +17,20 @@ export class LogsService {
     });
   }
 
+  async findAll() {
+    return this.prisma.activityLog.findMany({
+      include: {
+        user: {
+          select: { username: true, role: true },
+        },
+        item: {
+          select: { slug: true, name: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async create(data: { userId: string; itemId?: string; action: string; changes?: any }) {
     return this.prisma.activityLog.create({
       data,
