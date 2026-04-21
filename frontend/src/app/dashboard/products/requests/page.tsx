@@ -57,7 +57,7 @@ export default function RequestsPage() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'PENDING' | 'FULFILLED' | 'ALL'>('PENDING');
+  const [activeTab, setActiveTab] = useState<'PENDING' | 'APPROVED' | 'FULFILLED' | 'REJECTED' | 'ALL'>('PENDING');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Form state
@@ -488,7 +488,7 @@ export default function RequestsPage() {
         <div className="lg:col-span-8 space-y-6">
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
             <div className="flex space-x-1 rounded-lg bg-gray-100 p-1 w-fit">
-              {(['PENDING', 'FULFILLED', 'ALL'] as const).map((tab) => (
+              {(['PENDING', 'APPROVED', 'FULFILLED', 'REJECTED', 'ALL'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => { setActiveTab(tab); setSelectedIds([]); }}
