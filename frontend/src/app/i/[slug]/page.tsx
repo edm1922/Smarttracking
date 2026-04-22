@@ -4,7 +4,8 @@ import { useEffect, useState, use } from 'react';
 import { 
   Lock, Unlock, ArrowLeft, Save, AlertCircle, Clock, 
   History, ChevronDown, ChevronUp, Image as ImageIcon, 
-  ListPlus, LayoutGrid, Tags as TagsIcon, Box, ChevronRight
+  ListPlus, LayoutGrid, Tags as TagsIcon, Box, ChevronRight,
+  Eye, LogIn, LogOut, Truck, CheckCircle2, ShieldCheck, User
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -14,8 +15,13 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  // View Modes: 'loading' | 'choice' | 'guest' | 'login' | 'form'
+  const [viewMode, setViewMode] = useState<'loading' | 'choice' | 'guest' | 'login' | 'form'>('loading');
+  
   const [isEditing, setIsEditing] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
+  const [isPullingOut, setIsPullingOut] = useState(false);
   
   const [formData, setFormData] = useState({ 
     name: '', 
@@ -27,8 +33,12 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
   const [dynamicValues, setDynamicValues] = useState<Record<string, any>>({});
   const [isSaving, setIsSaving] = useState(false);
   
+  const [loginData, setLoginData] = useState({ username: '', password: '' });
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState('');
+  const [username, setUsername] = useState('');
 
   const fetchData = async () => {
     try {
@@ -41,16 +51,28 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
         categoryId: itemRes.data.categoryId || '',
         batchId: itemRes.data.batchId || '',
       });
+      
       const values: Record<string, any> = {};
       itemRes.data.fieldValues?.forEach((fv: any) => {
         values[fv.fieldId] = fv.value;
       });
       setDynamicValues(values);
 
-      if (localStorage.getItem('token')) {
+      const token = localStorage.getItem('token');
+      if (token) {
         const logsRes = await api.get(`/logs/item/${itemRes.data.id}`);
         setLogs(logsRes.data);
       }
+
+      // Determine initial view mode
+      if (!itemRes.data.locked) {
+        setViewMode('form');
+      } else if (token) {
+        setViewMode('form'); // Already logged in, show the data
+      } else {
+        setViewMode('choice'); // Locked and not logged in
+      }
+
     } catch (err: any) {
       setError(err.response?.status === 404 ? 'Item not found' : 'Failed to load item details');
     } finally {
@@ -62,8 +84,40 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     const token = localStorage.getItem('token');
     setIsLoggedIn(!!token);
     setUserRole(localStorage.getItem('role') || '');
+    setUsername(localStorage.getItem('username') || '');
     fetchData();
   }, [slug]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoggingIn(true);
+    try {
+      const res = await api.post('/auth/login', loginData);
+      localStorage.setItem('token', res.data.access_token);
+      localStorage.setItem('role', res.data.role);
+      localStorage.setItem('username', res.data.username);
+      
+      setIsLoggedIn(true);
+      setUserRole(res.data.role);
+      setUsername(res.data.username);
+      setViewMode('form');
+      fetchData();
+    } catch (err: any) {
+      alert('Login failed. Please check credentials.');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('role');
+    localStorage.removeItem('username');
+    setIsLoggedIn(false);
+    setUserRole('');
+    setUsername('');
+    setViewMode('choice');
+  };
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,6 +133,8 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       await api.patch(`/items/${slug}`, payload);
       await fetchData();
       setIsEditing(false);
+      setIsPullingOut(false);
+      alert('Item record updated successfully.');
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to update item');
     } finally {
@@ -108,12 +164,12 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     }
   };
 
-  const canEdit = isLoggedIn && (!item?.locked || userRole === 'admin');
-  const isPublicForm = !isLoggedIn && !item?.locked;
-
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="animate-pulse text-gray-500 font-medium tracking-tighter uppercase text-xs">Accessing record...</div>
+  if (loading || viewMode === 'loading') return (
+    <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="flex flex-col items-center">
+        <div className="h-12 w-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="text-xs font-black uppercase tracking-widest text-gray-400">Syncing Record...</p>
+      </div>
     </div>
   );
 
@@ -130,149 +186,275 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     </div>
   );
 
+  // --- VIEW: Access Choice ---
+  if (viewMode === 'choice') return (
+    <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-6">
+      <div className="max-w-md w-full space-y-8 text-center">
+        <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl shadow-blue-900/10 border border-white">
+          <div className="h-20 w-20 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <Lock className="h-10 w-10 text-primary" />
+          </div>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tighter mb-2">RECORD LOCKED</h1>
+          <p className="text-sm font-medium text-gray-500 mb-10 leading-relaxed">
+            Scan detected for <span className="font-mono font-bold text-primary">{slug}</span>. This item has been formally submitted. Choose how to proceed:
+          </p>
+          
+          <div className="space-y-4">
+            <button 
+              onClick={() => setViewMode('guest')}
+              className="w-full group flex items-center justify-between p-6 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-all text-left"
+            >
+              <div>
+                <p className="text-sm font-bold text-gray-900">View as Guest</p>
+                <p className="text-xs text-gray-400">Read-only access to item data</p>
+              </div>
+              <Eye className="h-5 w-5 text-gray-300 group-hover:text-primary transition-colors" />
+            </button>
+            
+            <button 
+              onClick={() => setViewMode('login')}
+              className="w-full group flex items-center justify-between p-6 bg-primary text-white rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all text-left"
+            >
+              <div>
+                <p className="text-sm font-bold">Staff Login</p>
+                <p className="text-xs text-white/60">Pull out or edit item record</p>
+              </div>
+              <LogIn className="h-5 w-5 text-white/40 group-hover:text-white transition-colors" />
+            </button>
+          </div>
+        </div>
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Smart Tracking Enterprise v1.0</p>
+      </div>
+    </div>
+  );
+
+  // --- VIEW: Login Form ---
+  if (viewMode === 'login') return (
+    <div className="min-h-screen bg-white p-8 flex flex-col">
+      <button onClick={() => setViewMode('choice')} className="mb-12 flex items-center text-sm font-bold text-gray-400 hover:text-gray-900 transition-colors">
+        <ArrowLeft className="mr-2 h-4 w-4" /> Back to choices
+      </button>
+      
+      <div className="max-w-sm mx-auto w-full pt-12">
+        <h2 className="text-4xl font-black text-gray-900 tracking-tighter mb-2">Staff Login</h2>
+        <p className="text-gray-400 mb-10 font-medium">Enter your assigned credentials to manage <span className="text-primary font-bold">{slug}</span></p>
+        
+        <form onSubmit={handleLogin} className="space-y-4">
+          <input 
+            required
+            type="text" 
+            placeholder="Username" 
+            value={loginData.username}
+            onChange={(e) => setLoginData({...loginData, username: e.target.value})}
+            className="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 focus:bg-white focus:ring-4 focus:ring-primary/10 outline-none transition-all font-medium" 
+          />
+          <input 
+            required
+            type="password" 
+            placeholder="Password" 
+            value={loginData.password}
+            onChange={(e) => setLoginData({...loginData, password: e.target.value})}
+            className="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 focus:bg-white focus:ring-4 focus:ring-primary/10 outline-none transition-all font-medium" 
+          />
+          <button 
+            type="submit" 
+            disabled={isLoggingIn}
+            className="w-full py-5 bg-gray-900 text-white rounded-2xl font-bold shadow-xl active:scale-95 transition-all disabled:opacity-50"
+          >
+            {isLoggingIn ? 'Verifying...' : 'Sign In & Access'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+
+  // --- VIEW: Main Record (Guest or Staff) ---
+  const isGuest = viewMode === 'guest';
+  const canAdmin = userRole === 'admin';
+  const canInventory = userRole === 'inventory';
+  const isPublicForm = !isLoggedIn && !item?.locked;
+
   return (
-    <div className="min-h-screen bg-[#f1f5f9] py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#f1f5f9] pb-12 px-4 sm:px-6">
+      {/* Mobile Top Bar */}
+      <div className="max-w-3xl mx-auto pt-6 flex items-center justify-between mb-4">
+        {isGuest ? (
+          <button onClick={() => setViewMode('choice')} className="flex items-center text-[10px] font-black uppercase text-gray-400">
+            <ArrowLeft className="mr-1 h-3 w-3" /> Exit Preview
+          </button>
+        ) : (
+          <div className="flex items-center">
+             <div className="h-6 w-6 bg-primary/10 rounded-md flex items-center justify-center mr-2">
+                {canAdmin ? <ShieldCheck className="h-4 w-4 text-primary" /> : <User className="h-4 w-4 text-primary" />}
+             </div>
+             <span className="text-[10px] font-black uppercase text-gray-500">{username} ({userRole})</span>
+          </div>
+        )}
+        
+        {isLoggedIn && (
+          <button onClick={handleLogout} className="text-[10px] font-black uppercase text-red-500 flex items-center">
+            Logout <LogOut className="ml-1 h-3 w-3" />
+          </button>
+        )}
+      </div>
+
       <div className="max-w-3xl mx-auto space-y-6">
-        <div className="bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-gray-100">
+        <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-gray-100">
           {/* Hero Section */}
-          <div className="relative h-72 group">
+          <div className="relative h-64 group">
             {item.imageUrl ? (
-              <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+              <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 text-gray-400">
-                <ImageIcon className="h-20 w-20 mb-4 opacity-10" />
-                <p className="text-xs font-bold uppercase tracking-[0.2em] opacity-30">QR Digital Twin</p>
+              <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100 text-gray-300">
+                <ImageIcon className="h-12 w-12 mb-2 opacity-20" />
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-30">Scan Success</p>
               </div>
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-            <div className="absolute bottom-8 left-8 text-white">
-              <h1 className="text-4xl font-mono font-black tracking-tighter uppercase">{item.slug}</h1>
-              <p className="text-sm font-bold opacity-80 mt-1">{item.name || 'Untitled Form'}</p>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+            <div className="absolute bottom-6 left-8">
+              <p className="text-primary font-black text-[10px] uppercase tracking-widest mb-1">Asset ID</p>
+              <h1 className="text-4xl font-mono font-black text-white tracking-tighter uppercase leading-none">{item.slug}</h1>
             </div>
-            <div className="absolute top-6 right-6">
-              <button 
-                onClick={async () => {
-                   if (!canEdit) return;
-                   if (userRole !== 'admin') {
-                     alert('Only admins can toggle lock status.');
-                     return;
-                   }
-                   if (confirm(`Are you sure you want to ${item.locked ? 'unlock' : 'lock'} this item?`)) {
-                     try {
-                       await api.patch(`/items/${slug}/lock`);
-                       await fetchData();
-                     } catch(err) {
-                       alert('Failed to toggle lock');
-                     }
-                   }
-                }}
-                className={`p-3 rounded-2xl shadow-lg backdrop-blur bg-white/90 transition-all ${item.locked ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'} ${canEdit && userRole === 'admin' ? 'cursor-pointer hover:scale-105' : 'cursor-default'}`}
-                disabled={!(canEdit && userRole === 'admin')}
-              >
-                {item.locked ? <Lock className="h-6 w-6" /> : <Unlock className="h-6 w-6" />}
-              </button>
-            </div>
+            
+            {canAdmin && (
+              <div className="absolute top-6 right-6">
+                <button 
+                  onClick={async () => {
+                    if (confirm(`Are you sure you want to ${item.locked ? 'unlock' : 'lock'} this item?`)) {
+                      try {
+                        await api.patch(`/items/${slug}/lock`);
+                        await fetchData();
+                      } catch(err) {
+                        alert('Failed to toggle lock');
+                      }
+                    }
+                  }}
+                  className={`p-3 rounded-2xl shadow-lg backdrop-blur bg-white/90 transition-all ${item.locked ? 'text-red-600' : 'text-green-600'}`}
+                >
+                  {item.locked ? <Lock className="h-6 w-6" /> : <Unlock className="h-6 w-6" />}
+                </button>
+              </div>
+            )}
           </div>
 
-          <div className="p-10">
-            {isEditing || isPublicForm ? (
-              <form onSubmit={isEditing ? handleUpdate : handleSubmitForm} className="space-y-8">
-                <div className="space-y-6">
-                  {(isEditing || (isPublicForm && !item.name)) && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      <div>
-                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Internal Reference Name {isPublicForm && <span className="text-red-500">*</span>}</label>
-                        <input required={isPublicForm} type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm" placeholder="Enter reference name..." />
-                      </div>
-                      {isEditing && (
-                        <div>
-                          <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Status</label>
-                          <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm font-bold">
-                            <option value="Available">Available</option>
-                            <option value="Used">Used</option>
-                            <option value="Defective">Defective</option>
-                          </select>
-                        </div>
+          <div className="p-8">
+            {(isEditing || isPublicForm) ? (
+              <form onSubmit={isEditing ? handleUpdate : handleSubmitForm} className="space-y-6">
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Internal Reference Name {isPublicForm && <span className="text-red-500">*</span>}</label>
+                  <input required={isPublicForm} type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-primary/10 transition-all" placeholder="Enter reference name..." />
+                </div>
+                
+                {isEditing && (
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Status</label>
+                    <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-primary/10 transition-all">
+                      <option value="Available">Available</option>
+                      <option value="Used">Used</option>
+                      <option value="Defective">Defective</option>
+                      <option value="Released">Released</option>
+                    </select>
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <h3 className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] pt-4">Custom Attributes</h3>
+                  {item.fieldValues?.map((fv: any) => (
+                    <div key={fv.field.id}>
+                      <label className="block text-xs font-bold text-gray-500 mb-1.5">{fv.field.name} {fv.field.required && <span className="text-red-500">*</span>}</label>
+                      {fv.field.fieldType === 'dropdown' ? (
+                         <select 
+                          required={fv.field.required}
+                          value={dynamicValues[fv.field.id] || ''} 
+                          onChange={(e) => setDynamicValues({...dynamicValues, [fv.field.id]: e.target.value})} 
+                          className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all"
+                        >
+                          <option value="">Select Option</option>
+                          {fv.field.options?.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                      ) : (
+                        <input 
+                          required={fv.field.required}
+                          type={fv.field.fieldType} 
+                          value={dynamicValues[fv.field.id] || ''} 
+                          onChange={(e) => setDynamicValues({...dynamicValues, [fv.field.id]: e.target.value})} 
+                          className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all" 
+                        />
                       )}
                     </div>
-                  )}
-
-                  {/* Dynamic Fields (The actual Form) */}
-                  <div className="grid grid-cols-1 gap-6">
-                    <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center">
-                      <ListPlus className="mr-2 h-4 w-4" /> Form Input Fields
-                    </h3>
-                    {item.fieldValues?.map((fv: any) => (
-                      <div key={fv.field.id}>
-                        <label className="block text-xs font-bold text-gray-500 mb-1">{fv.field.name} {fv.field.required && <span className="text-red-500">*</span>}</label>
-                        {fv.field.fieldType === 'dropdown' ? (
-                           <select 
-                            required={fv.field.required}
-                            value={dynamicValues[fv.field.id] || ''} 
-                            onChange={(e) => setDynamicValues({...dynamicValues, [fv.field.id]: e.target.value})} 
-                            className="w-full rounded-xl border border-gray-200 px-4 py-4 text-sm outline-none focus:ring-4 focus:ring-primary/10"
-                          >
-                            <option value="">Select Option</option>
-                            {fv.field.options?.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
-                          </select>
-                        ) : (
-                          <input 
-                            required={fv.field.required}
-                            type={fv.field.fieldType} 
-                            value={dynamicValues[fv.field.id] || ''} 
-                            onChange={(e) => setDynamicValues({...dynamicValues, [fv.field.id]: e.target.value})} 
-                            className="w-full rounded-xl border border-gray-200 px-4 py-4 text-sm outline-none focus:ring-4 focus:ring-primary/10" 
-                          />
-                        )}
-                      </div>
-                    ))}
-                    {item.fieldValues?.length === 0 && <p className="text-sm text-gray-400 italic">No custom fields defined for this form.</p>}
-                  </div>
+                  ))}
                 </div>
 
-                <div className="flex space-x-4 pt-8">
+                <div className="flex gap-3 pt-6">
                   {isEditing && (
-                    <button type="button" onClick={() => setIsEditing(false)} className="px-6 py-4 text-sm font-bold text-gray-400 hover:text-gray-900 bg-gray-50 rounded-2xl transition-all">Cancel</button>
+                    <button type="button" onClick={() => setIsEditing(false)} className="px-6 py-4 text-sm font-bold text-gray-500 bg-gray-50 rounded-2xl flex-1">Cancel</button>
                   )}
-                  <button type="submit" disabled={isSaving} className="flex-1 px-6 py-4 text-sm font-bold text-white bg-primary hover:bg-primary-dark rounded-2xl shadow-xl shadow-primary/30 transition-all active:scale-95 disabled:opacity-50">
-                    {isSaving ? 'Processing...' : isEditing ? 'Save Changes' : 'Submit & Lock Form'}
+                  <button type="submit" disabled={isSaving} className="flex-[2] px-6 py-4 text-sm font-bold text-white bg-primary rounded-2xl shadow-xl shadow-primary/20 disabled:opacity-50 transition-all active:scale-95">
+                    {isSaving ? 'Saving...' : isEditing ? 'Update Record' : 'Complete Submission'}
                   </button>
                 </div>
               </form>
             ) : (
-              <div className="space-y-12">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-8">
+                <div className="flex items-start justify-between">
                   <div>
-                    <h2 className="text-3xl font-black text-gray-900 tracking-tight">{item.name || 'Form Submission'}</h2>
-                    {item.locked && (
-                      <div className="mt-4 flex items-center bg-red-50 text-red-700 px-4 py-2 rounded-full text-xs font-bold border border-red-100 w-fit">
-                        <Lock className="h-3 w-3 mr-2" /> FORM LOCKED - SUBMISSION COMPLETE
-                      </div>
-                    )}
+                    <h2 className="text-2xl font-black text-gray-900 tracking-tight leading-tight mb-2">{item.name || 'Submitted Item'}</h2>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter ${
+                        item.status === 'Available' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                      }`}>
+                        {item.status}
+                      </span>
+                      {item.locked && (
+                         <span className="inline-flex items-center bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter">
+                            <Lock className="h-3 w-3 mr-1" /> Locked
+                         </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {item.fieldValues?.length > 0 && (
-                  <div className="pt-8 border-t border-gray-100">
-                    <h3 className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] mb-6 flex items-center">
-                      <ListPlus className="mr-2 h-4 w-4" /> Submitted Data
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
-                      {item.fieldValues.map((fv: any) => (
-                        <div key={fv.id}>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">{fv.field.name}</p>
-                          <p className="text-sm font-black text-gray-800">{fv.value || 'N/A'}</p>
-                        </div>
-                      ))}
+                {/* Attributes Grid */}
+                <div className="grid grid-cols-2 gap-6 pt-6 border-t border-gray-50">
+                   {item.fieldValues?.map((fv: any) => (
+                    <div key={fv.id}>
+                      <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">{fv.field.name}</p>
+                      <p className="text-sm font-bold text-gray-700">{fv.value || '—'}</p>
                     </div>
-                  </div>
+                  ))}
+                </div>
+
+                {/* Staff Actions */}
+                {!isGuest && isLoggedIn && (
+                   <div className="pt-8 space-y-3">
+                     <button 
+                        onClick={() => {
+                          setFormData({...formData, status: 'Released'});
+                          setIsPullingOut(true);
+                        }}
+                        className="w-full py-5 bg-orange-600 text-white rounded-3xl font-black uppercase tracking-widest text-xs flex items-center justify-center shadow-xl shadow-orange-900/20 active:scale-95 transition-all"
+                      >
+                        <Truck className="mr-2 h-5 w-5" /> Pull Out Item
+                      </button>
+                      
+                      {canAdmin && (
+                         <button 
+                            onClick={() => setIsEditing(true)}
+                            className="w-full py-4 border-2 border-gray-100 text-gray-400 rounded-3xl font-black uppercase tracking-widest text-[10px] hover:border-primary hover:text-primary transition-all"
+                          >
+                            Edit Record
+                          </button>
+                      )}
+                   </div>
                 )}
 
-                {canEdit && (
-                  <div className="pt-8 border-t border-gray-100">
-                    <button onClick={() => setIsEditing(true)} className="w-full py-5 text-sm font-black text-white bg-primary hover:bg-primary-dark rounded-[2rem] shadow-2xl shadow-primary/30 transition-all uppercase tracking-widest">
-                      Admin Edit
-                    </button>
+                {isGuest && (
+                  <div className="pt-8">
+                     <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100 text-center">
+                        <CheckCircle2 className="h-10 w-10 text-blue-600 mx-auto mb-3" />
+                        <p className="text-sm font-bold text-blue-900 mb-1">Guest Mode Active</p>
+                        <p className="text-xs text-blue-600/70 font-medium leading-relaxed">You are viewing this record in read-only mode. No changes can be made.</p>
+                     </div>
                   </div>
                 )}
               </div>
@@ -280,9 +462,49 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
           </div>
         </div>
 
-        {/* Logs (Only for logged in users) */}
+        {/* Pull Out Modal (Status Update) */}
+        {isPullingOut && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="w-full max-w-sm bg-white rounded-[2.5rem] p-8 shadow-2xl animate-in slide-in-from-bottom duration-300">
+               <div className="h-16 w-16 bg-orange-100 rounded-full flex items-center justify-center mb-6">
+                 <Truck className="h-8 w-8 text-orange-600" />
+               </div>
+               <h2 className="text-2xl font-black text-gray-900 mb-2">Pull Out Item</h2>
+               <p className="text-sm text-gray-500 mb-8 font-medium">Record this asset as released from inventory.</p>
+               
+               <div className="space-y-4 mb-8">
+                 <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">New Status</label>
+                    <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-bold">
+                      <option value="Released">Released</option>
+                      <option value="Used">Used</option>
+                      <option value="Deployed">Deployed</option>
+                    </select>
+                 </div>
+               </div>
+
+               <div className="flex flex-col gap-3">
+                  <button 
+                    onClick={handleUpdate}
+                    disabled={isSaving}
+                    className="w-full py-5 bg-gray-900 text-white rounded-2xl font-bold shadow-xl active:scale-95 disabled:opacity-50"
+                  >
+                    {isSaving ? 'Recording...' : 'Confirm Pull Out'}
+                  </button>
+                  <button 
+                    onClick={() => setIsPullingOut(false)}
+                    className="w-full py-4 text-sm font-bold text-gray-400"
+                  >
+                    Cancel
+                  </button>
+               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Logs */}
         {isLoggedIn && logs.length > 0 && (
-          <div className="bg-white rounded-[2rem] shadow-xl border border-gray-100 overflow-hidden">
+          <div className="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden">
              <button onClick={() => setShowLogs(!showLogs)} className="w-full flex items-center justify-between p-8 hover:bg-gray-50 transition-all">
               <div className="flex items-center text-gray-900">
                 <History className="mr-4 h-6 w-6 text-primary" />
