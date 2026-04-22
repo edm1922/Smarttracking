@@ -8,7 +8,10 @@ export class CustomFieldsService {
   async findAll() {
     return this.prisma.customField.findMany({
       include: { batch: true },
-      orderBy: { createdAt: 'asc' },
+      orderBy: [
+        { orderIndex: 'asc' },
+        { createdAt: 'asc' }
+      ],
     });
   }
 
@@ -20,7 +23,10 @@ export class CustomFieldsService {
           { batchId: null }
         ]
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: [
+        { orderIndex: 'asc' },
+        { createdAt: 'asc' }
+      ],
     });
   }
 
@@ -73,6 +79,18 @@ export class CustomFieldsService {
       where: { id },
       data: updateData,
     });
+  }
+
+  async reorder(data: { id: string; orderIndex: number }[]) {
+    // Perform bulk update in a transaction
+    return this.prisma.$transaction(
+      data.map((item) =>
+        this.prisma.customField.update({
+          where: { id: item.id },
+          data: { orderIndex: item.orderIndex },
+        })
+      )
+    );
   }
 
   async remove(id: string) {

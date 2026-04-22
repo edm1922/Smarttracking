@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Search, Edit2, Trash2, Settings, ListPlus, Eye, X, LayoutGrid } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Settings, ListPlus, Eye, X, LayoutGrid, GripVertical } from 'lucide-react';
 import api from '@/lib/api';
 
 interface CustomField {
@@ -24,6 +24,7 @@ export default function CustomFieldsPage() {
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [previewBatchId, setPreviewBatchId] = useState<string>('GLOBAL');
   const [editingField, setEditingField] = useState<CustomField | null>(null);
+  const [draggedFieldId, setDraggedFieldId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -104,6 +105,40 @@ export default function CustomFieldsPage() {
       fetchFields();
     } catch (err) {
       alert('Failed to delete field');
+    }
+  };
+
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    setDraggedFieldId(id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, id: string) => {
+    e.preventDefault();
+    if (!draggedFieldId || draggedFieldId === id) return;
+
+    const newFields = [...fields];
+    const draggedIndex = newFields.findIndex(f => f.id === draggedFieldId);
+    const targetIndex = newFields.findIndex(f => f.id === id);
+
+    const [draggedItem] = newFields.splice(draggedIndex, 1);
+    newFields.splice(targetIndex, 0, draggedItem);
+
+    setFields(newFields);
+  };
+
+  const handleDragEnd = async () => {
+    setDraggedFieldId(null);
+    
+    const updatePayload = fields.map((f, index) => ({
+      id: f.id,
+      orderIndex: index
+    }));
+
+    try {
+      await api.patch('/custom-fields/reorder', updatePayload);
+    } catch (err) {
+      console.error('Failed to save field order', err);
     }
   };
 
@@ -295,28 +330,40 @@ export default function CustomFieldsPage() {
                   </p>
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-2">
                   {fields.filter(f => !f.batchId || f.batchId === previewBatchId).map(field => (
-                    <div key={field.id}>
-                      <label className="block text-xs font-bold text-gray-500 mb-1 flex items-center">
-                        {field.name} {field.required && <span className="text-red-500 ml-1">*</span>}
-                        {!field.batchId && previewBatchId !== 'GLOBAL' && (
-                          <span className="ml-3 text-[9px] font-black uppercase tracking-widest bg-gray-100 px-2 py-0.5 rounded-full text-gray-400">Global</span>
+                    <div 
+                      key={field.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, field.id)}
+                      onDragOver={(e) => handleDragOver(e, field.id)}
+                      onDragEnd={handleDragEnd}
+                      className={`relative group p-4 -mx-4 rounded-2xl transition-colors cursor-move ${draggedFieldId === field.id ? 'opacity-50 bg-gray-50' : 'hover:bg-gray-50'}`}
+                    >
+                      <div className="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <GripVertical className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <div className="pl-6">
+                        <label className="block text-xs font-bold text-gray-500 mb-1 flex items-center">
+                          {field.name} {field.required && <span className="text-red-500 ml-1">*</span>}
+                          {!field.batchId && previewBatchId !== 'GLOBAL' && (
+                            <span className="ml-3 text-[9px] font-black uppercase tracking-widest bg-gray-100 px-2 py-0.5 rounded-full text-gray-400">Global</span>
+                          )}
+                        </label>
+                        {field.fieldType === 'dropdown' ? (
+                          <select className="w-full rounded-xl border border-gray-200 px-4 py-4 text-sm outline-none bg-white pointer-events-none" disabled>
+                            <option value="">Select Option</option>
+                            {field.options?.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+                          </select>
+                        ) : (
+                          <input
+                            type={field.fieldType}
+                            className="w-full rounded-xl border border-gray-200 px-4 py-4 text-sm outline-none bg-white pointer-events-none"
+                            placeholder={`Enter ${field.name.toLowerCase()}...`}
+                            disabled
+                          />
                         )}
-                      </label>
-                      {field.fieldType === 'dropdown' ? (
-                        <select className="w-full rounded-xl border border-gray-200 px-4 py-4 text-sm outline-none bg-gray-50" disabled>
-                          <option value="">Select Option</option>
-                          {field.options?.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
-                        </select>
-                      ) : (
-                        <input
-                          type={field.fieldType}
-                          className="w-full rounded-xl border border-gray-200 px-4 py-4 text-sm outline-none bg-gray-50"
-                          placeholder={`Enter ${field.name.toLowerCase()}...`}
-                          disabled
-                        />
-                      )}
+                      </div>
                     </div>
                   ))}
 

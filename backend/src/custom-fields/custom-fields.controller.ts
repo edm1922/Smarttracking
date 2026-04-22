@@ -17,6 +17,11 @@ export class CustomFieldsController {
     return this.customFieldsService.create(data);
   }
 
+  @Patch('reorder')
+  reorder(@Body() data: { id: string; orderIndex: number }[]) {
+    return this.customFieldsService.reorder(data);
+  }
+
   @Patch(':id')
   update(@Param('id') id: string, @Body() data: any) {
     return this.customFieldsService.update(id, data);

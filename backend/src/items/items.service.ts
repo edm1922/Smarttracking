@@ -114,7 +114,15 @@ export class ItemsService {
         field: f
       }));
 
-    (item as any).fieldValues = [...item.fieldValues, ...newFieldValues];
+    (item as any).fieldValues = [...item.fieldValues, ...newFieldValues].sort((a, b) => {
+      const aOrder = a.field?.orderIndex || 0;
+      const bOrder = b.field?.orderIndex || 0;
+      if (aOrder === bOrder) {
+         // Fallback to createdAt or id just to ensure stable sort
+         return a.field?.id.localeCompare(b.field?.id) || 0;
+      }
+      return aOrder - bOrder;
+    });
 
     return item;
   }
