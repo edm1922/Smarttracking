@@ -219,7 +219,7 @@ function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: (
           <div className="flex-1 overflow-auto p-8 no-scrollbar">
             <div className="print-area">
               <div className="mb-10 text-center border-b-2 border-gray-900 pb-8">
-                <h1 className="text-3xl font-black uppercase tracking-tighter">Inventory Intelligence Report</h1>
+                <h1 className="text-3xl font-black uppercase tracking-tighter text-gray-900">Inventory Intelligence Report</h1>
                 <p className="text-sm font-bold text-gray-500 mt-2">Generated on {new Date().toLocaleString()}</p>
               </div>
 
@@ -235,7 +235,7 @@ function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: (
                   {formatDataForExcel(previewData, reportType).map((row, idx) => (
                     <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       {Object.values(row).map((val: any, vIdx) => (
-                        <td key={vIdx} className="px-4 py-3 text-xs font-medium border border-gray-100">{val}</td>
+                        <td key={vIdx} className="px-4 py-3 text-xs font-bold border border-gray-100 text-gray-900">{val}</td>
                       ))}
                     </tr>
                   ))}
