@@ -116,6 +116,14 @@ export default function ProductTransmittalPage() {
     setMounted(true);
   }, []);
 
+  const updateSubject = (mode: 'PRODUCT' | 'LOG', filter: 'IN' | 'OUT') => {
+    if (mode === 'PRODUCT') {
+      setHeaderInfo(prev => ({ ...prev, subject: 'Material Transmittal' }));
+    } else {
+      setHeaderInfo(prev => ({ ...prev, subject: filter === 'IN' ? 'Stock IN' : 'Stock OUT' }));
+    }
+  };
+
   if (!mounted) return null;
 
   const addItem = (product: Product) => {
@@ -160,7 +168,7 @@ export default function ProductTransmittalPage() {
   const savePreset = () => {
     const { date, transmittalNo, ...presetData } = headerInfo;
     localStorage.setItem('transmittal_preset', JSON.stringify(presetData));
-    alert('Header Preset Saved!');
+    alert('Header Preset Saved! This will be the default for future transmittals.');
   };
 
   const filteredProducts = products.filter(p =>
@@ -281,8 +289,8 @@ export default function ProductTransmittalPage() {
                   Select Items
                 </h3>
                 <div className="flex bg-gray-100 p-1 rounded-lg">
-                  <button onClick={() => setSelectionMode('PRODUCT')} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${selectionMode === 'PRODUCT' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}>Products</button>
-                  <button onClick={() => setSelectionMode('LOG')} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${selectionMode === 'LOG' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}>Stock History</button>
+                  <button onClick={() => { setSelectionMode('PRODUCT'); updateSubject('PRODUCT', logFilter); }} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${selectionMode === 'PRODUCT' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}>Products</button>
+                  <button onClick={() => { setSelectionMode('LOG'); updateSubject('LOG', logFilter); }} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${selectionMode === 'LOG' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}>Stock History</button>
                 </div>
               </div>
 
@@ -298,7 +306,11 @@ export default function ProductTransmittalPage() {
                   />
                 </div>
                 {selectionMode === 'LOG' && (
-                  <select value={logFilter} onChange={e => setLogFilter(e.target.value as 'IN' | 'OUT')} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-1 bg-white">
+                  <select value={logFilter} onChange={e => { 
+                    const val = e.target.value as 'IN' | 'OUT';
+                    setLogFilter(val);
+                    updateSubject('LOG', val);
+                  }} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-1 bg-white">
                     <option value="OUT">Stock OUT</option>
                     <option value="IN">Stock IN</option>
                   </select>
@@ -374,7 +386,7 @@ export default function ProductTransmittalPage() {
       <div className="hidden print:block bg-white p-12 text-gray-900 min-h-screen">
         <div className="flex justify-between items-start border-b-2 border-gray-900 pb-8 mb-12">
           <div>
-            <h1 className="text-4xl font-black uppercase tracking-tighter text-gray-900 mb-1">Material Transmittal</h1>
+            <h1 className="text-4xl font-black uppercase tracking-tighter text-gray-900 mb-1">{headerInfo.subject || 'Material Transmittal'}</h1>
             <p className="text-sm font-bold text-gray-500">{headerInfo.customSubHeader || headerInfo.subTitle}</p>
           </div>
           <div className="text-right">
