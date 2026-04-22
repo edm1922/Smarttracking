@@ -11,6 +11,7 @@ import { LocationsModule } from './locations/locations.module';
 import { ProductsModule } from './products/products.module';
 import { PurchaseRequestsModule } from './purchase-requests/purchase-requests.module';
 import { InternalRequestsModule } from './internal-requests/internal-requests.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { InternalRequestsModule } from './internal-requests/internal-requests.mo
     ProductsModule,
     PurchaseRequestsModule,
     InternalRequestsModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

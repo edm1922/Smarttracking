@@ -57,6 +57,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'QR Logs', href: '/dashboard/logs', icon: ClipboardList },
     { name: 'Custom Fields', href: '/dashboard/custom-fields', icon: Package },
     { name: 'Print Labels', href: '/dashboard/print', icon: Printer },
+    { name: 'Accounts', href: '/dashboard/users', icon: User, adminOnly: true },
   ];
 
   /* const settingsItems = [
@@ -118,7 +119,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div>
             <p className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">QR Form System</p>
             <div className="space-y-1">
-              {qrSystemItems.map((item) => {
+              {qrSystemItems.map((item: any) => {
+                if (item.adminOnly && role !== 'admin') return null;
                 const Icon = item.icon;
                 const isActive = pathname === item.href;
                 return (
