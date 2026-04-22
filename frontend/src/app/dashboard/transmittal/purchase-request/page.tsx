@@ -27,6 +27,8 @@ export default function PRTransmittalPage() {
       position: '',
       sourceSupplier: '',
       subTitle: 'Purchase Requisition & Procurement Request',
+      customSubHeader: '',
+      movementType: 'NONE',
       preparedBy: '',
       checkedBy: '',
       receivedBy: '',
