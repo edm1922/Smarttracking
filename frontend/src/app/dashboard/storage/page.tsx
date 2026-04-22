@@ -154,9 +154,20 @@ export default function StoragePage() {
         </div>
         <style jsx global>{`
           @media print {
-            body * { visibility: hidden; }
+            body * { visibility: hidden; height: auto !important; }
             .print-area, .print-area * { visibility: visible; }
-            .print-area { position: relative; width: 100%; top: 0; left: 0; }
+            .print-area { 
+              position: absolute; 
+              left: 0; 
+              top: 0; 
+              width: 100%; 
+              height: auto !important;
+              overflow: visible !important;
+            }
+            /* Hide UI elements during print */
+            .fixed, .bg-black\/60 { background: none !important; position: static !important; }
+            .w-full.max-w-6xl { width: 100% !important; max-width: none !important; height: auto !important; position: static !important; box-shadow: none !important; }
+            .flex-1.overflow-auto { overflow: visible !important; height: auto !important; }
           }
         `}</style>
       </div>
