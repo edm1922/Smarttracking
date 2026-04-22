@@ -154,17 +154,16 @@ export default function StoragePage() {
         </div>
         <style jsx global>{`
           @media print {
-            body { visibility: hidden; bg: white; }
+            body { visibility: hidden; }
             .print-area, .print-area * { visibility: visible !important; }
             .print-area { 
-              position: absolute !important; 
-              left: 0 !important; 
-              top: 0 !important; 
+              position: relative !important; 
               width: 100% !important; 
               margin: 0 !important;
               padding: 0 !important;
+              display: block !important;
             }
-            /* Ensure parents don't clip or hide the print area */
+            /* Reset modal styling for print */
             .fixed, .w-full, .flex-1, .overflow-auto { 
               visibility: visible !important; 
               overflow: visible !important; 
