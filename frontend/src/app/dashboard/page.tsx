@@ -10,14 +10,12 @@ import {
   ChevronRight, ArrowUpRight, ArrowDownRight, Package, ClipboardList, ShoppingCart
 } from 'lucide-react';
 import api from '@/lib/api';
-import * as XLSX from 'xlsx';
-import { Printer, Download, X as CloseIcon, FileSpreadsheet, Eye } from 'lucide-react';
+import { Printer, Eye, X as CloseIcon } from 'lucide-react';
 
 const COLORS = ['#6366f1', '#f43f5e', '#10b981', '#f59e0b', '#8b5cf6'];
 
 function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: () => void, section: 'product' | 'employee' }) {
   const [reportType, setReportType] = useState('');
-  const [format, setFormat] = useState<'excel' | 'html'>('html');
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -25,7 +23,6 @@ function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: (
   const productReports = [
     { id: 'stock-summary', name: 'Stock Summary' },
     { id: 'need-restock', name: 'Need Restock' },
-    { id: 'uniform-stocks', name: 'Professional Stocks Report (ExcelJS)' },
     { id: 'inventory-distribution', name: 'Inventory Distribution (by Location)' },
     { id: 'custom-item-report', name: 'Custom Item Report' },
   ];
@@ -43,80 +40,9 @@ function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: (
     if (!reportType) return alert('Please select a report type');
     setLoading(true);
     try {
-      if (reportType === 'uniform-stocks') {
-        const headerConfig = {
-          company_name: "CENTRO SERVICES COOPERATIVE",
-          logo_url: "https://raw.githubusercontent.com/lucide-react/lucide/main/icons/package.png", // Fallback placeholder
-          address: "Purok Camachille, Brgy. Tambler, General Santos City",
-          contact: "centrocooperative21@gmail.com | (083) 554 5552",
-          report_title: "UNIFORM STOCKS REPORT",
-          metadata: [
-            { label: "Period Covered", value: "January 01 - April 11, 2026" },
-            { label: "Runtime", value: "Auto-generated timestamp" }
-          ]
-        };
-
-        const res = await api.post('/reports/uniform-stocks/export', {
-          header_config: headerConfig,
-          filters: { location: section === 'product' ? (window as any).selectedLocation : 'all' }
-        }, { responseType: 'blob' });
-
-        const url = window.URL.createObjectURL(new Blob([res.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `Uniform_Stocks_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
-        document.body.appendChild(link);
-        link.click();
-        onClose();
-        return;
-      }
-
       const res = await api.get(`/reports/report-data?type=${reportType}`);
-      const data = res.data;
-
-      if (format === 'excel') {
-        const reportTitle = reportType.replace(/-/g, ' ').toUpperCase();
-        const formattedData = formatDataForExcel(data, reportType);
-        
-        // Build Excel with Corporate Header (matching sample.xlsx)
-        const header = [
-          ['CENTRO SERVICES COOPERATIVE'],
-          [' Purok Camachille, Brgy. Tambler, General Santos City'],
-          [' centrocooperative21@gmail.com | (083) 554 5552'],
-          [],
-          [reportTitle],
-          [],
-          ['Period Covered:', '', `Generated on ${new Date().toLocaleDateString()}`],
-          ['Runtime:', '', new Date().toLocaleString()],
-          []
-        ];
-
-        // Get column headers from the first row of formatted data
-        const columns = Object.keys(formattedData[0] || {});
-        header.push(columns);
-
-        // Map data values
-        const rows = formattedData.map(item => Object.values(item));
-        const fullSheetData = [...header, ...rows];
-
-        const worksheet = XLSX.utils.aoa_to_sheet(fullSheetData);
-        
-        // Basic merge for company name and title
-        worksheet['!merges'] = [
-          { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }, // Company Name
-          { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } }, // Address
-          { s: { r: 2, c: 0 }, e: { r: 2, c: 5 } }, // Contact
-          { s: { r: 4, c: 0 }, e: { r: 4, c: 5 } }, // Title
-        ];
-
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Report");
-        XLSX.writeFile(workbook, `${reportType}_${new Date().toISOString().split('T')[0]}.xlsx`);
-        onClose();
-      } else {
-        setPreviewData(data);
-        setIsPreviewOpen(true);
-      }
+      setPreviewData(res.data);
+      setIsPreviewOpen(true);
     } catch (err) {
       alert('Failed to generate report');
     } finally {
@@ -124,7 +50,7 @@ function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: (
     }
   };
 
-  const formatDataForExcel = (data: any[], type: string) => {
+  const formatDataForPreview = (data: any[], type: string) => {
     switch (type) {
       case 'stock-summary':
         return data.map(p => ({
@@ -217,30 +143,6 @@ function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: (
                 ))}
               </div>
             </div>
-
-            <div className="space-y-4">
-              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Export Format</label>
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setFormat('html')}
-                  className={`flex-1 flex items-center justify-center gap-3 px-6 py-4 rounded-2xl border-2 transition-all ${
-                    format === 'html' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 hover:border-gray-200 text-gray-600'
-                  }`}
-                >
-                  <Eye className="h-5 w-5" />
-                  <span className="text-sm font-bold">HTML Preview</span>
-                </button>
-                <button
-                  onClick={() => setFormat('excel')}
-                  className={`flex-1 flex items-center justify-center gap-3 px-6 py-4 rounded-2xl border-2 transition-all ${
-                    format === 'excel' ? 'border-green-500 bg-green-50 text-green-600' : 'border-gray-100 hover:border-gray-200 text-gray-600'
-                  }`}
-                >
-                  <FileSpreadsheet className="h-5 w-5" />
-                  <span className="text-sm font-bold">Excel Sheet</span>
-                </button>
-              </div>
-            </div>
           </div>
 
           <div className="px-8 py-6 bg-gray-50 border-t border-gray-100 flex justify-end">
@@ -251,8 +153,8 @@ function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: (
             >
               {loading ? 'Processing...' : (
                 <>
-                  <Download className="h-4 w-4" />
-                  Generate Report
+                  <Eye className="h-4 w-4" />
+                  View Report
                 </>
               )}
             </button>
@@ -288,13 +190,13 @@ function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: (
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="bg-gray-900 text-white">
-                    {Object.keys(formatDataForExcel(previewData, reportType)[0] || {}).map(key => (
+                    {Object.keys(formatDataForPreview(previewData, reportType)[0] || {}).map(key => (
                       <th key={key} className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest border border-gray-800">{key}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {formatDataForExcel(previewData, reportType).map((row, idx) => (
+                  {formatDataForPreview(previewData, reportType).map((row, idx) => (
                     <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       {Object.values(row).map((val: any, vIdx) => (
                         <td key={vIdx} className="px-4 py-3 text-xs font-bold border border-gray-100 text-gray-900">{val}</td>

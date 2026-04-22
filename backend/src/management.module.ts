@@ -4,7 +4,6 @@ import { TagsService } from './tags/tags.service';
 import { BatchesService } from './batches/batches.service';
 import { WorkflowService } from './workflow/workflow.service';
 import { ReportsService } from './reports/reports.service';
-import { ExcelGeneratorService } from './reports/excel-generator.service';
 import {
   CategoriesController,
   TagsController,
@@ -29,7 +28,7 @@ import { PrismaModule } from './prisma/prisma.module';
     BatchesService,
     WorkflowService,
     ReportsService,
-    ExcelGeneratorService,
+
   ],
   exports: [
     CategoriesService,
@@ -37,7 +36,7 @@ import { PrismaModule } from './prisma/prisma.module';
     BatchesService,
     WorkflowService,
     ReportsService,
-    ExcelGeneratorService,
+
   ],
 })
 export class ManagementModule {}
