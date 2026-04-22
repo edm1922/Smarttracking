@@ -303,8 +303,8 @@ export default function DashboardPage() {
               onClick={() => { setActiveSection('product'); setIsReportModalOpen(true); }}
               className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase shadow-sm hover:bg-gray-800 transition-all"
             >
-              <FileSpreadsheet className="h-3.5 w-3.5" />
-              Export Reports
+              <Eye className="h-3.5 w-3.5" />
+              View Reports
             </button>
             <div className="flex items-center space-x-2 bg-white border border-gray-200 px-3 py-1.5 rounded-xl shadow-sm hover:border-primary/50 transition-colors">
               <MapPin className="h-3.5 w-3.5 text-primary" />
@@ -456,8 +456,8 @@ export default function DashboardPage() {
               onClick={() => { setActiveSection('employee'); setIsReportModalOpen(true); }}
               className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase shadow-sm hover:bg-purple-700 transition-all"
             >
-              <FileSpreadsheet className="h-3.5 w-3.5" />
-              Export Reports
+              <Eye className="h-3.5 w-3.5" />
+              View Reports
             </button>
             <button className="flex items-center space-x-2 bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm hover:border-primary/30 transition-all text-[10px] font-black text-gray-600 uppercase">
               <Calendar className="h-3.5 w-3.5 text-gray-400" />
