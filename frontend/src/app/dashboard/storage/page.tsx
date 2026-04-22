@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { 
-  Database, Folder, ChevronRight, Search, Download, 
-  Filter, Calendar, ArrowLeft, FileSpreadsheet, ListFilter,
+  Database, Folder, ChevronRight, Search, 
+  Filter, Calendar, ArrowLeft, ListFilter,
   Eye, QrCode, Clock
 } from 'lucide-react';
 import api from '@/lib/api';
@@ -113,12 +113,6 @@ export default function StoragePage() {
               </h1>
               <p className="text-sm text-gray-500 font-medium">Viewing all form submissions in this template</p>
             </div>
-          </div>
-          <div className="flex space-x-3">
-            <button className="inline-flex items-center rounded-xl bg-green-50 px-4 py-2 text-sm font-bold text-green-700 border border-green-100 hover:bg-green-100 transition-all">
-              <FileSpreadsheet className="mr-2 h-4 w-4" />
-              Export CSV
-            </button>
           </div>
         </div>
 
