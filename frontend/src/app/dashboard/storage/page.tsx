@@ -154,20 +154,40 @@ export default function StoragePage() {
         </div>
         <style jsx global>{`
           @media print {
-            body * { visibility: hidden; height: auto !important; }
-            .print-area, .print-area * { visibility: visible; }
-            .print-area { 
-              position: relative !important; 
+            /* Hide everything by default */
+            body > * { display: none !important; }
+            /* Show only the modal and its contents */
+            body > div[class*="fixed"], 
+            body > div[class*="fixed"] * { display: block !important; visibility: visible !important; }
+            
+            /* Specific overrides for the modal container */
+            div[class*="fixed"] { 
+              position: absolute !important; 
+              top: 0 !important; 
+              left: 0 !important; 
               width: 100% !important; 
               height: auto !important;
-              overflow: visible !important;
+              background: white !important;
               display: block !important;
             }
-            /* Reset modal styling for print */
-            .fixed { position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: auto !important; background: white !important; }
-            .w-full.max-w-6xl { width: 100% !important; max-width: none !important; height: auto !important; box-shadow: none !important; border: none !important; }
-            .flex-1.overflow-auto { overflow: visible !important; height: auto !important; display: block !important; }
-            .sticky { position: relative !important; }
+            
+            /* Ensure the table stays as a table */
+            table { display: table !important; width: 100% !important; border-collapse: collapse !important; }
+            thead { display: table-header-group !important; }
+            tr { display: table-row !important; }
+            th, td { display: table-cell !important; }
+
+            /* Hide buttons and UI elements */
+            button, .CloseIcon, svg { display: none !important; }
+            
+            /* Remove scrollbars and fixed heights */
+            .overflow-auto, .h-\[90vh\] { 
+              overflow: visible !important; 
+              height: auto !important; 
+              max-height: none !important;
+            }
+            
+            .print-area { width: 100% !important; }
           }
         `}</style>
       </div>
