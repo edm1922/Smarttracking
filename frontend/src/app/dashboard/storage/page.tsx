@@ -99,7 +99,7 @@ export default function StoragePage() {
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
         <div className="w-full max-w-6xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col h-[90vh] animate-in slide-in-from-bottom-10 duration-500">
-          <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
+          <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10 no-print">
             <div>
               <h2 className="text-xl font-black text-gray-900 tracking-tight">Batch Report Preview</h2>
               <p className="text-[10px] font-black text-primary uppercase tracking-widest mt-1">{selectedBatch.batchCode}</p>
@@ -107,11 +107,11 @@ export default function StoragePage() {
             <div className="flex items-center gap-4">
               <button 
                 onClick={() => window.print()}
-                className="flex items-center gap-2 bg-gray-900 text-white px-6 py-2.5 rounded-xl font-bold text-xs hover:bg-gray-800 transition-all"
+                className="flex items-center gap-2 bg-gray-900 text-white px-6 py-2.5 rounded-xl font-bold text-xs hover:bg-gray-800 transition-all no-print"
               >
                 <Printer className="h-4 w-4" /> Print PDF
               </button>
-              <button onClick={() => setIsPreviewOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+              <button onClick={() => setIsPreviewOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors no-print">
                 <X className="h-5 w-5 text-gray-500" />
               </button>
             </div>
@@ -154,40 +154,28 @@ export default function StoragePage() {
         </div>
         <style jsx global>{`
           @media print {
-            /* Hide everything by default */
-            body > * { display: none !important; }
-            /* Show only the modal and its contents */
-            body > div[class*="fixed"], 
-            body > div[class*="fixed"] * { display: block !important; visibility: visible !important; }
-            
-            /* Specific overrides for the modal container */
-            div[class*="fixed"] { 
+            body { visibility: hidden; bg: white; }
+            .print-area, .print-area * { visibility: visible !important; }
+            .print-area { 
               position: absolute !important; 
-              top: 0 !important; 
               left: 0 !important; 
+              top: 0 !important; 
               width: 100% !important; 
-              height: auto !important;
-              background: white !important;
-              display: block !important;
+              margin: 0 !important;
+              padding: 0 !important;
             }
-            
-            /* Ensure the table stays as a table */
-            table { display: table !important; width: 100% !important; border-collapse: collapse !important; }
-            thead { display: table-header-group !important; }
-            tr { display: table-row !important; }
-            th, td { display: table-cell !important; }
-
-            /* Hide buttons and UI elements */
-            button, .CloseIcon, svg { display: none !important; }
-            
-            /* Remove scrollbars and fixed heights */
-            .overflow-auto, .h-\[90vh\] { 
+            /* Ensure parents don't clip or hide the print area */
+            .fixed, .w-full, .flex-1, .overflow-auto { 
+              visibility: visible !important; 
               overflow: visible !important; 
               height: auto !important; 
               max-height: none !important;
+              position: static !important;
+              background: none !important;
+              box-shadow: none !important;
+              border: none !important;
             }
-            
-            .print-area { width: 100% !important; }
+            .no-print { display: none !important; }
           }
         `}</style>
       </div>
