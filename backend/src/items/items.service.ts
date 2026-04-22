@@ -154,10 +154,12 @@ export class ItemsService {
         ...finalData,
         fieldValues: fieldValues ? {
           deleteMany: {},
-          create: fieldValues.map((fv: any) => ({
-            fieldId: fv.fieldId,
-            value: fv.value,
-          })),
+          create: fieldValues
+            .filter((fv: any) => fv.value !== null && fv.value !== undefined && fv.value !== '')
+            .map((fv: any) => ({
+              fieldId: fv.fieldId,
+              value: fv.value,
+            })),
         } : undefined,
         tags: tagIds ? {
           deleteMany: {},
@@ -191,10 +193,12 @@ export class ItemsService {
         locked: true, // Automatically lock upon submission
         fieldValues: fieldValues ? {
           deleteMany: {},
-          create: fieldValues.map((fv: any) => ({
-            fieldId: fv.fieldId,
-            value: fv.value,
-          })),
+          create: fieldValues
+            .filter((fv: any) => fv.value !== null && fv.value !== undefined && fv.value !== '')
+            .map((fv: any) => ({
+              fieldId: fv.fieldId,
+              value: fv.value,
+            })),
         } : undefined,
       },
       include: { fieldValues: true },

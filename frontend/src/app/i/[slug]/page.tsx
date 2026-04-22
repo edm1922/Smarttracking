@@ -149,9 +149,27 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
               <p className="text-sm font-bold opacity-80 mt-1">{item.name || 'Untitled Form'}</p>
             </div>
             <div className="absolute top-6 right-6">
-              <div className={`p-3 rounded-2xl shadow-lg backdrop-blur bg-white/90 ${item.locked ? 'text-red-600' : 'text-green-600'}`}>
+              <button 
+                onClick={async () => {
+                   if (!canEdit) return;
+                   if (userRole !== 'admin') {
+                     alert('Only admins can toggle lock status.');
+                     return;
+                   }
+                   if (confirm(`Are you sure you want to ${item.locked ? 'unlock' : 'lock'} this item?`)) {
+                     try {
+                       await api.patch(`/items/${slug}/lock`);
+                       await fetchData();
+                     } catch(err) {
+                       alert('Failed to toggle lock');
+                     }
+                   }
+                }}
+                className={`p-3 rounded-2xl shadow-lg backdrop-blur bg-white/90 transition-all ${item.locked ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'} ${canEdit && userRole === 'admin' ? 'cursor-pointer hover:scale-105' : 'cursor-default'}`}
+                disabled={!(canEdit && userRole === 'admin')}
+              >
                 {item.locked ? <Lock className="h-6 w-6" /> : <Unlock className="h-6 w-6" />}
-              </div>
+              </button>
             </div>
           </div>
 
