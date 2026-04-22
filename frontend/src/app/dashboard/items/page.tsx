@@ -124,10 +124,18 @@ export default function QRItemsPage() {
     }
   };
 
-  const filteredItems = items.filter(item => 
-    item.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (item.name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
-  );
+  const [filterStatus, setFilterStatus] = useState('all');
+
+  const filteredItems = items.filter(item => {
+    const matchesSearch = item.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.name?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+    
+    const matchesFilter = filterStatus === 'all' || 
+      (filterStatus === 'released' && item.status === 'Released') ||
+      (filterStatus === 'available' && item.status !== 'Released');
+
+    return matchesSearch && matchesFilter;
+  });
 
   return (
     <div className="space-y-8">
@@ -145,17 +153,28 @@ export default function QRItemsPage() {
         </button>
       </div>
 
-      <div className="relative">
-        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-          <Search className="h-5 w-5 text-gray-400" />
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+            <Search className="h-5 w-5 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search QR codes..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="block w-full rounded-md border border-gray-300 bg-white py-3 pl-10 pr-3 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary"
+          />
         </div>
-        <input
-          type="text"
-          placeholder="Search QR codes..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="block w-full rounded-md border border-gray-300 bg-white py-3 pl-10 pr-3 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary"
-        />
+        <select 
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="px-4 py-3 rounded-md border border-gray-300 bg-white text-sm font-bold text-gray-700 outline-none focus:ring-1 focus:ring-primary min-w-[160px]"
+        >
+          <option value="all">All Items</option>
+          <option value="available">In Stock</option>
+          <option value="released">Released Items</option>
+        </select>
       </div>
 
       <div className="table-container bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -163,6 +182,7 @@ export default function QRItemsPage() {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">QR Code / Slug</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Inventory Status</th>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Form Status</th>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Generated</th>
               <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
@@ -170,12 +190,12 @@ export default function QRItemsPage() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {loading ? (
-              <tr><td colSpan={4} className="px-6 py-10 text-center text-sm text-gray-500">Syncing with system...</td></tr>
+              <tr><td colSpan={5} className="px-6 py-10 text-center text-sm text-gray-500">Syncing with system...</td></tr>
             ) : filteredItems.length === 0 ? (
-              <tr><td colSpan={4} className="px-6 py-10 text-center text-sm text-gray-500">No QR codes found.</td></tr>
+              <tr><td colSpan={5} className="px-6 py-10 text-center text-sm text-gray-500">No QR codes found.</td></tr>
             ) : (
               filteredItems.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={item.id} className={`hover:bg-gray-50 transition-colors ${item.status === 'Released' ? 'bg-purple-50/30' : ''}`}>
                   <td className="px-6 py-4">
                     <div className="flex items-center">
                       <QrCode className="h-5 w-5 text-primary mr-3" />
@@ -186,11 +206,21 @@ export default function QRItemsPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${
+                      item.status === 'Released' 
+                        ? 'bg-purple-600 text-white shadow-sm' 
+                        : 'bg-green-100 text-green-700 border border-green-200'
+                    }`}>
+                      {item.status === 'Released' && <Truck className="h-3 w-3 mr-1" />}
+                      {item.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${
                       item.locked ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
                     }`}>
                       {item.locked ? <Lock className="h-3 w-3 mr-1" /> : <Unlock className="h-3 w-3 mr-1" />}
-                      {item.locked ? 'Locked (Submitted)' : 'Active (Editable)'}
+                      {item.locked ? 'Locked' : 'Active'}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500">

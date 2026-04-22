@@ -316,6 +316,13 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       </div>
 
       <div className="max-w-3xl mx-auto space-y-6">
+        {item.status === 'Released' && (
+          <div className="bg-purple-600 text-white p-4 rounded-3xl shadow-xl flex items-center justify-center space-x-3 animate-pulse">
+            <Truck className="h-6 w-6" />
+            <span className="text-sm font-black uppercase tracking-[0.2em]">ITEM RELEASED FROM INVENTORY</span>
+          </div>
+        )}
+
         <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-gray-100">
           {/* Hero Section */}
           <div className="relative h-64 group">
@@ -417,13 +424,16 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                   <div>
                     <h2 className="text-2xl font-black text-gray-900 tracking-tight leading-tight mb-2">{item.name || 'Submitted Item'}</h2>
                     <div className="flex items-center gap-2">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter ${
-                        item.status === 'Available' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${
+                        item.status === 'Released' 
+                          ? 'bg-purple-600 text-white' 
+                          : item.status === 'Available' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
                       }`}>
+                        {item.status === 'Released' && <Truck className="h-3 w-3 mr-1" />}
                         {item.status}
                       </span>
                       {item.locked && (
-                         <span className="inline-flex items-center bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter">
+                         <span className="inline-flex items-center bg-gray-100 text-gray-500 px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">
                             <Lock className="h-3 w-3 mr-1" /> Locked
                          </span>
                       )}
