@@ -1,9 +1,21 @@
-import { Controller, Get, Post, Body, Patch, Param, UseGuards, Req, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  UseGuards,
+  Req,
+  Delete,
+} from '@nestjs/common';
 import { InternalRequestsService } from './internal-requests.service';
 
 @Controller('internal-requests')
 export class InternalRequestsController {
-  constructor(private readonly internalRequestsService: InternalRequestsService) {}
+  constructor(
+    private readonly internalRequestsService: InternalRequestsService,
+  ) {}
 
   @Post()
   create(@Body() createRequestDto: any) {
@@ -25,14 +37,32 @@ export class InternalRequestsController {
     @Param('id') id: string,
     @Body() body: { status: string; remarks?: string; userId?: string },
   ) {
-    const userId = body.userId || 'admin-system'; 
-    return this.internalRequestsService.updateStatus(id, body.status, userId, body.remarks);
+    const userId = body.userId || 'admin-system';
+    return this.internalRequestsService.updateStatus(
+      id,
+      body.status,
+      userId,
+      body.remarks,
+    );
   }
 
   @Post('bulk-status')
-  bulkUpdateStatus(@Body() body: { ids: string[]; status: string; remarks?: string; userId?: string }) {
+  bulkUpdateStatus(
+    @Body()
+    body: {
+      ids: string[];
+      status: string;
+      remarks?: string;
+      userId?: string;
+    },
+  ) {
     const userId = body.userId || 'admin-system';
-    return this.internalRequestsService.bulkUpdateStatus(body.ids, body.status, userId, body.remarks);
+    return this.internalRequestsService.bulkUpdateStatus(
+      body.ids,
+      body.status,
+      userId,
+      body.remarks,
+    );
   }
 
   @Delete(':id')

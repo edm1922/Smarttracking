@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -58,20 +62,26 @@ export class InternalRequestsService {
     // This avoids firing N separate count queries, which crashes the DB connection pool
     const allFulfilled = await this.prisma.internalRequest.findMany({
       where: { status: 'FULFILLED' },
-      select: { employeeName: true, productId: true, createdAt: true }
+      select: { employeeName: true, productId: true, createdAt: true },
     });
 
-    return requests.map(req => {
-      const prevCount = allFulfilled.filter(f => 
-        f.employeeName === req.employeeName && 
-        f.productId === req.productId && 
-        f.createdAt < req.createdAt
+    return requests.map((req) => {
+      const prevCount = allFulfilled.filter(
+        (f) =>
+          f.employeeName === req.employeeName &&
+          f.productId === req.productId &&
+          f.createdAt < req.createdAt,
       ).length;
       return { ...req, previousIssuancesCount: prevCount };
     });
   }
 
-  async updateStatus(id: string, status: string, userId: string, remarks?: string) {
+  async updateStatus(
+    id: string,
+    status: string,
+    userId: string,
+    remarks?: string,
+  ) {
     const request = await this.prisma.internalRequest.findUnique({
       where: { id },
       include: { product: true, location: true },
@@ -92,7 +102,9 @@ export class InternalRequestsService {
       });
 
       if (!stock || stock.quantity < request.quantity) {
-        throw new BadRequestException('Insufficient stock in the selected location');
+        throw new BadRequestException(
+          'Insufficient stock in the selected location',
+        );
       }
 
       // 2. Perform transaction in a prisma transaction
@@ -163,7 +175,12 @@ export class InternalRequestsService {
     });
   }
 
-  async bulkUpdateStatus(ids: string[], status: string, userId: string, remarks?: string) {
+  async bulkUpdateStatus(
+    ids: string[],
+    status: string,
+    userId: string,
+    remarks?: string,
+  ) {
     if (status === 'FULFILLED') {
       // Bulk fulfillment requires individual stock checks and transaction logging
       return this.prisma.$transaction(async (tx) => {
@@ -184,12 +201,14 @@ export class InternalRequestsService {
   }
 
   async remove(id: string) {
-    const request = await this.prisma.internalRequest.findUnique({ where: { id } });
+    const request = await this.prisma.internalRequest.findUnique({
+      where: { id },
+    });
     if (!request) throw new NotFoundException('Request not found');
 
     // If it was fulfilled, revert stock first
     if (request.status === 'FULFILLED') {
-      await this.updateStatus(id, 'PENDING', 'system-delete'); 
+      await this.updateStatus(id, 'PENDING', 'system-delete');
     }
 
     return this.prisma.internalRequest.delete({ where: { id } });

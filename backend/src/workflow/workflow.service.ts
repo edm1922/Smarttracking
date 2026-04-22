@@ -33,6 +33,6 @@ export class WorkflowService {
       where: { fromStatusId: currentStatusId },
       include: { toStatus: true },
     });
-    return transitions.map(t => t.toStatus);
+    return transitions.map((t) => t.toStatus);
   }
 }

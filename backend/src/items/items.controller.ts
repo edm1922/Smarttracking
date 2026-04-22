@@ -1,4 +1,17 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, UseInterceptors, UploadedFile, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Request,
+  UseInterceptors,
+  UploadedFile,
+  Query,
+} from '@nestjs/common';
 import { ItemsService } from './items.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -43,7 +56,11 @@ export class ItemsController {
   @UseGuards(AuthGuard)
   @Post(':slug/image')
   @UseInterceptors(FileInterceptor('image'))
-  uploadImage(@Param('slug') slug: string, @UploadedFile() file: any, @Request() req: any) {
+  uploadImage(
+    @Param('slug') slug: string,
+    @UploadedFile() file: any,
+    @Request() req: any,
+  ) {
     return this.itemsService.uploadImage(slug, file, req.user.sub);
   }
 

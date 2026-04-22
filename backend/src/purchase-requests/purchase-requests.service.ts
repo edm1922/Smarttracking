@@ -7,7 +7,7 @@ export class PurchaseRequestsService {
 
   findAll() {
     return this.prisma.purchaseRequest.findMany({
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -38,8 +38,8 @@ export class PurchaseRequestsService {
     });
 
     const prNumbers = allPrs
-      .map(p => parseInt(p.prNo.replace(/\D/g, ''))) // Extract numbers only
-      .filter(n => !isNaN(n));
+      .map((p) => parseInt(p.prNo.replace(/\D/g, ''))) // Extract numbers only
+      .filter((n) => !isNaN(n));
 
     const maxPr = prNumbers.length > 0 ? Math.max(...prNumbers) : 0;
     const nextNo = (maxPr + 1).toString().padStart(6, '0');
@@ -49,26 +49,26 @@ export class PurchaseRequestsService {
   async create(data: any) {
     // Ensure we use the server-calculated PR number if it's not provided or to enforce consistency
     const autoPrNo = await this.getNextPrNo(data.date);
-    
+
     return this.prisma.purchaseRequest.create({
       data: {
         ...data,
         prNo: autoPrNo, // Enforce the auto-generated number
         date: data.date ? new Date(data.date) : new Date(),
-      }
+      },
     });
   }
 
   update(id: string, data: any) {
     return this.prisma.purchaseRequest.update({
       where: { id },
-      data
+      data,
     });
   }
 
   remove(id: string) {
     return this.prisma.purchaseRequest.delete({
-      where: { id }
+      where: { id },
     });
   }
 }

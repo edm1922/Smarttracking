@@ -9,16 +9,16 @@ export class ProductsService {
     return this.prisma.product.findMany({
       include: {
         stocks: {
-          include: { location: true }
-        }
+          include: { location: true },
+        },
       },
-      orderBy: { name: 'asc' }
+      orderBy: { name: 'asc' },
     });
   }
 
-  async create(data: { 
-    sku: string; 
-    name: string; 
+  async create(data: {
+    sku: string;
+    name: string;
     description?: string;
     unit?: string;
     price?: number;
@@ -33,12 +33,12 @@ export class ProductsService {
     const { initialLocationId, userId, initialStock: _, ...productData } = data;
 
     return this.prisma.$transaction(async (tx) => {
-      const product = await tx.product.create({ 
+      const product = await tx.product.create({
         data: {
           ...productData,
           price,
           threshold,
-        } 
+        },
       });
 
       if (initialStock > 0 && initialLocationId && userId) {
@@ -46,8 +46,8 @@ export class ProductsService {
           data: {
             productId: product.id,
             locationId: initialLocationId,
-            quantity: initialStock
-          }
+            quantity: initialStock,
+          },
         });
 
         await tx.productTransaction.create({
@@ -57,8 +57,8 @@ export class ProductsService {
             userId,
             type: 'IN',
             quantity: initialStock,
-            remarks: 'Initial Actual Stock'
-          }
+            remarks: 'Initial Actual Stock',
+          },
         });
       }
 
@@ -66,27 +66,39 @@ export class ProductsService {
     });
   }
 
-  async processStock(productId: string, locationId: string, userId: string, type: 'IN' | 'OUT', quantity: number, remarks?: string) {
-    if (quantity <= 0) throw new BadRequestException('Quantity must be greater than zero');
+  async processStock(
+    productId: string,
+    locationId: string,
+    userId: string,
+    type: 'IN' | 'OUT',
+    quantity: number,
+    remarks?: string,
+  ) {
+    if (quantity <= 0)
+      throw new BadRequestException('Quantity must be greater than zero');
 
     return this.prisma.$transaction(async (tx) => {
       // 1. Update or Create ProductStock
       const existingStock = await tx.productStock.findUnique({
-        where: { productId_locationId: { productId, locationId } }
+        where: { productId_locationId: { productId, locationId } },
       });
 
-      if (type === 'OUT' && (!existingStock || existingStock.quantity < quantity)) {
+      if (
+        type === 'OUT' &&
+        (!existingStock || existingStock.quantity < quantity)
+      ) {
         throw new BadRequestException('Insufficient stock at this location');
       }
 
-      const newQuantity = type === 'IN' 
-        ? (existingStock?.quantity || 0) + quantity 
-        : (existingStock?.quantity || 0) - quantity;
+      const newQuantity =
+        type === 'IN'
+          ? (existingStock?.quantity || 0) + quantity
+          : (existingStock?.quantity || 0) - quantity;
 
       await tx.productStock.upsert({
         where: { productId_locationId: { productId, locationId } },
         create: { productId, locationId, quantity: newQuantity },
-        update: { quantity: newQuantity }
+        update: { quantity: newQuantity },
       });
 
       // 2. Create Transaction Log
@@ -97,9 +109,9 @@ export class ProductsService {
           userId,
           type,
           quantity,
-          remarks
+          remarks,
         },
-        include: { product: true, location: true }
+        include: { product: true, location: true },
       });
     });
   }
@@ -117,18 +129,30 @@ export class ProductsService {
       for (const item of data.items) {
         // 1. Check stock
         const existingStock = await tx.productStock.findUnique({
-          where: { productId_locationId: { productId: item.productId, locationId: data.sourceLocationId } }
+          where: {
+            productId_locationId: {
+              productId: item.productId,
+              locationId: data.sourceLocationId,
+            },
+          },
         });
 
         if (!existingStock || existingStock.quantity < item.quantity) {
-          throw new BadRequestException(`Insufficient stock for item ${item.productId}`);
+          throw new BadRequestException(
+            `Insufficient stock for item ${item.productId}`,
+          );
         }
 
         // 2. Update stock
         const newQuantity = existingStock.quantity - item.quantity;
         await tx.productStock.update({
-          where: { productId_locationId: { productId: item.productId, locationId: data.sourceLocationId } },
-          data: { quantity: newQuantity }
+          where: {
+            productId_locationId: {
+              productId: item.productId,
+              locationId: data.sourceLocationId,
+            },
+          },
+          data: { quantity: newQuantity },
         });
 
         // 3. Log transaction
@@ -139,8 +163,8 @@ export class ProductsService {
             userId: data.userId,
             type: 'OUT',
             quantity: item.quantity,
-            remarks: `Bulk Release: ${data.remarks} | To: ${data.whereTo} | Req by: ${data.requestedBy}`
-          }
+            remarks: `Bulk Release: ${data.remarks} | To: ${data.whereTo} | Req by: ${data.requestedBy}`,
+          },
         });
         results.push(log);
       }
@@ -153,16 +177,22 @@ export class ProductsService {
       include: {
         product: true,
         location: true,
-        user: { select: { username: true } }
+        user: { select: { username: true } },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
   }
 
-  async manualStockAdjustment(productId: string, locationId: string, userId: string, newTotalQuantity: number, remarks: string = 'Manual Stock Adjustment') {
+  async manualStockAdjustment(
+    productId: string,
+    locationId: string,
+    userId: string,
+    newTotalQuantity: number,
+    remarks: string = 'Manual Stock Adjustment',
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const existingStock = await tx.productStock.findUnique({
-        where: { productId_locationId: { productId, locationId } }
+        where: { productId_locationId: { productId, locationId } },
       });
 
       const currentQty = existingStock?.quantity || 0;
@@ -177,7 +207,7 @@ export class ProductsService {
       await tx.productStock.upsert({
         where: { productId_locationId: { productId, locationId } },
         create: { productId, locationId, quantity: newTotalQuantity },
-        update: { quantity: newTotalQuantity }
+        update: { quantity: newTotalQuantity },
       });
 
       // Log transaction
@@ -188,8 +218,8 @@ export class ProductsService {
           userId,
           type,
           quantity,
-          remarks: `${remarks} (Previous: ${currentQty}, New: ${newTotalQuantity})`
-        }
+          remarks: `${remarks} (Previous: ${currentQty}, New: ${newTotalQuantity})`,
+        },
       });
     });
   }
@@ -198,16 +228,16 @@ export class ProductsService {
     // Ensure numbers are parsed correctly if they exist in update
     if (data.price !== undefined) data.price = Number(data.price);
     if (data.threshold !== undefined) data.threshold = Number(data.threshold);
-    
+
     return this.prisma.product.update({
       where: { id },
-      data
+      data,
     });
   }
 
   remove(id: string) {
     return this.prisma.product.delete({
-      where: { id }
+      where: { id },
     });
   }
 
@@ -221,31 +251,39 @@ export class ProductsService {
 
       // Adjust stock based on the difference
       const stock = await tx.productStock.findUnique({
-        where: { productId_locationId: { productId: log.productId, locationId: log.locationId } }
+        where: {
+          productId_locationId: {
+            productId: log.productId,
+            locationId: log.locationId,
+          },
+        },
       });
 
       if (stock) {
         const adjustment = log.type === 'IN' ? diff : -diff;
         const newQty = stock.quantity + adjustment;
-        if (newQty < 0) throw new BadRequestException('Adjustment would result in negative stock');
-        
+        if (newQty < 0)
+          throw new BadRequestException(
+            'Adjustment would result in negative stock',
+          );
+
         await tx.productStock.update({
           where: { id: stock.id },
-          data: { quantity: newQty }
+          data: { quantity: newQty },
         });
       }
 
       return tx.productTransaction.update({
         where: { id },
-        data: { 
-          quantity: Number(data.quantity), 
-          remarks: data.remarks 
+        data: {
+          quantity: Number(data.quantity),
+          remarks: data.remarks,
         },
         include: {
           product: true,
           location: true,
-          user: { select: { username: true } }
-        }
+          user: { select: { username: true } },
+        },
       });
     });
   }
@@ -257,17 +295,25 @@ export class ProductsService {
 
       // Revert stock
       const stock = await tx.productStock.findUnique({
-        where: { productId_locationId: { productId: log.productId, locationId: log.locationId } }
+        where: {
+          productId_locationId: {
+            productId: log.productId,
+            locationId: log.locationId,
+          },
+        },
       });
 
       if (stock) {
         const adjustment = log.type === 'IN' ? -log.quantity : log.quantity;
         const newQty = stock.quantity + adjustment;
-        if (newQty < 0) throw new BadRequestException('Deletion would result in negative stock');
+        if (newQty < 0)
+          throw new BadRequestException(
+            'Deletion would result in negative stock',
+          );
 
         await tx.productStock.update({
           where: { id: stock.id },
-          data: { quantity: newQty }
+          data: { quantity: newQty },
         });
       }
 

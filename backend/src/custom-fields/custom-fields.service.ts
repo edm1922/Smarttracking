@@ -8,29 +8,27 @@ export class CustomFieldsService {
   async findAll() {
     return this.prisma.customField.findMany({
       include: { batch: true },
-      orderBy: [
-        { orderIndex: 'asc' },
-        { createdAt: 'asc' }
-      ],
+      orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
     });
   }
 
   async findByBatch(batchId?: string) {
     return this.prisma.customField.findMany({
       where: {
-        OR: [
-          { batchId: batchId || null },
-          { batchId: null }
-        ]
+        OR: [{ batchId: batchId || null }, { batchId: null }],
       },
-      orderBy: [
-        { orderIndex: 'asc' },
-        { createdAt: 'asc' }
-      ],
+      orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
     });
   }
 
-  async create(data: { name: string; fieldType: string; options?: string[]; required: boolean; batchId?: string; batchCode?: string }) {
+  async create(data: {
+    name: string;
+    fieldType: string;
+    options?: string[];
+    required: boolean;
+    batchId?: string;
+    batchCode?: string;
+  }) {
     let finalBatchId = data.batchId || null;
 
     if (data.batchCode) {
@@ -53,7 +51,17 @@ export class CustomFieldsService {
     });
   }
 
-  async update(id: string, data: { name?: string; fieldType?: string; options?: string[]; required?: boolean; batchId?: string; batchCode?: string }) {
+  async update(
+    id: string,
+    data: {
+      name?: string;
+      fieldType?: string;
+      options?: string[];
+      required?: boolean;
+      batchId?: string;
+      batchCode?: string;
+    },
+  ) {
     const updateData: any = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.fieldType !== undefined) updateData.fieldType = data.fieldType;
@@ -88,8 +96,8 @@ export class CustomFieldsService {
         this.prisma.customField.update({
           where: { id: item.id },
           data: { orderIndex: item.orderIndex },
-        })
-      )
+        }),
+      ),
     );
   }
 

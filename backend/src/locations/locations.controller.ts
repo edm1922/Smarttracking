@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
 import { LocationsService } from './locations.service';
 import { AuthGuard } from '../auth/auth.guard';
 
@@ -18,7 +27,10 @@ export class LocationsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() data: { name: string; description?: string }) {
+  update(
+    @Param('id') id: string,
+    @Body() data: { name: string; description?: string },
+  ) {
     return this.locationsService.update(id, data);
   }
 

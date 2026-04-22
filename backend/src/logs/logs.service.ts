@@ -31,7 +31,12 @@ export class LogsService {
     });
   }
 
-  async create(data: { userId: string; itemId?: string; action: string; changes?: any }) {
+  async create(data: {
+    userId: string;
+    itemId?: string;
+    action: string;
+    changes?: any;
+  }) {
     return this.prisma.activityLog.create({
       data,
     });

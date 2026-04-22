@@ -1,9 +1,20 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+} from '@nestjs/common';
 import { PurchaseRequestsService } from './purchase-requests.service';
 
 @Controller('purchase-requests')
 export class PurchaseRequestsController {
-  constructor(private readonly purchaseRequestsService: PurchaseRequestsService) {}
+  constructor(
+    private readonly purchaseRequestsService: PurchaseRequestsService,
+  ) {}
 
   @Post()
   create(@Body() data: any) {
@@ -14,7 +25,7 @@ export class PurchaseRequestsController {
   findAll() {
     return this.purchaseRequestsService.findAll();
   }
-  
+
   @Get('next-no')
   getNextPrNo(@Query('date') date: string) {
     return this.purchaseRequestsService.getNextPrNo(date);

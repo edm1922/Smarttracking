@@ -23,7 +23,7 @@ import { InternalRequestsModule } from './internal-requests/internal-requests.mo
     LocationsModule,
     ProductsModule,
     PurchaseRequestsModule,
-    InternalRequestsModule
+    InternalRequestsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

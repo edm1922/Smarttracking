@@ -8,7 +8,7 @@ export class SupabaseService {
   constructor() {
     this.supabase = createClient(
       process.env.SUPABASE_URL || '',
-      process.env.SUPABASE_KEY || ''
+      process.env.SUPABASE_KEY || '',
     );
   }
 
@@ -21,7 +21,7 @@ export class SupabaseService {
       });
 
     if (error) throw error;
-    
+
     const { data: publicUrlData } = this.supabase.storage
       .from('item-images')
       .getPublicUrl(data.path);
@@ -33,7 +33,7 @@ export class SupabaseService {
     const { error } = await this.supabase.storage
       .from('item-images')
       .remove([path]);
-    
+
     if (error) console.error('Failed to delete image from Supabase:', error);
   }
 }

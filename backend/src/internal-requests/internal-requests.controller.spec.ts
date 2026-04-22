@@ -9,7 +9,9 @@ describe('InternalRequestsController', () => {
       controllers: [InternalRequestsController],
     }).compile();
 
-    controller = module.get<InternalRequestsController>(InternalRequestsController);
+    controller = module.get<InternalRequestsController>(
+      InternalRequestsController,
+    );
   });
 
   it('should be defined', () => {

@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Request, Patch, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  Request,
+  Patch,
+  Delete,
+} from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { AuthGuard } from '../auth/auth.guard';
 
@@ -25,8 +35,14 @@ export class ProductsController {
   @Post(':id/stock')
   processStock(
     @Param('id') productId: string,
-    @Body() data: { locationId: string; type: 'IN' | 'OUT'; quantity: number; remarks?: string },
-    @Request() req: any
+    @Body()
+    data: {
+      locationId: string;
+      type: 'IN' | 'OUT';
+      quantity: number;
+      remarks?: string;
+    },
+    @Request() req: any,
   ) {
     return this.productsService.processStock(
       productId,
@@ -34,22 +50,23 @@ export class ProductsController {
       req.user.sub,
       data.type,
       data.quantity,
-      data.remarks
+      data.remarks,
     );
   }
 
   @Patch(':id/adjust-stock')
   manualStockAdjustment(
     @Param('id') productId: string,
-    @Body() data: { locationId: string; newTotalQuantity: number; remarks?: string },
-    @Request() req: any
+    @Body()
+    data: { locationId: string; newTotalQuantity: number; remarks?: string },
+    @Request() req: any,
   ) {
     return this.productsService.manualStockAdjustment(
       productId,
       data.locationId,
       req.user.sub,
       data.newTotalQuantity,
-      data.remarks
+      data.remarks,
     );
   }
 

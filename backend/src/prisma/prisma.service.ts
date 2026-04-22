@@ -6,10 +6,12 @@ import * as bcrypt from 'bcrypt';
 export class PrismaService extends PrismaClient implements OnModuleInit {
   async onModuleInit() {
     await this.$connect();
-    
+
     // Seed default admin user
     try {
-      const adminExists = await this.user.findFirst({ where: { role: 'admin' } });
+      const adminExists = await this.user.findFirst({
+        where: { role: 'admin' },
+      });
       if (!adminExists) {
         const hashedPassword = await bcrypt.hash('admin123', 10);
         await this.user.create({
