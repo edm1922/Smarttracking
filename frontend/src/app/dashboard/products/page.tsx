@@ -1143,7 +1143,7 @@ export default function ProductsPage() {
                               </td>
                               <td className="px-4 py-3 text-center">
                                 <span className="inline-flex px-3 py-1 rounded-lg bg-gray-100 text-gray-900 text-[10px] font-bold border border-gray-200">
-                                  {item.available}
+                                  {products.find(p => p.id === item.productId)?.stocks.find(s => s.locationId === releaseForm.sourceLocationId)?.quantity || 0}
                                 </span>
                               </td>
                               <td className="px-4 py-3">
