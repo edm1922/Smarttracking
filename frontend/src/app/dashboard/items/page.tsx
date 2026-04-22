@@ -41,6 +41,7 @@ export default function QRItemsPage() {
     categoryId: '',
     batchId: '',
     tagIds: [] as string[],
+    copies: 1,
   });
 
   const userRole = typeof window !== 'undefined' ? localStorage.getItem('role') : '';
@@ -80,10 +81,11 @@ export default function QRItemsPage() {
         categoryId: (item as any).categoryId || '',
         batchId: (item as any).batchId || '',
         tagIds: item.tags?.map(t => (t as any).tagId) || [],
+        copies: 1,
       });
     } else {
       setEditingItem(null);
-      setFormData({ name: '', description: '', status: 'Available', categoryId: '', batchId: '', tagIds: [] });
+      setFormData({ name: '', description: '', status: 'Available', categoryId: '', batchId: '', tagIds: [], copies: 1 });
     }
     setIsModalOpen(true);
   };
@@ -232,10 +234,18 @@ export default function QRItemsPage() {
           <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-2xl">
             <h2 className="text-xl font-bold text-gray-900 mb-6">Generate Unique QR Code</h2>
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Internal Reference Name</label>
-                <input required type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none" placeholder="e.g. Site Visit Form - Area A" />
-              </div>
+              {!editingItem && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Number of QR Codes to Generate</label>
+                  <input required type="number" min="1" max="100" value={formData.copies} onChange={(e) => setFormData({...formData, copies: parseInt(e.target.value) || 1})} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none" />
+                </div>
+              )}
+              {editingItem && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Internal Reference Name</label>
+                  <input required type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none" placeholder="e.g. Site Visit Form - Area A" />
+                </div>
+              )}
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Batch (Template)</label>

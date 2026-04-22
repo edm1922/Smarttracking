@@ -92,6 +92,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     setIsSaving(true);
     try {
       const payload = {
+        name: formData.name,
         fieldValues: Object.entries(dynamicValues).map(([fieldId, value]) => ({
           fieldId,
           value,
@@ -177,20 +178,22 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
             {isEditing || isPublicForm ? (
               <form onSubmit={isEditing ? handleUpdate : handleSubmitForm} className="space-y-8">
                 <div className="space-y-6">
-                  {isEditing && (
+                  {(isEditing || (isPublicForm && !item.name)) && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                       <div>
-                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Internal Name</label>
-                        <input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm" />
+                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Internal Reference Name {isPublicForm && <span className="text-red-500">*</span>}</label>
+                        <input required={isPublicForm} type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm" placeholder="Enter reference name..." />
                       </div>
-                      <div>
-                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Status</label>
-                        <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm font-bold">
-                          <option value="Available">Available</option>
-                          <option value="Used">Used</option>
-                          <option value="Defective">Defective</option>
-                        </select>
-                      </div>
+                      {isEditing && (
+                        <div>
+                          <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Status</label>
+                          <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm font-bold">
+                            <option value="Available">Available</option>
+                            <option value="Used">Used</option>
+                            <option value="Defective">Defective</option>
+                          </select>
+                        </div>
+                      )}
                     </div>
                   )}
 

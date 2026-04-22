@@ -14,48 +14,55 @@ export class ItemsService {
   ) {}
 
   async create(data: any, userId: string) {
-    let slug = '';
-    let isUnique = false;
-    while (!isUnique) {
-      const randomStr = Math.random().toString(36).substring(2, 7).toUpperCase();
-      slug = `TEL-${randomStr}`;
-      const existing = await this.prisma.item.findUnique({ where: { slug } });
-      if (!existing) isUnique = true;
+    const { fieldValues, tagIds, categoryId, batchId, copies = 1, ...itemData } = data;
+    
+    const createdItems = [];
+
+    for (let i = 0; i < copies; i++) {
+      let slug = '';
+      let isUnique = false;
+      while (!isUnique) {
+        const randomStr = Math.random().toString(36).substring(2, 7).toUpperCase();
+        slug = `TEL-${randomStr}`;
+        const existing = await this.prisma.item.findUnique({ where: { slug } });
+        if (!existing) isUnique = true;
+      }
+
+      const finalData: any = {
+        ...itemData,
+        slug,
+        categoryId: categoryId || null,
+        batchId: batchId || null,
+        name: itemData.name || null, // Force null if empty string
+      };
+
+      const item = await this.prisma.item.create({
+        data: {
+          ...finalData,
+          fieldValues: {
+            create: fieldValues ? fieldValues.map((fv: any) => ({
+              fieldId: fv.fieldId,
+              value: fv.value,
+            })) : [],
+          },
+          tags: tagIds ? {
+            create: tagIds.map((tagId: string) => ({ tagId }))
+          } : undefined,
+        },
+        include: { fieldValues: true, tags: true },
+      });
+
+      await this.logsService.create({
+        userId,
+        itemId: item.id,
+        action: 'CREATE_ITEM',
+        changes: { name: item.name },
+      });
+
+      createdItems.push(item);
     }
 
-    const { fieldValues, tagIds, categoryId, batchId, ...itemData } = data;
-
-    const finalData: any = {
-      ...itemData,
-      slug,
-      categoryId: categoryId || null,
-      batchId: batchId || null,
-    };
-
-    const item = await this.prisma.item.create({
-      data: {
-        ...finalData,
-        fieldValues: {
-          create: fieldValues ? fieldValues.map((fv: any) => ({
-            fieldId: fv.fieldId,
-            value: fv.value,
-          })) : [],
-        },
-        tags: tagIds ? {
-          create: tagIds.map((tagId: string) => ({ tagId }))
-        } : undefined,
-      },
-      include: { fieldValues: true, tags: true },
-    });
-
-    await this.logsService.create({
-      userId,
-      itemId: item.id,
-      action: 'CREATE_ITEM',
-      changes: { name: item.name },
-    });
-
-    return item;
+    return copies === 1 ? createdItems[0] : createdItems;
   }
 
   async findAll(batchId?: string) {
@@ -185,12 +192,13 @@ export class ItemsService {
     const item = await this.findOne(slug);
     if (item.locked) throw new BadRequestException('This form has already been submitted and is locked.');
 
-    const { fieldValues } = data;
+    const { fieldValues, name } = data;
     
     return this.prisma.item.update({
       where: { slug },
       data: {
         locked: true, // Automatically lock upon submission
+        name: name || item.name, // Save the assigned name if provided
         fieldValues: fieldValues ? {
           deleteMany: {},
           create: fieldValues
