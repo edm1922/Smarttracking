@@ -383,7 +383,7 @@ export default function ProductTransmittalPage() {
       </div>
 
       {/* Printable Form */}
-      <div className="hidden print:block bg-white p-12 text-gray-900 min-h-screen">
+      <div className="hidden print:block bg-white p-12 text-gray-900">
         <div className="flex justify-between items-start border-b-2 border-gray-900 pb-8 mb-12">
           <div>
             <h1 className="text-4xl font-black uppercase tracking-tighter text-gray-900 mb-1">{headerInfo.subject || 'Material Transmittal'}</h1>
