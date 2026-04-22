@@ -46,7 +46,40 @@ function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: (
       const data = res.data;
 
       if (format === 'excel') {
-        const worksheet = XLSX.utils.json_to_sheet(formatDataForExcel(data, reportType));
+        const reportTitle = reportType.replace(/-/g, ' ').toUpperCase();
+        const formattedData = formatDataForExcel(data, reportType);
+        
+        // Build Excel with Corporate Header (matching sample.xlsx)
+        const header = [
+          ['CENTRO SERVICES COOPERATIVE'],
+          [' Purok Camachille, Brgy. Tambler, General Santos City'],
+          [' centrocooperative21@gmail.com | (083) 554 5552'],
+          [],
+          [reportTitle],
+          [],
+          ['Period Covered:', '', `Generated on ${new Date().toLocaleDateString()}`],
+          ['Runtime:', '', new Date().toLocaleString()],
+          []
+        ];
+
+        // Get column headers from the first row of formatted data
+        const columns = Object.keys(formattedData[0] || {});
+        header.push(columns);
+
+        // Map data values
+        const rows = formattedData.map(item => Object.values(item));
+        const fullSheetData = [...header, ...rows];
+
+        const worksheet = XLSX.utils.aoa_to_sheet(fullSheetData);
+        
+        // Basic merge for company name and title
+        worksheet['!merges'] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }, // Company Name
+          { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } }, // Address
+          { s: { r: 2, c: 0 }, e: { r: 2, c: 5 } }, // Contact
+          { s: { r: 4, c: 0 }, e: { r: 4, c: 5 } }, // Title
+        ];
+
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Report");
         XLSX.writeFile(workbook, `${reportType}_${new Date().toISOString().split('T')[0]}.xlsx`);
