@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { 
   Plus, Search, Lock, Unlock, Edit2, Trash2, QrCode, 
-  X, ImageIcon, ListPlus, LayoutGrid, Tags as TagsIcon, Box
+  X, ImageIcon, ListPlus, LayoutGrid, Tags as TagsIcon, Box,
+  Truck
 } from 'lucide-react';
 import api from '@/lib/api';
 
