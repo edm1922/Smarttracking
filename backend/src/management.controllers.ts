@@ -8,12 +8,15 @@ import {
   Delete,
   UseGuards,
   Query,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { CategoriesService } from './categories/categories.service';
 import { TagsService } from './tags/tags.service';
 import { BatchesService } from './batches/batches.service';
 import { WorkflowService } from './workflow/workflow.service';
 import { ReportsService } from './reports/reports.service';
+import { ExcelGeneratorService } from './reports/excel-generator.service';
 import { AuthGuard } from './auth/auth.guard';
 
 @Controller('categories')
@@ -94,7 +97,10 @@ export class WorkflowController {
 @Controller('reports')
 @UseGuards(AuthGuard)
 export class ReportsController {
-  constructor(private readonly service: ReportsService) {}
+  constructor(
+    private readonly service: ReportsService,
+    private readonly excelService: ExcelGeneratorService,
+  ) {}
   @Get('summary') getSummary() {
     return this.service.getSummary();
   }
@@ -106,5 +112,17 @@ export class ReportsController {
     @Query('productId') productId?: string,
   ) {
     return this.service.getReportData(type, { productId });
+  }
+
+  @Post('uniform-stocks/export')
+  async exportUniformStocks(
+    @Body() body: { header_config: any; filters: any },
+    @Res() res: Response,
+  ) {
+    return this.excelService.generateUniformStocksReport(
+      res,
+      body.header_config,
+      body.filters,
+    );
   }
 }

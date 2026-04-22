@@ -25,6 +25,7 @@ function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: (
   const productReports = [
     { id: 'stock-summary', name: 'Stock Summary' },
     { id: 'need-restock', name: 'Need Restock' },
+    { id: 'uniform-stocks', name: 'Professional Stocks Report (ExcelJS)' },
     { id: 'inventory-distribution', name: 'Inventory Distribution (by Location)' },
     { id: 'custom-item-report', name: 'Custom Item Report' },
   ];
@@ -42,6 +43,34 @@ function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: (
     if (!reportType) return alert('Please select a report type');
     setLoading(true);
     try {
+      if (reportType === 'uniform-stocks') {
+        const headerConfig = {
+          company_name: "CENTRO SERVICES COOPERATIVE",
+          logo_url: "https://raw.githubusercontent.com/lucide-react/lucide/main/icons/package.png", // Fallback placeholder
+          address: "Purok Camachille, Brgy. Tambler, General Santos City",
+          contact: "centrocooperative21@gmail.com | (083) 554 5552",
+          report_title: "UNIFORM STOCKS REPORT",
+          metadata: [
+            { label: "Period Covered", value: "January 01 - April 11, 2026" },
+            { label: "Runtime", value: "Auto-generated timestamp" }
+          ]
+        };
+
+        const res = await api.post('/reports/uniform-stocks/export', {
+          header_config: headerConfig,
+          filters: { location: section === 'product' ? (window as any).selectedLocation : 'all' }
+        }, { responseType: 'blob' });
+
+        const url = window.URL.createObjectURL(new Blob([res.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Uniform_Stocks_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+        document.body.appendChild(link);
+        link.click();
+        onClose();
+        return;
+      }
+
       const res = await api.get(`/reports/report-data?type=${reportType}`);
       const data = res.data;
 
