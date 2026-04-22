@@ -216,11 +216,17 @@ export default function CustomFieldsPage() {
                 <label className="block text-sm font-medium text-gray-700">Assign to Batch (Template Code)</label>
                 <input
                   type="text"
+                  list="batch-options"
                   value={formData.batchCode}
                   onChange={(e) => setFormData({...formData, batchCode: e.target.value.toUpperCase()})}
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:ring-1 focus:ring-primary outline-none"
                   placeholder="e.g. TELA"
                 />
+                <datalist id="batch-options">
+                  {batches.map(batch => (
+                    <option key={batch.id} value={batch.batchCode} />
+                  ))}
+                </datalist>
                 <p className="mt-1 text-[10px] text-gray-400 italic">Leave empty for "Global". Typing a new code will automatically create that template.</p>
               </div>
               <div className="flex items-center pt-2">
