@@ -119,6 +119,23 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     setViewMode('choice');
   };
 
+  const handleConfirmPullOut = async () => {
+    setIsSaving(true);
+    try {
+      const payload = {
+        status: formData.status
+      };
+      await api.patch(`/items/${slug}`, payload);
+      await fetchData();
+      setIsPullingOut(false);
+      alert('Item pulled out successfully.');
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to pull out item');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -485,7 +502,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
 
                <div className="flex flex-col gap-3">
                   <button 
-                    onClick={handleUpdate}
+                    onClick={handleConfirmPullOut}
                     disabled={isSaving}
                     className="w-full py-5 bg-gray-900 text-white rounded-2xl font-bold shadow-xl active:scale-95 disabled:opacity-50"
                   >
