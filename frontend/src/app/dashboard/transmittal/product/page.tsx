@@ -45,7 +45,6 @@ export default function ProductTransmittalPage() {
     subject: 'Material Transmittal',
     subTitle: 'Enterprise Logistics & Supply Chain Tracking',
     customSubHeader: '',
-    movementType: 'NONE', // 'NONE' | 'IN' | 'OUT'
     preparedBy: '',
     checkedBy: '',
     receivedBy: '',
@@ -230,15 +229,6 @@ export default function ProductTransmittalPage() {
               <input type="text" value={headerInfo.customSubHeader || ''} onChange={e => setHeaderInfo({ ...headerInfo, customSubHeader: e.target.value })} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-1" placeholder="Override subtitle..." />
             </div>
 
-            <div className="pt-2">
-              <label className="block text-xs font-bold text-gray-500 mb-2">Movement Type Indicator</label>
-              <div className="flex bg-gray-100 p-1 rounded-lg">
-                <button onClick={() => setHeaderInfo({ ...headerInfo, movementType: 'NONE' })} className={`flex-1 py-1 text-[10px] font-black uppercase rounded-md transition-all ${headerInfo.movementType === 'NONE' ? 'bg-white shadow-sm text-gray-600' : 'text-gray-400'}`}>None</button>
-                <button onClick={() => setHeaderInfo({ ...headerInfo, movementType: 'IN' })} className={`flex-1 py-1 text-[10px] font-black uppercase rounded-md transition-all ${headerInfo.movementType === 'IN' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}>Stock In</button>
-                <button onClick={() => setHeaderInfo({ ...headerInfo, movementType: 'OUT' })} className={`flex-1 py-1 text-[10px] font-black uppercase rounded-md transition-all ${headerInfo.movementType === 'OUT' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400'}`}>Stock Out</button>
-              </div>
-            </div>
-
             <div className="pt-4">
               <button 
                 onClick={savePreset}
@@ -384,16 +374,7 @@ export default function ProductTransmittalPage() {
       <div className="hidden print:block bg-white p-12 text-gray-900 min-h-screen">
         <div className="flex justify-between items-start border-b-2 border-gray-900 pb-8 mb-12">
           <div>
-            <div className="flex items-center gap-4 mb-1">
-              <h1 className="text-4xl font-black uppercase tracking-tighter text-gray-900">Material Transmittal</h1>
-              {headerInfo.movementType !== 'NONE' && (
-                <span className={`px-4 py-1 rounded-full text-xl font-black uppercase tracking-widest border-4 ${
-                  headerInfo.movementType === 'IN' ? 'border-green-600 text-green-600' : 'border-blue-600 text-blue-600'
-                }`}>
-                  STOCK {headerInfo.movementType}
-                </span>
-              )}
-            </div>
+            <h1 className="text-4xl font-black uppercase tracking-tighter text-gray-900 mb-1">Material Transmittal</h1>
             <p className="text-sm font-bold text-gray-500">{headerInfo.customSubHeader || headerInfo.subTitle}</p>
           </div>
           <div className="text-right">
