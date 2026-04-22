@@ -45,6 +45,7 @@ export default function StoragePage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'details'>('grid');
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -93,6 +94,75 @@ export default function StoragePage() {
     b.batchCode.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  if (isPreviewOpen && selectedBatch) {
+    const batchFields = getRelevantFields();
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="w-full max-w-6xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col h-[90vh] animate-in slide-in-from-bottom-10 duration-500">
+          <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
+            <div>
+              <h2 className="text-xl font-black text-gray-900 tracking-tight">Batch Report Preview</h2>
+              <p className="text-[10px] font-black text-primary uppercase tracking-widest mt-1">{selectedBatch.batchCode}</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => window.print()}
+                className="flex items-center gap-2 bg-gray-900 text-white px-6 py-2.5 rounded-xl font-bold text-xs hover:bg-gray-800 transition-all"
+              >
+                <Printer className="h-4 w-4" /> Print PDF
+              </button>
+              <button onClick={() => setIsPreviewOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                <CloseIcon className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+          </div>
+          
+          <div className="flex-1 overflow-auto p-8 no-scrollbar">
+            <div className="print-area">
+              <div className="mb-10 text-center border-b-2 border-gray-900 pb-8">
+                <h1 className="text-3xl font-black uppercase tracking-tighter text-gray-900">Batch Submission Report</h1>
+                <p className="text-sm font-bold text-gray-500 mt-2">Batch Code: {selectedBatch.batchCode}</p>
+                <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">Generated on {new Date().toLocaleString()}</p>
+              </div>
+
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-gray-900 text-white">
+                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest border border-gray-800">QR Code</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest border border-gray-800">Reference</th>
+                    {batchFields.map(f => (
+                      <th key={f.id} className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest border border-gray-800">{f.name}</th>
+                    ))}
+                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest border border-gray-800">Submitted</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item, idx) => (
+                    <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="px-4 py-3 text-[10px] font-mono font-black border border-gray-100 text-gray-900">{item.slug}</td>
+                      <td className="px-4 py-3 text-xs font-bold border border-gray-100 text-gray-900">{item.name || 'Untitled'}</td>
+                      {batchFields.map(f => (
+                        <td key={f.id} className="px-4 py-3 text-xs font-medium border border-gray-100 text-gray-600">{getFieldValue(item, f.id)}</td>
+                      ))}
+                      <td className="px-4 py-3 text-[10px] font-bold border border-gray-100 text-gray-400">{new Date(item.createdAt).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <style jsx global>{`
+          @media print {
+            body * { visibility: hidden; }
+            .print-area, .print-area * { visibility: visible; }
+            .print-area { position: relative; width: 100%; top: 0; left: 0; }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
   if (viewMode === 'details' && selectedBatch) {
     const batchFields = getRelevantFields();
     
@@ -113,6 +183,15 @@ export default function StoragePage() {
               </h1>
               <p className="text-sm text-gray-500 font-medium">Viewing all form submissions in this template</p>
             </div>
+          </div>
+          <div className="flex space-x-3">
+            <button 
+              onClick={() => setIsPreviewOpen(true)}
+              className="inline-flex items-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-gray-200 hover:scale-[1.02] active:scale-95 transition-all"
+            >
+              <Eye className="mr-2 h-4 w-4" />
+              Print Preview
+            </button>
           </div>
         </div>
 
@@ -180,6 +259,97 @@ export default function StoragePage() {
       </div>
     );
   }
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight flex items-center">
+            <Database className="mr-3 h-8 w-8 text-primary" />
+            Submission Storage
+          </h1>
+          <p className="text-sm text-gray-500 font-medium">Access and analyze all data captured through QR forms</p>
+        </div>
+        <div className="flex items-center space-x-2 bg-white rounded-2xl border border-gray-200 p-1.5 shadow-sm">
+          <button 
+            onClick={() => setViewMode('grid')}
+            className={`p-2 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'text-gray-400 hover:text-gray-600'}`}
+          >
+            <LayoutGrid className="h-5 w-5" />
+          </button>
+          <button 
+            onClick={() => setViewMode('details')}
+            className={`p-2 rounded-xl transition-all ${viewMode === 'details' ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'text-gray-400 hover:text-gray-600'}`}
+          >
+            <ListFilter className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="relative">
+        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+          <Search className="h-5 w-5 text-gray-400" />
+        </div>
+        <input
+          type="text"
+          placeholder="Search by batch name..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="block w-full rounded-2xl border-none bg-white py-4 pl-12 pr-4 text-sm text-gray-900 shadow-xl shadow-gray-200/50 ring-1 ring-gray-200 focus:ring-2 focus:ring-primary transition-all"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {/* Global Storage */}
+        <div 
+          onClick={() => fetchData()} // Just refresh for now
+          className="group relative bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-primary/5 transition-all cursor-pointer"
+        >
+          <div className="absolute top-6 right-8 opacity-5 group-hover:opacity-20 transition-opacity">
+            <Folder className="h-16 w-16" />
+          </div>
+          <div className="bg-gray-50 h-16 w-16 rounded-3xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
+            <Database className="h-8 w-8 text-gray-400" />
+          </div>
+          <h3 className="text-xl font-black text-gray-900 mb-1">Global Storage</h3>
+          <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Miscellaneous Data</p>
+          <div className="mt-8 flex items-center text-xs font-bold text-primary group-hover:translate-x-2 transition-transform">
+            OPEN FOLDER <ChevronRight className="ml-1 h-3 w-3" />
+          </div>
+        </div>
+
+        {filteredBatches.map((batch) => (
+          <div 
+            key={batch.id}
+            onClick={() => handleSelectBatch(batch)}
+            className="group relative bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-primary/5 transition-all cursor-pointer"
+          >
+            <div className="absolute top-6 right-8 opacity-5 group-hover:opacity-20 transition-opacity">
+              <Folder className="h-16 w-16" />
+            </div>
+            <div className="bg-primary/5 h-16 w-16 rounded-3xl flex items-center justify-center mb-6 group-hover:rotate-6 transition-transform duration-500">
+              <Folder className="h-8 w-8 text-primary fill-primary/10" />
+            </div>
+            <h3 className="text-xl font-black text-gray-900 mb-1">{batch.batchCode}</h3>
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{batch._count?.items || 0} Submissions</p>
+            <div className="mt-8 flex items-center text-xs font-bold text-primary group-hover:translate-x-2 transition-transform">
+              EXPLORE DATA <ChevronRight className="ml-1 h-3 w-3" />
+            </div>
+          </div>
+        ))}
+
+        {filteredBatches.length === 0 && !loading && (
+          <div className="col-span-full py-20 text-center">
+            <div className="bg-gray-50 h-24 w-24 rounded-[2rem] flex items-center justify-center mx-auto mb-6">
+              <Folder className="h-10 w-10 text-gray-200" />
+            </div>
+            <p className="text-gray-400 font-medium">No storage folders found matching "{searchTerm}"</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
