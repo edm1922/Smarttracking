@@ -157,17 +157,17 @@ export default function StoragePage() {
             body * { visibility: hidden; height: auto !important; }
             .print-area, .print-area * { visibility: visible; }
             .print-area { 
-              position: absolute; 
-              left: 0; 
-              top: 0; 
-              width: 100%; 
+              position: relative !important; 
+              width: 100% !important; 
               height: auto !important;
               overflow: visible !important;
+              display: block !important;
             }
-            /* Hide UI elements during print */
-            .fixed, .bg-black\/60 { background: none !important; position: static !important; }
-            .w-full.max-w-6xl { width: 100% !important; max-width: none !important; height: auto !important; position: static !important; box-shadow: none !important; }
-            .flex-1.overflow-auto { overflow: visible !important; height: auto !important; }
+            /* Reset modal styling for print */
+            .fixed { position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: auto !important; background: white !important; }
+            .w-full.max-w-6xl { width: 100% !important; max-width: none !important; height: auto !important; box-shadow: none !important; border: none !important; }
+            .flex-1.overflow-auto { overflow: visible !important; height: auto !important; display: block !important; }
+            .sticky { position: relative !important; }
           }
         `}</style>
       </div>
