@@ -5,14 +5,14 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ReportsService {
   constructor(private prisma: PrismaService) {}
 
-  async getAnalytics(locationId?: string) {
     // 1. Summary Stats
-    const totalRequests = await this.prisma.internalRequest.count();
+    const summaryWhere = locationId ? { locationId } : {};
+    const totalRequests = await this.prisma.internalRequest.count({ where: summaryWhere });
     const fulfilledRequests = await this.prisma.internalRequest.count({
-      where: { status: 'FULFILLED' },
+      where: { ...summaryWhere, status: 'FULFILLED' },
     });
     const pendingRequests = await this.prisma.internalRequest.count({
-      where: { status: 'PENDING' },
+      where: { ...summaryWhere, status: 'PENDING' },
     });
 
     // 2. Stock Distribution (Sufficient vs Need Restock)
@@ -43,6 +43,7 @@ export class ReportsService {
 
     const requests = await this.prisma.internalRequest.findMany({
       where: {
+        ...summaryWhere,
         status: 'FULFILLED',
         date: { gte: sixMonthsAgo },
       },
@@ -131,6 +132,7 @@ export class ReportsService {
 
     // 5. Employee/Dept Insights
     const allInternalRequests = await this.prisma.internalRequest.findMany({
+      where: summaryWhere,
       include: { product: true },
     });
 
@@ -245,6 +247,18 @@ export class ReportsService {
             (analysis[key].items[r.product.name] || 0) + r.quantity;
         });
         return Object.values(analysis);
+
+      case 'custom-item-report':
+        return await this.prisma.product.findMany({
+          include: { stocks: { include: { location: true } } },
+        });
+
+      case 'filter-item':
+        // Fallback to stock summary if no item specified, 
+        // frontend would usually pass options but we handle base case
+        return await this.prisma.product.findMany({
+          include: { stocks: { include: { location: true } } },
+        });
 
       default:
         return [];
