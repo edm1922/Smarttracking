@@ -378,7 +378,15 @@ export default function DashboardPage() {
                     ))}
                   </Pie>
                   <Tooltip 
-                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
+                    contentStyle={{ 
+                      backgroundColor: '#111827', 
+                      border: 'none', 
+                      borderRadius: '12px', 
+                      padding: '12px',
+                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' 
+                    }}
+                    itemStyle={{ color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+                    labelStyle={{ color: '#94a3b8', fontSize: '10px', fontWeight: 'black', marginBottom: '4px', textTransform: 'uppercase' }}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -413,8 +421,15 @@ export default function DashboardPage() {
                   <YAxis fontSize={10} fontWeight="bold" axisLine={false} tickLine={false} tick={{fill: '#94a3b8'}} />
                   <Tooltip 
                     cursor={{fill: '#f8fafc'}}
-                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
-                    itemStyle={{ fontSize: '10px', fontWeight: 'bold' }}
+                    contentStyle={{ 
+                      backgroundColor: '#111827', 
+                      border: 'none', 
+                      borderRadius: '12px', 
+                      padding: '12px',
+                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' 
+                    }}
+                    itemStyle={{ color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+                    labelStyle={{ color: '#94a3b8', fontSize: '10px', fontWeight: 'black', marginBottom: '4px', textTransform: 'uppercase' }}
                   />
                   <Bar dataKey="count" fill="url(#barGradient)" radius={[6, 6, 0, 0]} barSize={45} />
                 </BarChart>
@@ -549,7 +564,15 @@ export default function DashboardPage() {
                     ))}
                   </Pie>
                   <Tooltip 
-                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
+                    contentStyle={{ 
+                      backgroundColor: '#111827', 
+                      border: 'none', 
+                      borderRadius: '12px', 
+                      padding: '12px',
+                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' 
+                    }}
+                    itemStyle={{ color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+                    labelStyle={{ color: '#94a3b8', fontSize: '10px', fontWeight: 'black', marginBottom: '4px', textTransform: 'uppercase' }}
                   />
                   <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingTop: '20px' }} />
                 </PieChart>
