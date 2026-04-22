@@ -148,7 +148,15 @@ export class ItemsService {
     const item = await this.findOne(slug);
 
     if (item.locked && userRole !== 'admin') {
-      throw new BadRequestException('Item is locked. Only admins can edit it.');
+      // Allow inventory users to pull out (update status) even if locked
+      const { status, statusId, ...otherData } = data;
+      const isStatusOnly = Object.keys(otherData).length === 0 && (!data.fieldValues || data.fieldValues.length === 0);
+      
+      if (userRole === 'inventory' && isStatusOnly) {
+        // Proceed - inventory users can pull out
+      } else {
+        throw new BadRequestException('Item is locked. Only admins can edit core details.');
+      }
     }
 
     const { fieldValues, tagIds, categoryId, batchId, ...itemData } = data;
