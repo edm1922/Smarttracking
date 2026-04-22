@@ -299,6 +299,7 @@ export default function ProductsPage() {
 
   const filteredLogs = logs.filter(log => 
     log.product.name.toLowerCase().includes(logSearchTerm.toLowerCase()) ||
+    (log.product.description || '').toLowerCase().includes(logSearchTerm.toLowerCase()) ||
     (log.remarks || '').toLowerCase().includes(logSearchTerm.toLowerCase()) ||
     log.user?.username.toLowerCase().includes(logSearchTerm.toLowerCase()) ||
     log.location.name.toLowerCase().includes(logSearchTerm.toLowerCase())
@@ -714,7 +715,12 @@ export default function ProductsPage() {
                       title="Double click to edit/delete log"
                     >
                       <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{new Date(log.createdAt).toLocaleString()}</td>
-                      <td className="px-4 py-3 font-bold text-gray-900">{log.product.name}</td>
+                      <td className="px-4 py-3 font-bold text-gray-900">
+                        <div>{log.product.name}</div>
+                        {log.product.description && (
+                          <div className="text-[10px] text-gray-400 italic font-medium">{log.product.description}</div>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <span className="flex items-center text-xs text-gray-600">
                           <MapPin className="h-3 w-3 mr-1" /> {log.location.name}
