@@ -429,18 +429,20 @@ export default function ProductTransmittalPage() {
           </tbody>
         </table>
 
-        <div className="grid grid-cols-2 gap-x-24 gap-y-12 pt-12">
+        <div className="grid grid-cols-2 gap-x-12 gap-y-6 pt-8">
           {['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy'].filter(field => {
             const showField = field === 'preparedBy' ? 'showPrepared' : 
                             field === 'checkedBy' ? 'showChecked' :
                             field === 'receivedBy' ? 'showReceived' : 'showApproved';
             return (headerInfo as any)[showField];
           }).map(field => (
-            <div key={field} className="flex flex-col items-center">
-              <div className="w-full text-[10px] font-black text-gray-400 uppercase mb-8">{field.replace(/By$/, ' By')}:</div>
-              <div className="text-[10px] font-black mb-1 uppercase text-center">{(headerInfo as any)[field] || '____________________'}</div>
-              <div className="border-b-2 border-gray-900 w-full mb-2"></div>
-              <div className="text-center text-[10px] font-bold text-gray-500 uppercase italic">Signature / Date</div>
+            <div key={field} className="flex flex-col items-start border-t border-gray-100 pt-2">
+              <div className="w-full text-[9px] font-black text-gray-400 uppercase mb-4">{field.replace(/By$/, ' By')}:</div>
+              <div className="w-full">
+                <div className="text-[10px] font-black mb-1 uppercase text-center">{(headerInfo as any)[field] || '____________________'}</div>
+                <div className="border-b-2 border-gray-900 w-full mb-1"></div>
+                <div className="text-center text-[8px] font-bold text-gray-400 uppercase italic tracking-tighter">Signature / Date</div>
+              </div>
             </div>
           ))}
         </div>
