@@ -1104,7 +1104,7 @@ export default function ProductsPage() {
                                 </div>
                                 <div className="flex flex-col items-end">
                                   <div className="flex items-center space-x-2">
-                                    <span className="text-xs font-black text-primary bg-primary/10 px-3 py-1 rounded-full uppercase">Available: {getTotalStock(p)}</span>
+                                    <span className="text-xs font-black text-primary bg-primary/10 px-3 py-1 rounded-full uppercase">Available: {p.stocks.find(s => s.locationId === releaseForm.sourceLocationId)?.quantity || 0}</span>
                                   </div>
                                   <span className="text-[10px] text-gray-400 italic mt-1 font-bold uppercase tracking-widest">{p.unit}</span>
                                 </div>
