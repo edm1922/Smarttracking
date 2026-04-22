@@ -1097,6 +1097,9 @@ export default function ProductsPage() {
                                   <div className="flex flex-col">
                                     <span className="text-base font-black text-gray-900 group-hover:text-primary transition-colors">{p.name}</span>
                                     <span className="text-[11px] text-gray-400 font-mono font-black uppercase tracking-tighter mt-0.5">{p.sku}</span>
+                                    {p.description && (
+                                      <span className="text-[10px] text-gray-500 italic mt-1 line-clamp-1">{p.description}</span>
+                                    )}
                                   </div>
                                 </div>
                                 <div className="flex flex-col items-end">
