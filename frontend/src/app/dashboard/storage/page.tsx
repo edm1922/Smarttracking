@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { 
   Database, Folder, ChevronRight, Search, 
   Filter, Calendar, ArrowLeft, ListFilter,
-  Eye, QrCode, Clock
+  Eye, QrCode, Clock, Printer, X
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -112,7 +112,7 @@ export default function StoragePage() {
                 <Printer className="h-4 w-4" /> Print PDF
               </button>
               <button onClick={() => setIsPreviewOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                <CloseIcon className="h-5 w-5 text-gray-500" />
+                <X className="h-5 w-5 text-gray-500" />
               </button>
             </div>
           </div>
