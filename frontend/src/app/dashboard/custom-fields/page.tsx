@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Search, Edit2, Trash2, Settings, ListPlus } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Settings, ListPlus, Eye, X, LayoutGrid } from 'lucide-react';
 import api from '@/lib/api';
 
 interface CustomField {
@@ -21,6 +21,8 @@ export default function CustomFieldsPage() {
   const [batches, setBatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [previewBatchId, setPreviewBatchId] = useState<string>('GLOBAL');
   const [editingField, setEditingField] = useState<CustomField | null>(null);
 
   const [formData, setFormData] = useState({
@@ -112,13 +114,22 @@ export default function CustomFieldsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Custom Fields</h1>
           <p className="text-sm text-gray-500">Define global attributes for your items</p>
         </div>
-        <button
-          onClick={() => handleOpenModal()}
-          className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-dark transition-colors"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add New Field
-        </button>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => setIsPreviewModalOpen(true)}
+            className="inline-flex items-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-700 border border-gray-300 shadow-sm hover:bg-gray-50 transition-colors"
+          >
+            <Eye className="mr-2 h-4 w-4 text-primary" />
+            Preview Form
+          </button>
+          <button
+            onClick={() => handleOpenModal()}
+            className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-dark transition-colors"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add New Field
+          </button>
+        </div>
       </div>
 
       <div className="table-container">
@@ -244,6 +255,83 @@ export default function CustomFieldsPage() {
                 <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary-dark rounded-md">Save Field</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {isPreviewModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-lg bg-white shadow-xl flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center">
+                <LayoutGrid className="mr-2 h-5 w-5 text-primary" />
+                Form Layout Preview
+              </h2>
+              <button onClick={() => setIsPreviewModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 bg-gray-50 flex-shrink-0 border-b border-gray-100">
+              <label className="block text-sm font-bold text-gray-700 mb-2">Preview Context</label>
+              <select
+                value={previewBatchId}
+                onChange={(e) => setPreviewBatchId(e.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-bold text-primary focus:ring-1 focus:ring-primary outline-none"
+              >
+                <option value="GLOBAL">Global Form (No Batch Assigned)</option>
+                {batches.map(b => (
+                  <option key={b.id} value={b.id}>Batch Form: {b.batchCode}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="p-8 overflow-y-auto flex-1 bg-[#f1f5f9]">
+              <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-8">
+                <div className="mb-6 pb-6 border-b border-gray-100">
+                  <h3 className="text-xl font-black text-gray-900 tracking-tight">Form Submission Preview</h3>
+                  <p className="text-xs text-gray-500 font-bold uppercase mt-1">
+                    {previewBatchId === 'GLOBAL' ? 'Global Fields Only' : `Batch ${batches.find(b => b.id === previewBatchId)?.batchCode} + Global Fields`}
+                  </p>
+                </div>
+
+                <div className="space-y-6">
+                  {fields.filter(f => !f.batchId || f.batchId === previewBatchId).map(field => (
+                    <div key={field.id}>
+                      <label className="block text-xs font-bold text-gray-500 mb-1 flex items-center">
+                        {field.name} {field.required && <span className="text-red-500 ml-1">*</span>}
+                        {!field.batchId && previewBatchId !== 'GLOBAL' && (
+                          <span className="ml-3 text-[9px] font-black uppercase tracking-widest bg-gray-100 px-2 py-0.5 rounded-full text-gray-400">Global</span>
+                        )}
+                      </label>
+                      {field.fieldType === 'dropdown' ? (
+                        <select className="w-full rounded-xl border border-gray-200 px-4 py-4 text-sm outline-none bg-gray-50" disabled>
+                          <option value="">Select Option</option>
+                          {field.options?.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                      ) : (
+                        <input
+                          type={field.fieldType}
+                          className="w-full rounded-xl border border-gray-200 px-4 py-4 text-sm outline-none bg-gray-50"
+                          placeholder={`Enter ${field.name.toLowerCase()}...`}
+                          disabled
+                        />
+                      )}
+                    </div>
+                  ))}
+
+                  {fields.filter(f => !f.batchId || f.batchId === previewBatchId).length === 0 && (
+                    <div className="text-center py-12 text-gray-400 text-xs font-bold uppercase tracking-widest">
+                      No custom fields are active for this context.
+                    </div>
+                  )}
+
+                  <button type="button" disabled className="w-full mt-6 px-6 py-4 text-sm font-bold text-white bg-primary opacity-50 rounded-2xl shadow-xl transition-all cursor-not-allowed">
+                    Submit & Lock Form (Preview)
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
