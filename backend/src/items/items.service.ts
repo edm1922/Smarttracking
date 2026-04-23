@@ -171,6 +171,9 @@ export class ItemsService {
       batchId: batchId === undefined ? item.batchId : batchId || null,
     };
 
+    delete finalData.logAction;
+    delete finalData.tagIds;
+
     // Validate Status Transition
     if (itemData.statusId && itemData.statusId !== item.statusId) {
       if (item.statusId) {
