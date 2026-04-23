@@ -363,6 +363,7 @@ export class ItemsService {
         batch: item.batch?.batchCode,
         status: item.status,
         fieldValues: item.fieldValues.map(fv => ({
+          fieldId: fv.fieldId,
           name: fv.field.name,
           value: fv.value
         }))
