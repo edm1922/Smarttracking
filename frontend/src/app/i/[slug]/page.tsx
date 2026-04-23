@@ -219,15 +219,17 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       // Update local state immediately for UI feedback
       setUnitTracking(newUnitTracking);
 
-      const payload = {
-        status: finalStatus,
-        fieldValues: prepareFieldValues(dynamicValues, newUnitTracking),
-        logAction: `PULL_OUT_${pullOutQty}_${unitTracking.unit.toUpperCase()}`
+      const requestPayload = {
+        itemId: item.id,
+        qty: pullOutQty,
+        unit: unitTracking.unit,
+        remarks: `Pull out request for ${pullOutQty} ${unitTracking.unit}`
       };
 
-      await api.patch(`/items/${slug}`, payload);
-      await fetchData();
+      await api.post('/pull-out-requests', requestPayload);
+      alert(`Pull out request for ${pullOutQty} ${unitTracking.unit} has been submitted for approval.`);
       setIsPullingOut(false);
+
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to pull out item. Check stock levels or server connection.');
     } finally {
@@ -662,7 +664,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                         }}
                         className="w-full py-5 bg-orange-600 text-white rounded-3xl font-black uppercase tracking-widest text-xs flex items-center justify-center shadow-xl shadow-orange-900/20 active:scale-95 transition-all"
                       >
-                        <Truck className="mr-2 h-5 w-5" /> Pull Out Item
+                        <Truck className="mr-2 h-5 w-5" /> Request Pull Out
                       </button>
                       
                       {canAdmin && (
@@ -696,8 +698,8 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                <div className="h-16 w-16 bg-orange-100 rounded-full flex items-center justify-center mb-6">
                  <Truck className="h-8 w-8 text-orange-600" />
                </div>
-               <h2 className="text-2xl font-black text-gray-900 mb-2">Pull Out Item</h2>
-               <p className="text-sm text-gray-500 mb-8 font-medium">Record this asset as released from inventory.</p>
+               <h2 className="text-2xl font-black text-gray-900 mb-2">Request Pull Out</h2>
+               <p className="text-sm text-gray-500 mb-8 font-medium">Submit a request to release this asset from inventory.</p>
                
                <div className="space-y-4 mb-8">
                  <div>
@@ -740,7 +742,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                     disabled={isSaving}
                     className="w-full py-5 bg-gray-900 text-white rounded-2xl font-bold shadow-xl active:scale-95 disabled:opacity-50"
                   >
-                    {isSaving ? 'Recording...' : 'Confirm Pull Out'}
+                    {isSaving ? 'Submitting...' : 'Confirm Request'}
                   </button>
                   <button 
                     onClick={() => setIsPullingOut(false)}

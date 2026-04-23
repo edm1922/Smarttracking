@@ -16,6 +16,7 @@ model User {
   createdAt          DateTime             @default(now())
   ActivityLog        ActivityLog[]
   ProductTransaction ProductTransaction[]
+  PullOutRequest     PullOutRequest[]
 }
 
 model Item {
@@ -41,6 +42,21 @@ model Item {
   statusRef    Status?          @relation(fields: [statusId], references: [id])
   fieldValues  ItemFieldValue[]
   tags         ItemTag[]
+  pullOutRequests PullOutRequest[]
+}
+
+model PullOutRequest {
+  id        String   @id @default(uuid())
+  itemId    String
+  userId    String
+  qty       Int
+  unit      String
+  status    String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  remarks   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model Category {

@@ -12,6 +12,8 @@ import { ProductsModule } from './products/products.module';
 import { PurchaseRequestsModule } from './purchase-requests/purchase-requests.module';
 import { InternalRequestsModule } from './internal-requests/internal-requests.module';
 import { UsersModule } from './users/users.module';
+import { PullOutRequestsModule } from './pull-out-requests/pull-out-requests.module';
+
 
 @Module({
   imports: [
@@ -26,6 +28,7 @@ import { UsersModule } from './users/users.module';
     PurchaseRequestsModule,
     InternalRequestsModule,
     UsersModule,
+    PullOutRequestsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

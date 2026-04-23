@@ -5,7 +5,7 @@ import {
   Boxes, Package, Search, Filter, ArrowRight, 
   ChevronRight, ChevronDown, ChevronUp, History,
   TrendingDown, TrendingUp, AlertTriangle, Box,
-  QrCode, Clock, User, ArrowUpRight
+  QrCode, Clock, User, ArrowUpRight, Check, X, Truck, Activity
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -16,9 +16,44 @@ export default function UnitTrackingPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
 
+  const [requests, setRequests] = useState<any[]>([]);
+
   useEffect(() => {
     fetchInventory();
+    fetchRequests();
   }, []);
+
+  const fetchRequests = async () => {
+    try {
+      const res = await api.get('/pull-out-requests/pending');
+      setRequests(res.data);
+    } catch (err) {
+      console.error('Failed to fetch pending requests', err);
+    }
+  };
+
+  const handleApprove = async (id: string) => {
+    if (!confirm('Are you sure you want to approve this pull-out? It will deduct stock immediately.')) return;
+    try {
+      await api.patch(`/pull-out-requests/${id}/approve`);
+      alert('Request approved successfully.');
+      fetchRequests();
+      fetchInventory();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to approve request');
+    }
+  };
+
+  const handleReject = async (id: string) => {
+    if (!confirm('Reject this pull-out request?')) return;
+    try {
+      await api.patch(`/pull-out-requests/${id}/reject`);
+      alert('Request rejected.');
+      fetchRequests();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to reject request');
+    }
+  };
 
   const fetchInventory = async () => {
     try {
@@ -70,6 +105,72 @@ export default function UnitTrackingPage() {
           </div>
         </div>
       </div>
+      
+      {/* Pending Approvals Section */}
+      {requests.length > 0 && (
+        <div className="bg-orange-50 border border-orange-100 rounded-[2.5rem] p-8 space-y-6 animate-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 bg-orange-600/10 rounded-2xl flex items-center justify-center">
+                <Activity className="h-6 w-6 text-orange-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-gray-900 tracking-tight">Pending Approvals</h2>
+                <p className="text-xs font-bold text-orange-600/60 uppercase tracking-widest">New pull-out requests waiting for review</p>
+              </div>
+            </div>
+            <span className="px-4 py-1.5 bg-orange-600 text-white text-[10px] font-black rounded-full uppercase tracking-widest animate-pulse">
+              {requests.length} Action Required
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {requests.map((req) => (
+              <div key={req.id} className="bg-white p-6 rounded-3xl border border-orange-100 shadow-sm hover:shadow-md transition-all group">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-4">
+                    <div className="h-10 w-10 bg-gray-50 rounded-xl flex items-center justify-center group-hover:bg-orange-50 transition-colors">
+                      <Truck className="h-5 w-5 text-gray-400 group-hover:text-orange-600" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Asset ID</p>
+                      <p className="text-sm font-mono font-bold text-gray-900">{req.item.slug}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-0.5">Qty to Release</p>
+                    <p className="text-xl font-black text-gray-900 tracking-tighter">
+                      {req.qty} <span className="text-[10px] text-gray-400 uppercase">{req.unit}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-gray-50">
+                  <div className="flex flex-col">
+                    <p className="text-[9px] font-black text-gray-400 uppercase">Requested By</p>
+                    <p className="text-xs font-bold text-gray-700">{req.user.username}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => handleReject(req.id)}
+                      className="p-2.5 bg-gray-50 text-gray-400 rounded-xl hover:bg-red-50 hover:text-red-500 transition-all"
+                      title="Reject Request"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                    <button 
+                      onClick={() => handleApprove(req.id)}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-xl font-bold text-xs hover:bg-orange-600 transition-all shadow-lg active:scale-95"
+                    >
+                      <Check className="h-4 w-4" /> Approve
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Control Bar */}
       <div className="flex items-center gap-4">
