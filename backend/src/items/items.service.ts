@@ -205,7 +205,17 @@ export class ItemsService {
     const updatedItem = await this.prisma.item.update({
       where: { slug },
       data: {
-        ...finalData,
+        name: cleanItemData.name,
+        description: cleanItemData.description,
+        status: cleanItemData.status,
+        imageUrl: cleanItemData.imageUrl,
+        isLegacy: cleanItemData.isLegacy,
+        supplierId: cleanItemData.supplierId,
+        unit: cleanItemData.unit,
+        trackingType: cleanItemData.trackingType,
+        categoryId: finalData.categoryId,
+        batchId: finalData.batchId,
+        statusId: itemData.statusId, // Use original statusId if present
         fieldValues: fieldValues
           ? {
               deleteMany: {},
