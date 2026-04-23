@@ -32,9 +32,6 @@ export default function CustomFieldsPage() {
     optionsString: '',
     required: false,
     batchCode: '',
-    hasUnitQuantity: false,
-    unitLabel: '',
-    qtyLabel: '',
   });
 
   const fetchFields = async () => {
@@ -59,18 +56,15 @@ export default function CustomFieldsPage() {
   const handleOpenModal = (field: CustomField | null = null) => {
     if (field) {
       const opts = field.options || {};
-      const isLegacyArray = Array.isArray(opts);
+      const dropdownOpts = Array.isArray(opts) ? opts : (opts.dropdownOptions || []);
       
       setEditingField(field);
       setFormData({
         name: field.name,
         fieldType: field.fieldType,
-        optionsString: isLegacyArray ? opts.join(', ') : (opts.dropdownOptions?.join(', ') || ''),
+        optionsString: dropdownOpts.join(', '),
         required: field.required,
         batchCode: field.batch?.batchCode || '',
-        hasUnitQuantity: !isLegacyArray && !!opts.hasUnitQuantity,
-        unitLabel: !isLegacyArray ? (opts.unitLabel || '') : '',
-        qtyLabel: !isLegacyArray ? (opts.qtyLabel || '') : '',
       });
     } else {
       setEditingField(null);
@@ -80,9 +74,6 @@ export default function CustomFieldsPage() {
         optionsString: '',
         required: false,
         batchCode: '',
-        hasUnitQuantity: false,
-        unitLabel: '',
-        qtyLabel: '',
       });
     }
     setIsModalOpen(true);
@@ -91,22 +82,14 @@ export default function CustomFieldsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // We store metadata in the options field
     const dropdownOptions = formData.optionsString ? formData.optionsString.split(',').map(o => o.trim()) : [];
     
-    const optionsData = {
-      hasUnitQuantity: formData.hasUnitQuantity,
-      unitLabel: formData.unitLabel,
-      qtyLabel: formData.qtyLabel,
-      dropdownOptions: dropdownOptions
-    };
-
     const data = {
       name: formData.name,
       fieldType: formData.fieldType,
       required: formData.required,
       batchCode: formData.batchCode.trim(),
-      options: optionsData,
+      options: dropdownOptions, // Simplified back to just dropdown options array
     };
     try {
       if (editingField) {
@@ -196,7 +179,6 @@ export default function CustomFieldsPage() {
             <tr>
               <th className="table-cell font-semibold">Field Name</th>
               <th className="table-cell font-semibold">Type</th>
-              <th className="table-cell font-semibold text-center">Unit/Qty Tracking</th>
               <th className="table-cell font-semibold">Assignment (Batch)</th>
               <th className="table-cell font-semibold">Required</th>
               <th className="table-cell font-semibold text-right">Actions</th>
@@ -204,23 +186,14 @@ export default function CustomFieldsPage() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {loading ? (
-              <tr><td colSpan={6} className="table-cell text-center py-10">Loading...</td></tr>
+              <tr><td colSpan={5} className="table-cell text-center py-10">Loading...</td></tr>
             ) : fields.length === 0 ? (
-              <tr><td colSpan={6} className="table-cell text-center py-10">No custom fields defined.</td></tr>
+              <tr><td colSpan={5} className="table-cell text-center py-10">No custom fields defined.</td></tr>
             ) : (
               fields.map((field) => (
                 <tr key={field.id} className="table-row">
                   <td className="table-cell font-medium">{field.name}</td>
-                  <td className="table-cell capitalize">
-                    {field.fieldType === 'UNIT_QUANTITY' ? 'Legacy Unit Field' : field.fieldType}
-                  </td>
-                  <td className="table-cell text-center">
-                    {(field.options as any)?.hasUnitQuantity ? (
-                      <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-[10px] font-bold text-green-700 border border-green-100 uppercase">Enabled</span>
-                    ) : (
-                      <span className="text-gray-300 text-[10px] font-bold uppercase tracking-tighter">—</span>
-                    )}
-                  </td>
+                  <td className="table-cell capitalize">{field.fieldType}</td>
                   <td className="table-cell">
                     {field.batch ? (
                       <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 border border-blue-100">
@@ -294,49 +267,6 @@ export default function CustomFieldsPage() {
                 </div>
               )}
 
-              <div className="bg-gray-50 p-4 rounded-xl space-y-4 border border-gray-100">
-                <div className="flex items-center justify-between">
-                   <label className="text-sm font-bold text-gray-700">Enable Unit & Quantity tracking</label>
-                   <input
-                    type="checkbox"
-                    checked={formData.hasUnitQuantity}
-                    onChange={(e) => setFormData({...formData, hasUnitQuantity: e.target.checked})}
-                    className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
-                  />
-                </div>
-                
-                {formData.hasUnitQuantity && (
-                  <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                    <div>
-                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Fixed Unit Value</label>
-                      <input
-                        type="text"
-                        value={formData.unitLabel}
-                        onChange={(e) => setFormData({...formData, unitLabel: e.target.value})}
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-xs focus:ring-1 focus:ring-primary outline-none"
-                        placeholder="e.g. Pair / Bundle / Roll"
-                        required={formData.hasUnitQuantity}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Fixed Quantity Value</label>
-                      <input
-                        type="number"
-                        value={formData.qtyLabel}
-                        onChange={(e) => setFormData({...formData, qtyLabel: e.target.value})}
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-xs focus:ring-1 focus:ring-primary outline-none"
-                        placeholder="e.g. 15 / 10 / 5"
-                        required={formData.hasUnitQuantity}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-              {formData.fieldType === 'UNIT_QUANTITY' && (
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                   <p className="text-xs text-blue-800 font-medium">This field type allows users to specify a unit (e.g. Bundle, Roll) and its quantity content (e.g. 15 pcs).</p>
-                </div>
-              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Assign to Batch (Template Code)</label>
                 <input
@@ -432,13 +362,8 @@ export default function CustomFieldsPage() {
                         {field.fieldType === 'dropdown' ? (
                           <select className="w-full rounded-xl border border-gray-200 px-4 py-4 text-sm outline-none bg-white pointer-events-none" disabled>
                             <option value="">Select Option</option>
-                            {field.options?.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+                            {Array.isArray(field.options) ? field.options.map((opt: string) => <option key={opt} value={opt}>{opt}</option>) : []}
                           </select>
-                        ) : field.fieldType === 'UNIT_QUANTITY' ? (
-                           <div className="flex gap-2">
-                              <input type="text" disabled placeholder="Unit (e.g. Bundle)" className="flex-1 rounded-xl border border-gray-200 px-4 py-4 text-sm outline-none bg-white pointer-events-none" />
-                              <input type="number" disabled placeholder="Qty" className="w-24 rounded-xl border border-gray-200 px-4 py-4 text-sm outline-none bg-white pointer-events-none" />
-                           </div>
                         ) : (
                           <input
                             type={field.fieldType}

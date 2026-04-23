@@ -5,15 +5,14 @@ import {
   Lock, Unlock, ArrowLeft, Save, AlertCircle, Clock, 
   History, ChevronDown, ChevronUp, Image as ImageIcon, 
   ListPlus, LayoutGrid, Tags as TagsIcon, Box, ChevronRight,
-  Eye, LogIn, LogOut, Truck, CheckCircle2, ShieldCheck, User
+  Eye, LogIn, LogOut, Truck, CheckCircle2, ShieldCheck, User, Activity
 } from 'lucide-react';
 import api from '@/lib/api';
 
-interface UnitFieldInfo {
-  fieldId: string;
+interface UnitTrackingData {
+  useUnitQty: boolean;
   unit: string;
-  currentQty: number;
-  label: string;
+  qty: number;
 }
 
 export default function ItemPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -23,9 +22,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
-  // View Modes: 'loading' | 'choice' | 'guest' | 'login' | 'form'
   const [viewMode, setViewMode] = useState<'loading' | 'choice' | 'guest' | 'login' | 'form'>('loading');
-  
   const [isEditing, setIsEditing] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [isPullingOut, setIsPullingOut] = useState(false);
@@ -38,17 +35,19 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     batchId: '',
   });
   const [dynamicValues, setDynamicValues] = useState<Record<string, any>>({});
-  const [isSaving, setIsSaving] = useState(false);
+  const [unitTracking, setUnitTracking] = useState<UnitTrackingData>({
+    useUnitQty: false,
+    unit: 'Pair',
+    qty: 15
+  });
   
+  const [isSaving, setIsSaving] = useState(false);
   const [loginData, setLoginData] = useState({ username: '', password: '' });
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState('');
   const [username, setUsername] = useState('');
-
   const [pullOutQty, setPullOutQty] = useState<number>(0);
-  const [unitFieldInfo, setUnitFieldInfo] = useState<UnitFieldInfo | null>(null);
 
   const fetchData = async () => {
     try {
@@ -64,23 +63,27 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       });
       
       const values: Record<string, any> = {};
-      let unitInfo: UnitFieldInfo | null = null;
+      let foundUnitData = false;
       
       itemData.fieldValues?.forEach((fv: any) => {
         values[fv.fieldId] = fv.value;
-        if (fv.field.options?.hasUnitQuantity && fv.value?.useUnitQty) {
-          unitInfo = {
-            fieldId: fv.fieldId,
-            unit: fv.value.unit,
-            currentQty: fv.value.qty,
-            label: fv.field.options.qtyLabel || 'Quantity'
-          };
+        if (fv.value && typeof fv.value === 'object' && fv.value.useUnitQty) {
+          setUnitTracking({
+            useUnitQty: true,
+            unit: fv.value.unit || 'Pair',
+            qty: fv.value.qty || 0
+          });
+          setPullOutQty(fv.value.qty || 0);
+          foundUnitData = true;
         }
       });
       
+      if (!foundUnitData) {
+        setUnitTracking({ useUnitQty: false, unit: 'Pair', qty: 15 });
+        setPullOutQty(0);
+      }
+      
       setDynamicValues(values);
-      setUnitFieldInfo(unitInfo);
-      if (unitInfo) setPullOutQty((unitInfo as UnitFieldInfo).currentQty);
 
       const token = localStorage.getItem('token');
       if (token) {
@@ -88,13 +91,12 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
         setLogs(logsRes.data);
       }
 
-      // Determine initial view mode
       if (!itemRes.data.locked) {
         setViewMode('form');
       } else if (token) {
-        setViewMode('form'); // Already logged in, show the data
+        setViewMode('form');
       } else {
-        setViewMode('choice'); // Locked and not logged in
+        setViewMode('choice');
       }
 
     } catch (err: any) {
@@ -143,39 +145,45 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     setViewMode('choice');
   };
 
+  const prepareFieldValues = (baseValues: Record<string, any>) => {
+    const entries = Object.entries(baseValues);
+    if (entries.length === 0) return [];
+
+    // Inject unit tracking into the first field value to satisfy the schema/backend
+    return entries.map(([fieldId, value], index) => {
+      if (index === 0 && unitTracking.useUnitQty) {
+        const mainValue = typeof value === 'object' && value !== null ? value.main : value;
+        return {
+          fieldId,
+          value: {
+            main: mainValue,
+            ...unitTracking
+          }
+        };
+      }
+      return { fieldId, value };
+    });
+  };
+
   const handleConfirmPullOut = async () => {
     setIsSaving(true);
     try {
       let finalStatus = formData.status;
-      const updatedDynamicValues = { ...dynamicValues };
-
-      if (unitFieldInfo) {
-        const remaining = unitFieldInfo.currentQty - pullOutQty;
-        if (remaining > 0) {
-          // Partial Pull Out - keep Available but update Qty
-          finalStatus = 'Available';
-          updatedDynamicValues[unitFieldInfo.fieldId] = {
-            ...dynamicValues[unitFieldInfo.fieldId],
-            qty: remaining
-          };
-          alert(`Partially pulled out ${pullOutQty} ${unitFieldInfo.unit}. ${remaining} remaining.`);
-        } else {
-          // Full Pull Out
-          finalStatus = 'Released';
-          updatedDynamicValues[unitFieldInfo.fieldId] = {
-            ...dynamicValues[unitFieldInfo.fieldId],
-            qty: 0
-          };
-        }
+      const remaining = unitTracking.qty - pullOutQty;
+      
+      if (remaining > 0) {
+        finalStatus = 'Available';
+        setUnitTracking(prev => ({ ...prev, qty: remaining }));
+        alert(`Partially pulled out ${pullOutQty} ${unitTracking.unit}. ${remaining} remaining.`);
+      } else {
+        finalStatus = 'Released';
+        setUnitTracking(prev => ({ ...prev, qty: 0 }));
       }
 
       const payload = {
         status: finalStatus,
-        fieldValues: Object.entries(updatedDynamicValues).map(([fieldId, value]) => ({
-          fieldId,
-          value,
-        })),
-        logAction: unitFieldInfo ? `PULL_OUT_${pullOutQty}_${unitFieldInfo.unit.toUpperCase()}` : 'PULL_OUT'
+        fieldValues: prepareFieldValues(dynamicValues),
+        logAction: `PULL_OUT_${pullOutQty}_${unitTracking.unit.toUpperCase()}`
       };
 
       await api.patch(`/items/${slug}`, payload);
@@ -194,10 +202,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     try {
       const payload = {
         ...formData,
-        fieldValues: Object.entries(dynamicValues).map(([fieldId, value]) => ({
-          fieldId,
-          value,
-        })),
+        fieldValues: prepareFieldValues(dynamicValues),
       };
       await api.patch(`/items/${slug}`, payload);
       await fetchData();
@@ -218,10 +223,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     try {
       const payload = {
         name: formData.name,
-        fieldValues: Object.entries(dynamicValues).map(([fieldId, value]) => ({
-          fieldId,
-          value,
-        })),
+        fieldValues: prepareFieldValues(dynamicValues),
       };
       await api.post(`/items/${slug}/submit-form`, payload);
       await fetchData();
@@ -255,89 +257,6 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     </div>
   );
 
-  // --- VIEW: Access Choice ---
-  if (viewMode === 'choice') return (
-    <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-6">
-      <div className="max-w-md w-full space-y-8 text-center">
-        <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl shadow-blue-900/10 border border-white">
-          <div className="h-20 w-20 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
-            <Lock className="h-10 w-10 text-primary" />
-          </div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tighter mb-2">RECORD LOCKED</h1>
-          <p className="text-sm font-medium text-gray-500 mb-10 leading-relaxed">
-            Scan detected for <span className="font-mono font-bold text-primary">{slug}</span>. This item has been formally submitted. Choose how to proceed:
-          </p>
-          
-          <div className="space-y-4">
-            <button 
-              onClick={() => setViewMode('guest')}
-              className="w-full group flex items-center justify-between p-6 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-all text-left"
-            >
-              <div>
-                <p className="text-sm font-bold text-gray-900">View as Guest</p>
-                <p className="text-xs text-gray-400">Read-only access to item data</p>
-              </div>
-              <Eye className="h-5 w-5 text-gray-300 group-hover:text-primary transition-colors" />
-            </button>
-            
-            <button 
-              onClick={() => setViewMode('login')}
-              className="w-full group flex items-center justify-between p-6 bg-primary text-white rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all text-left"
-            >
-              <div>
-                <p className="text-sm font-bold">Staff Login</p>
-                <p className="text-xs text-white/60">Pull out or edit item record</p>
-              </div>
-              <LogIn className="h-5 w-5 text-white/40 group-hover:text-white transition-colors" />
-            </button>
-          </div>
-        </div>
-        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Smart Tracking Enterprise v1.0</p>
-      </div>
-    </div>
-  );
-
-  // --- VIEW: Login Form ---
-  if (viewMode === 'login') return (
-    <div className="min-h-screen bg-white p-8 flex flex-col">
-      <button onClick={() => setViewMode('choice')} className="mb-12 flex items-center text-sm font-bold text-gray-400 hover:text-gray-900 transition-colors">
-        <ArrowLeft className="mr-2 h-4 w-4" /> Back to choices
-      </button>
-      
-      <div className="max-w-sm mx-auto w-full pt-12">
-        <h2 className="text-4xl font-black text-gray-900 tracking-tighter mb-2">Staff Login</h2>
-        <p className="text-gray-400 mb-10 font-medium">Enter your assigned credentials to manage <span className="text-primary font-bold">{slug}</span></p>
-        
-        <form onSubmit={handleLogin} className="space-y-4">
-          <input 
-            required
-            type="text" 
-            placeholder="Username" 
-            value={loginData.username}
-            onChange={(e) => setLoginData({...loginData, username: e.target.value})}
-            className="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 focus:bg-white focus:ring-4 focus:ring-primary/10 outline-none transition-all font-medium" 
-          />
-          <input 
-            required
-            type="password" 
-            placeholder="Password" 
-            value={loginData.password}
-            onChange={(e) => setLoginData({...loginData, password: e.target.value})}
-            className="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 focus:bg-white focus:ring-4 focus:ring-primary/10 outline-none transition-all font-medium" 
-          />
-          <button 
-            type="submit" 
-            disabled={isLoggingIn}
-            className="w-full py-5 bg-gray-900 text-white rounded-2xl font-bold shadow-xl active:scale-95 transition-all disabled:opacity-50"
-          >
-            {isLoggingIn ? 'Verifying...' : 'Sign In & Access'}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-
-  // --- VIEW: Main Record (Guest or Staff) ---
   const isGuest = viewMode === 'guest';
   const canAdmin = userRole === 'admin';
   const canInventory = userRole === 'inventory';
@@ -345,7 +264,6 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
 
   return (
     <div className="min-h-screen bg-[#f1f5f9] pb-12 px-4 sm:px-6">
-      {/* Mobile Top Bar */}
       <div className="max-w-3xl mx-auto pt-6 flex items-center justify-between mb-4">
         {isGuest ? (
           <button onClick={() => setViewMode('choice')} className="flex items-center text-[10px] font-black uppercase text-gray-400">
@@ -376,7 +294,6 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
         )}
 
         <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-gray-100">
-          {/* Hero Section */}
           <div className="relative h-64 group">
             {item.imageUrl ? (
               <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
@@ -436,107 +353,100 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                 <div className="space-y-4">
                   <h3 className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] pt-4">Custom Attributes</h3>
                   {item.fieldValues?.map((fv: any) => {
-                    const opts = fv.field.options || {};
-                    const hasUnitQty = opts.hasUnitQuantity;
-                    const fieldOptions = Array.isArray(opts) ? opts : (opts.dropdownOptions || []);
+                    const fieldOptions = Array.isArray(fv.field.options) ? fv.field.options : (fv.field.options?.dropdownOptions || []);
+                    const val = dynamicValues[fv.field.id];
+                    const displayValue = typeof val === 'object' && val !== null ? (val.main || '') : (val || '');
                     
                     return (
-                      <div key={fv.field.id} className="space-y-4">
-                        <div>
-                          <label className="block text-xs font-bold text-gray-500 mb-1.5">{fv.field.name} {fv.field.required && <span className="text-red-500 ml-1">*</span>}</label>
-                          {fv.field.fieldType === 'dropdown' ? (
-                            <select 
-                              required={fv.field.required}
-                              value={dynamicValues[fv.field.id]?.main || dynamicValues[fv.field.id] || ''} 
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                if (hasUnitQty) {
-                                  setDynamicValues({...dynamicValues, [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), main: val }});
-                                } else {
-                                  setDynamicValues({...dynamicValues, [fv.field.id]: val});
-                                }
-                              }} 
-                              className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all"
-                            >
-                              <option value="">Select Option</option>
-                              {fieldOptions.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
-                            </select>
-                          ) : (
-                            <input 
-                              required={fv.field.required}
-                              type={fv.field.fieldType} 
-                              value={hasUnitQty ? (dynamicValues[fv.field.id]?.main || '') : (dynamicValues[fv.field.id] || '')} 
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                if (hasUnitQty) {
-                                  setDynamicValues({...dynamicValues, [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), main: val }});
-                                } else {
-                                  setDynamicValues({...dynamicValues, [fv.field.id]: val});
-                                }
-                              }} 
-                              className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all" 
-                            />
-                          )}
-                        </div>
-
-                        {hasUnitQty && (
-                          <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100/50 space-y-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex flex-col">
-                                <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Enable Unit Tracking?</label>
-                                <p className="text-[10px] text-blue-400 font-bold">Default: <span className="text-blue-600">{opts.qtyLabel} {opts.unitLabel}</span></p>
-                              </div>
-                              <input 
-                                type="checkbox" 
-                                checked={!!dynamicValues[fv.field.id]?.useUnitQty}
-                                onChange={(e) => {
-                                  const isChecked = e.target.checked;
-                                  setDynamicValues({
-                                    ...dynamicValues, 
-                                    [fv.field.id]: { 
-                                      ...(dynamicValues[fv.field.id] || {}), 
-                                      useUnitQty: isChecked,
-                                      unit: isChecked ? (dynamicValues[fv.field.id]?.unit || opts.unitLabel) : '',
-                                      qty: isChecked ? (dynamicValues[fv.field.id]?.qty || parseInt(opts.qtyLabel)) : 0
-                                    }
-                                  });
-                                }}
-                                className="h-6 w-6 rounded-lg border-blue-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
-                              />
-                            </div>
-
-                            {dynamicValues[fv.field.id]?.useUnitQty && (canAdmin || canInventory) && (
-                              <div className="grid grid-cols-1 gap-4 pt-4 border-t border-blue-100/30 animate-in fade-in slide-in-from-top-2 duration-300">
-                                <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Override Values (Staff Only)</p>
-                                <div className="grid grid-cols-2 gap-3">
-                                  <input 
-                                    type="text" 
-                                    placeholder={opts.unitLabel}
-                                    value={dynamicValues[fv.field.id]?.unit || ''} 
-                                    onChange={(e) => setDynamicValues({
-                                      ...dynamicValues, 
-                                      [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), unit: e.target.value }
-                                    })} 
-                                    className="w-full rounded-2xl bg-white border-blue-100 px-4 py-3 text-sm font-medium outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" 
-                                  />
-                                  <input 
-                                    type="number" 
-                                    placeholder={opts.qtyLabel}
-                                    value={dynamicValues[fv.field.id]?.qty || ''} 
-                                    onChange={(e) => setDynamicValues({
-                                      ...dynamicValues, 
-                                      [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), qty: parseInt(e.target.value) || 0 }
-                                    })} 
-                                    className="w-full rounded-2xl bg-white border-blue-100 px-4 py-3 text-sm font-medium outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" 
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
+                      <div key={fv.field.id} className="space-y-2">
+                        <label className="block text-xs font-bold text-gray-500 mb-1.5">{fv.field.name} {fv.field.required && <span className="text-red-500 ml-1">*</span>}</label>
+                        {fv.field.fieldType === 'dropdown' ? (
+                          <select 
+                            required={fv.field.required}
+                            value={displayValue} 
+                            onChange={(e) => {
+                              const newVal = e.target.value;
+                              if (typeof val === 'object' && val !== null) {
+                                setDynamicValues({...dynamicValues, [fv.field.id]: { ...val, main: newVal }});
+                              } else {
+                                setDynamicValues({...dynamicValues, [fv.field.id]: newVal});
+                              }
+                            }} 
+                            className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all"
+                          >
+                            <option value="">Select Option</option>
+                            {fieldOptions.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+                          </select>
+                        ) : (
+                          <input 
+                            required={fv.field.required}
+                            type={fv.field.fieldType} 
+                            value={displayValue} 
+                            onChange={(e) => {
+                              const newVal = e.target.value;
+                              if (typeof val === 'object' && val !== null) {
+                                setDynamicValues({...dynamicValues, [fv.field.id]: { ...val, main: newVal }});
+                              } else {
+                                setDynamicValues({...dynamicValues, [fv.field.id]: newVal});
+                              }
+                            }} 
+                            className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all" 
+                          />
                         )}
                       </div>
                     );
                   })}
+                </div>
+
+                {/* Global Unit Tracking Section */}
+                <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100/50 space-y-4 mt-8">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 bg-blue-600/10 rounded-xl flex items-center justify-center">
+                        <Activity className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Enable Unit Tracking?</label>
+                        <p className="text-[10px] text-blue-400 font-bold italic">Link this asset to sub-inventory tracking</p>
+                      </div>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      checked={unitTracking.useUnitQty}
+                      onChange={(e) => setUnitTracking({ ...unitTracking, useUnitQty: e.target.checked })}
+                      className="h-6 w-6 rounded-lg border-blue-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
+                    />
+                  </div>
+
+                  {unitTracking.useUnitQty && (
+                    <div className="grid grid-cols-1 gap-4 pt-4 border-t border-blue-100/30 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Tracking Parameters {(canAdmin || canInventory) ? '(Editable)' : '(Pre-defined)'}</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-gray-400 uppercase">Unit Name</label>
+                          <input 
+                            type="text" 
+                            disabled={!canAdmin && !canInventory}
+                            placeholder="e.g. Pair"
+                            value={unitTracking.unit} 
+                            onChange={(e) => setUnitTracking({ ...unitTracking, unit: e.target.value })} 
+                            className="w-full rounded-2xl bg-white border border-blue-100 px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:ring-4 focus:ring-blue-500/10 transition-all disabled:opacity-50" 
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-gray-400 uppercase">Quantity</label>
+                          <input 
+                            type="number" 
+                            disabled={!canAdmin && !canInventory}
+                            placeholder="15"
+                            value={unitTracking.qty} 
+                            onChange={(e) => setUnitTracking({ ...unitTracking, qty: parseInt(e.target.value) || 0 })} 
+                            className="w-full rounded-2xl bg-white border border-blue-100 px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:ring-4 focus:ring-blue-500/10 transition-all disabled:opacity-50" 
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-3 pt-6">
@@ -571,40 +481,38 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                   </div>
                 </div>
 
-                {/* Attributes Grid */}
                 <div className="grid grid-cols-2 gap-6 pt-6 border-t border-gray-50">
                    {item.fieldValues?.map((fv: any) => {
-                     const opts = fv.field.options || {};
                      const val = fv.value;
-                     const hasUnitData = typeof val === 'object' && val !== null && val.useUnitQty;
+                     const displayValue = typeof val === 'object' && val !== null ? (val.main || '—') : (val || '—');
 
                      return (
-                      <div key={fv.id} className={hasUnitData ? 'col-span-2 space-y-4' : ''}>
-                        <div>
-                          <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">{fv.field.name}</p>
-                          <p className="text-sm font-bold text-gray-700">
-                            {typeof val === 'object' && val !== null ? (val.main || '—') : (val || '—')}
-                          </p>
-                        </div>
-                        
-                        {hasUnitData && (
-                          <div className="grid grid-cols-2 gap-6 p-6 bg-gray-50 rounded-[2rem] border border-gray-100">
-                             <div>
-                                <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-1">{opts.unitLabel || 'Unit'}</p>
-                                <p className="text-sm font-black text-gray-900">{val.unit || '—'}</p>
-                             </div>
-                             <div>
-                                <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-1">{opts.qtyLabel || 'Quantity'}</p>
-                                <p className="text-sm font-black text-gray-900">{val.qty || 0}</p>
-                             </div>
-                          </div>
-                        )}
+                      <div key={fv.id}>
+                        <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">{fv.field.name}</p>
+                        <p className="text-sm font-bold text-gray-700">{displayValue}</p>
                       </div>
                      );
                    })}
+                   
+                   {unitTracking.useUnitQty && (
+                      <div className="col-span-2 mt-4 p-6 bg-gray-50 rounded-[2rem] border border-gray-100 grid grid-cols-2 gap-6">
+                         <div className="absolute -mt-10 left-6">
+                            <span className="bg-white border border-gray-100 px-3 py-1 rounded-full text-[9px] font-black text-primary uppercase tracking-widest flex items-center">
+                               <Activity className="h-3 w-3 mr-1.5" /> Unit Tracking Enabled
+                            </span>
+                         </div>
+                         <div>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Unit Type</p>
+                            <p className="text-sm font-black text-gray-900">{unitTracking.unit}</p>
+                         </div>
+                         <div>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Current Stock</p>
+                            <p className="text-sm font-black text-gray-900">{unitTracking.qty}</p>
+                         </div>
+                      </div>
+                   )}
                 </div>
 
-                {/* Staff Actions */}
                 {!isGuest && isLoggedIn && (
                    <div className="pt-8 space-y-3">
                      <button 
@@ -642,7 +550,6 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
           </div>
         </div>
 
-        {/* Pull Out Modal (Status Update) */}
         {isPullingOut && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
             <div className="w-full max-w-sm bg-white rounded-[2.5rem] p-8 shadow-2xl animate-in slide-in-from-bottom duration-300">
@@ -662,26 +569,26 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                     </select>
                  </div>
 
-                 {unitFieldInfo && (
+                 {unitTracking.useUnitQty && (
                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                     <label className="block text-[10px] font-black text-orange-600 uppercase tracking-widest mb-2">Quantity to Pull Out ({unitFieldInfo.unit})</label>
+                     <label className="block text-[10px] font-black text-orange-600 uppercase tracking-widest mb-2">Quantity to Pull Out ({unitTracking.unit})</label>
                      <div className="relative">
                         <input 
                           type="number" 
                           min={1} 
-                          max={unitFieldInfo.currentQty}
+                          max={unitTracking.qty}
                           value={pullOutQty}
-                          onChange={(e) => setPullOutQty(Math.min(unitFieldInfo.currentQty, Math.max(1, parseInt(e.target.value) || 0)))}
+                          onChange={(e) => setPullOutQty(Math.min(unitTracking.qty, Math.max(1, parseInt(e.target.value) || 0)))}
                           className="w-full rounded-2xl bg-orange-50 border-orange-100 px-5 py-4 text-sm font-bold text-orange-700 outline-none focus:ring-4 focus:ring-orange-500/10"
                         />
                         <div className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-black text-orange-300 uppercase">
-                          / {unitFieldInfo.currentQty} Total
+                          / {unitTracking.qty} Total
                         </div>
                      </div>
                      <p className="mt-2 text-[10px] text-gray-400 font-bold italic">
-                        {pullOutQty === unitFieldInfo.currentQty 
+                        {pullOutQty === unitTracking.qty 
                           ? "Full pull-out: Item will be marked as Released." 
-                          : `Partial pull-out: ${unitFieldInfo.currentQty - pullOutQty} ${unitFieldInfo.unit} will remain.`}
+                          : `Partial pull-out: ${unitTracking.qty - pullOutQty} ${unitTracking.unit} will remain.`}
                      </p>
                    </div>
                  )}
@@ -706,7 +613,6 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
           </div>
         )}
 
-        {/* Logs */}
         {isLoggedIn && logs.length > 0 && (
           <div className="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden">
              <button onClick={() => setShowLogs(!showLogs)} className="w-full flex items-center justify-between p-8 hover:bg-gray-50 transition-all">

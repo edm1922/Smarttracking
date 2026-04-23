@@ -272,19 +272,8 @@ export class ItemsService {
   }
 
   async getUnitInventory() {
+    // Find all items where any field value has useUnitQty: true
     const items = await this.prisma.item.findMany({
-      where: {
-        fieldValues: {
-          some: {
-            field: {
-              options: {
-                path: ['hasUnitQuantity'],
-                equals: true
-              }
-            }
-          }
-        }
-      },
       include: {
         fieldValues: {
           include: { field: true }
@@ -298,12 +287,17 @@ export class ItemsService {
     const inventory: Record<string, any> = {};
     
     items.forEach(item => {
-      const unitField = item.fieldValues.find(fv => fv.field.options?.hasUnitQuantity);
-      if (!unitField || !unitField.value?.useUnitQty) return;
+      const unitField = item.fieldValues.find(fv => {
+        const val = fv.value as any;
+        return val && typeof val === 'object' && val.useUnitQty === true;
+      });
+      
+      if (!unitField) return;
+      const val = unitField.value as any;
 
       const name = item.name || 'Unnamed Product';
-      const qty = unitField.value.qty || 0;
-      const unit = unitField.value.unit || 'Units';
+      const qty = val.qty || 0;
+      const unit = val.unit || 'Units';
 
       if (!inventory[name]) {
         inventory[name] = {
