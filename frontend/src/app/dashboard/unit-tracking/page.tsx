@@ -5,7 +5,7 @@ import {
   Boxes, Package, Search, Filter, ArrowRight, 
   ChevronRight, ChevronDown, ChevronUp, History,
   TrendingDown, TrendingUp, AlertTriangle, Box,
-  QrCode, Clock, User, ArrowUpRight, Check, X, Truck, Activity, FileText, Printer
+  QrCode, Clock, User, ArrowUpRight, Check, X, Truck, Activity, FileText, Printer, LayoutGrid
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -19,6 +19,7 @@ export default function UnitTrackingPage() {
   const [requests, setRequests] = useState<any[]>([]);
   const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
   const [isBuildingTransmittal, setIsBuildingTransmittal] = useState(false);
+  const [groupBySpecs, setGroupBySpecs] = useState(false);
   const [transmittalHeader, setTransmittalHeader] = useState({
     transmittalNo: `TR-UNIT-${Date.now().toString().slice(-6)}`,
     date: new Date().toLocaleDateString('en-CA'),
@@ -97,6 +98,39 @@ export default function UnitTrackingPage() {
   const filteredInventory = inventory.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const getGroupedRequests = () => {
+    if (!groupBySpecs) return requests;
+
+    const groups: Record<string, any> = {};
+    
+    requests.forEach(req => {
+      // Create a unique key based on name and all field values
+      const specKey = `${req.item.name || 'Unnamed'}-${req.item.fieldValues?.map((fv: any) => fv.value).join('|')}`;
+      
+      if (!groups[specKey]) {
+        groups[specKey] = {
+          ...req,
+          ids: [req.id],
+          totalQty: req.qty,
+          itemsCount: 1,
+          slugs: [req.item.slug],
+          isGrouped: true
+        };
+      } else {
+        groups[specKey].ids.push(req.id);
+        groups[specKey].totalQty += req.qty;
+        groups[specKey].itemsCount += 1;
+        if (!groups[specKey].slugs.includes(req.item.slug)) {
+          groups[specKey].slugs.push(req.item.slug);
+        }
+      }
+    });
+
+    return Object.values(groups);
+  };
+
+  const displayRequests = getGroupedRequests();
 
   const totalStock = inventory.reduce((acc, p) => acc + p.totalQty, 0);
   const totalProducts = inventory.length;
@@ -321,6 +355,12 @@ export default function UnitTrackingPage() {
           </div>
           
           <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setGroupBySpecs(!groupBySpecs)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${groupBySpecs ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+            >
+              <LayoutGrid className="h-4 w-4" /> {groupBySpecs ? 'Grouped by Specs' : 'Show Individual QRs'}
+            </button>
             {selectedRequestIds.length > 0 && (
               <button 
                 onClick={() => setIsBuildingTransmittal(true)}
@@ -347,14 +387,14 @@ export default function UnitTrackingPage() {
                    />
                 </th>
                 <th className="px-4 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
-                <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Asset ID</th>
+                <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">{groupBySpecs ? 'Assets' : 'Asset ID'}</th>
                 <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Requester</th>
                 <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Qty</th>
                 <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {requests.map((req) => (
+              {displayRequests.map((req) => (
                 <tr key={req.id} className={`hover:bg-gray-50/50 transition-colors group ${selectedRequestIds.includes(req.id) ? 'bg-primary/5' : ''}`}>
                   <td className="px-8 py-5">
                     <input 
@@ -369,13 +409,21 @@ export default function UnitTrackingPage() {
                     <p className="text-[10px] text-gray-400 font-medium">{new Date(req.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                   </td>
                   <td className="px-8 py-5">
-                    <span className="text-sm font-mono font-bold text-primary bg-primary/5 px-2 py-1 rounded-md">{req.item.slug}</span>
+                    {req.isGrouped ? (
+                      <div className="space-y-1">
+                        <p className="text-sm font-black text-gray-900">{req.item.name || 'Multiple Assets'}</p>
+                        <p className="text-[10px] text-primary font-bold">{req.itemsCount} QRs • {req.slugs.slice(0,2).join(', ')}{req.slugs.length > 2 ? '...' : ''}</p>
+                      </div>
+                    ) : (
+                      <span className="text-sm font-mono font-bold text-primary bg-primary/5 px-2 py-1 rounded-md">{req.item.slug}</span>
+                    )}
                   </td>
                   <td className="px-8 py-5">
                     <p className="text-sm font-bold text-gray-900">{req.user.username}</p>
                   </td>
                   <td className="px-8 py-5 text-center">
-                    <p className="text-sm font-black text-gray-900">{req.qty} <span className="text-[10px] text-gray-400 uppercase">{req.unit}</span></p>
+                    <p className="text-sm font-black text-gray-900">{req.isGrouped ? req.totalQty : req.qty} <span className="text-[10px] text-gray-400 uppercase">{req.unit}</span></p>
+                    {req.isGrouped && <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Aggregated</p>}
                   </td>
                   <td className="px-8 py-5">
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
@@ -388,7 +436,7 @@ export default function UnitTrackingPage() {
                   </td>
                 </tr>
               ))}
-              {requests.length === 0 && (
+              {displayRequests.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-8 py-20 text-center">
                     <History className="h-12 w-12 text-gray-200 mx-auto mb-4" />

@@ -104,6 +104,48 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       
       setDynamicValues(values);
 
+      // SMART AUTOFILL: If the item is empty, try to find similar items in the same category/batch
+      if (!itemData.name && (!itemData.fieldValues || itemData.fieldValues.length === 0)) {
+        try {
+          const categoryId = itemData.categoryId;
+          const batchId = itemData.batchId;
+          
+          // Get items from same category/batch
+          const similarRes = await api.get('/items', { 
+            params: { 
+              categoryId, 
+              batchId,
+              limit: 5 // Just need a few to check
+            } 
+          });
+          
+          // Find the most recent one that ISN'T this one and has data
+          const sourceItem = similarRes.data.items?.find((i: any) => 
+            i.id !== itemData.id && (i.name || (i.fieldValues && i.fieldValues.length > 0))
+          );
+
+          if (sourceItem) {
+            console.log('Autofilling from similar item:', sourceItem.slug);
+            setFormData(prev => ({
+              ...prev,
+              name: sourceItem.name || prev.name,
+              description: sourceItem.description || prev.description,
+            }));
+
+            const autoValues: Record<string, any> = { ...values };
+            sourceItem.fieldValues?.forEach((fv: any) => {
+              // Only copy values for fields that exist for the current item
+              if (relevantFields.find(f => f.id === fv.fieldId)) {
+                autoValues[fv.fieldId] = fv.value;
+              }
+            });
+            setDynamicValues(autoValues);
+          }
+        } catch (err) {
+          console.error('Autofill failed', err);
+        }
+      }
+
       const token = localStorage.getItem('token');
       if (token) {
         const logsRes = await api.get(`/logs/item/${itemRes.data.id}`);
