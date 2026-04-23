@@ -268,9 +268,9 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
         return;
       }
       
-      // Basic size check (5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        alert('Image is too large. Please keep it under 5MB.');
+      // Basic size check (2MB) - Vercel has a 4.5MB total limit for the entire request
+      if (file.size > 2 * 1024 * 1024) {
+        alert('Image is too large. Please keep it under 2MB to ensure successful upload.');
         return;
       }
       const reader = new FileReader();
