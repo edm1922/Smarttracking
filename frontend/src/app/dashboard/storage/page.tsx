@@ -87,7 +87,14 @@ export default function StoragePage() {
 
   const getFieldValue = (item: Item, fieldId: string) => {
     const fv = item.fieldValues?.find(v => v.fieldId === fieldId);
-    return fv ? String(fv.value) : '-';
+    if (!fv) return '-';
+    
+    const value = fv.value;
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return String(value.main || JSON.stringify(value));
+    }
+    
+    return String(value);
   };
 
   const filteredBatches = batches.filter(b => 
