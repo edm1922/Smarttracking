@@ -40,8 +40,15 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
   const [userRole, setUserRole] = useState('');
   const [username, setUsername] = useState('');
 
+  interface UnitFieldInfo {
+    fieldId: string;
+    unit: string;
+    currentQty: number;
+    label: string;
+  }
+
   const [pullOutQty, setPullOutQty] = useState<number>(0);
-  const [unitFieldInfo, setUnitFieldInfo] = useState<any>(null);
+  const [unitFieldInfo, setUnitFieldInfo] = useState<UnitFieldInfo | null>(null);
 
   const fetchData = async () => {
     try {
