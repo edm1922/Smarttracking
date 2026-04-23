@@ -20,7 +20,8 @@ interface Item {
   fieldValues?: any[];
   category?: { name: string };
   tags?: { tag: { name: string } }[];
-  batch?: { batchCode: string };
+  batchId: string | null;
+  batch?: { id: string; batchCode: string } | null;
 }
 
 export default function QRItemsPage() {
@@ -215,11 +216,11 @@ export default function QRItemsPage() {
                 <tr key={item.id} className={`hover:bg-gray-50 transition-colors ${item.status === 'Released' ? 'bg-purple-50/30' : ''}`}>
                   <td className="px-6 py-4 relative">
                     {/* Batch Group Identifier */}
-                    {item.batchId && (
+                    {item.batch && (
                       <div 
                         className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full opacity-60" 
-                        style={{ backgroundColor: `hsl(${parseInt(item.batchId.slice(-4), 16) % 360}, 70%, 50%)` }}
-                        title={`Batch: ${item.batch?.batchCode}`}
+                        style={{ backgroundColor: `hsl(${parseInt(item.batch.id.slice(-4), 16) % 360}, 70%, 50%)` }}
+                        title={`Batch: ${item.batch.batchCode}`}
                       />
                     )}
                     <div className="flex items-center">
