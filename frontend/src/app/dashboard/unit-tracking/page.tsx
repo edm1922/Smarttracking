@@ -385,18 +385,26 @@ export default function UnitTrackingPage() {
                           
                           {/* Form Content / Specs Breakdown */}
                           <div className="flex flex-wrap gap-2 ml-5">
-                            {item.fieldValues?.filter((fv: any) => {
+                            {item.fieldValues?.map((fv: any, idx: number) => {
                               const v = fv.value as any;
-                              // Skip internal unit tracking objects
-                              return !(v && typeof v === 'object' && v.useUnitQty);
-                            }).map((fv: any, idx: number) => (
-                              <div key={idx} className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-100 rounded-lg shadow-sm">
-                                <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest border-r border-gray-100 pr-1.5">{fv.name}</span>
-                                <span className="text-[10px] font-bold text-gray-800">
-                                  {typeof fv.value === 'object' ? JSON.stringify(fv.value) : String(fv.value)}
-                                </span>
-                              </div>
-                            ))}
+                              let displayValue = '';
+                              
+                              if (v && typeof v === 'object' && v.useUnitQty) {
+                                if (v.main) displayValue = String(v.main);
+                                else return null; // Hide if it's just a technical qty object
+                              } else {
+                                displayValue = typeof fv.value === 'object' ? JSON.stringify(fv.value) : String(fv.value);
+                              }
+
+                              if (!displayValue || displayValue.trim() === '') return null;
+
+                              return (
+                                <div key={idx} className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-100 rounded-lg shadow-sm">
+                                  <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest border-r border-gray-100 pr-1.5">{fv.name}</span>
+                                  <span className="text-[10px] font-bold text-gray-800">{displayValue}</span>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                         <div className="flex items-center gap-4">

@@ -340,12 +340,20 @@ export class ItemsService {
       if (!inventory[name].specs) inventory[name].specs = {};
       item.fieldValues.forEach(fv => {
         const v = fv.value as any;
-        if (v && typeof v === 'object' && v.useUnitQty) return;
-        
-        if (!inventory[name].specs[fv.field.name]) {
-          inventory[name].specs[fv.field.name] = new Set();
+        let displayValue: string | null = null;
+
+        if (v && typeof v === 'object' && v.useUnitQty) {
+          if (v.main) displayValue = String(v.main);
+        } else {
+          displayValue = typeof fv.value === 'object' ? JSON.stringify(fv.value) : String(fv.value);
         }
-        inventory[name].specs[fv.field.name].add(typeof fv.value === 'object' ? JSON.stringify(fv.value) : String(fv.value));
+
+        if (displayValue && displayValue.trim() !== '') {
+          if (!inventory[name].specs[fv.field.name]) {
+            inventory[name].specs[fv.field.name] = new Set();
+          }
+          inventory[name].specs[fv.field.name].add(displayValue);
+        }
       });
 
       inventory[name].items.push({
