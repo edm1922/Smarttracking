@@ -80,7 +80,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       
       setDynamicValues(values);
       setUnitFieldInfo(unitInfo);
-      if (unitInfo) setPullOutQty(unitInfo.currentQty);
+      if (unitInfo) setPullOutQty((unitInfo as UnitFieldInfo).currentQty);
 
       const token = localStorage.getItem('token');
       if (token) {
