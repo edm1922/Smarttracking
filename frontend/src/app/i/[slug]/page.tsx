@@ -431,8 +431,8 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                           <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100/50 space-y-4">
                             <div className="flex items-center justify-between">
                               <div className="flex flex-col">
-                                <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Enable {opts.unitLabel || 'Unit'} tracking?</label>
-                                <p className="text-[10px] text-blue-400 font-bold">This will automatically apply: <span className="text-blue-600">{opts.qtyLabel} {opts.unitLabel}</span></p>
+                                <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Enable Unit Tracking?</label>
+                                <p className="text-[10px] text-blue-400 font-bold">Default: <span className="text-blue-600">{opts.qtyLabel} {opts.unitLabel}</span></p>
                               </div>
                               <input 
                                 type="checkbox" 
@@ -444,14 +444,42 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                                     [fv.field.id]: { 
                                       ...(dynamicValues[fv.field.id] || {}), 
                                       useUnitQty: isChecked,
-                                      unit: isChecked ? opts.unitLabel : '',
-                                      qty: isChecked ? parseInt(opts.qtyLabel) : 0
+                                      unit: isChecked ? (dynamicValues[fv.field.id]?.unit || opts.unitLabel) : '',
+                                      qty: isChecked ? (dynamicValues[fv.field.id]?.qty || parseInt(opts.qtyLabel)) : 0
                                     }
                                   });
                                 }}
                                 className="h-6 w-6 rounded-lg border-blue-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
                               />
                             </div>
+
+                            {dynamicValues[fv.field.id]?.useUnitQty && (canAdmin || canInventory) && (
+                              <div className="grid grid-cols-1 gap-4 pt-4 border-t border-blue-100/30 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Override Values (Staff Only)</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <input 
+                                    type="text" 
+                                    placeholder={opts.unitLabel}
+                                    value={dynamicValues[fv.field.id]?.unit || ''} 
+                                    onChange={(e) => setDynamicValues({
+                                      ...dynamicValues, 
+                                      [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), unit: e.target.value }
+                                    })} 
+                                    className="w-full rounded-2xl bg-white border-blue-100 px-4 py-3 text-sm font-medium outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" 
+                                  />
+                                  <input 
+                                    type="number" 
+                                    placeholder={opts.qtyLabel}
+                                    value={dynamicValues[fv.field.id]?.qty || ''} 
+                                    onChange={(e) => setDynamicValues({
+                                      ...dynamicValues, 
+                                      [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), qty: parseInt(e.target.value) || 0 }
+                                    })} 
+                                    className="w-full rounded-2xl bg-white border-blue-100 px-4 py-3 text-sm font-medium outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" 
+                                  />
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
