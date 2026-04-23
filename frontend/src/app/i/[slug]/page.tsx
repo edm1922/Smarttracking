@@ -9,6 +9,13 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api';
 
+interface UnitFieldInfo {
+  fieldId: string;
+  unit: string;
+  currentQty: number;
+  label: string;
+}
+
 export default function ItemPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   const [item, setItem] = useState<any>(null);
@@ -40,13 +47,6 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
   const [userRole, setUserRole] = useState('');
   const [username, setUsername] = useState('');
 
-  interface UnitFieldInfo {
-    fieldId: string;
-    unit: string;
-    currentQty: number;
-    label: string;
-  }
-
   const [pullOutQty, setPullOutQty] = useState<number>(0);
   const [unitFieldInfo, setUnitFieldInfo] = useState<UnitFieldInfo | null>(null);
 
@@ -64,7 +64,8 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       });
       
       const values: Record<string, any> = {};
-      let unitInfo = null;
+      let unitInfo: UnitFieldInfo | null = null;
+      
       itemData.fieldValues?.forEach((fv: any) => {
         values[fv.fieldId] = fv.value;
         if (fv.field.options?.hasUnitQuantity && fv.value?.useUnitQty) {
@@ -76,6 +77,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
           };
         }
       });
+      
       setDynamicValues(values);
       setUnitFieldInfo(unitInfo);
       if (unitInfo) setPullOutQty(unitInfo.currentQty);
