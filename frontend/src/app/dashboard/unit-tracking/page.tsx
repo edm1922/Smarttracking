@@ -350,10 +350,9 @@ export default function UnitTrackingPage() {
               {/* Expanded content */}
               {expandedProduct === product.name && (
                 <div className="mt-8 pt-8 border-t border-gray-100 animate-in slide-in-from-top-4 duration-300">
-                  {console.log(`Rendering expanded ${product.name}:`, product.specs)}
                   {/* Group Specs Summary */}
-                  {product.specs && Object.keys(product.specs).length > 0 && (
-                    <div className="mb-8 grid grid-cols-2 gap-y-6 gap-x-4">
+                  {product.specs && (
+                    <div className="mb-8 grid grid-cols-2 gap-y-6 gap-x-4 border-b border-orange-100/30 pb-8">
                       {Object.entries(product.specs).map(([key, values]: [string, any]) => (
                         <div key={key} className="animate-in fade-in slide-in-from-left-2 duration-500">
                           <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{key}</span>
