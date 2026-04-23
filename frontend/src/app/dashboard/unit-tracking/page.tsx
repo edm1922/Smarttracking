@@ -26,8 +26,10 @@ export default function UnitTrackingPage() {
     department: '',
     recipient: '',
     preparedBy: '',
+    checkedBy: '',
     receivedBy: '',
-    approvedBy: ''
+    approvedBy: '',
+    remarks: ''
   });
 
   useEffect(() => {
@@ -518,17 +520,28 @@ export default function UnitTrackingPage() {
 
                 <div className="pt-6 border-t border-gray-50 space-y-4">
                   <h3 className="text-[10px] font-black text-primary uppercase tracking-widest">Signatories</h3>
-                  {['preparedBy', 'receivedBy', 'approvedBy'].map(field => (
+                  {['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy'].map(field => (
                     <div key={field}>
                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">{field.replace(/By$/, ' By')}</label>
                         <input 
                             type="text" 
+                            placeholder={field === 'checkedBy' ? 'Optional' : 'Name'}
                             value={(transmittalHeader as any)[field]}
                             onChange={e => setTransmittalHeader({...transmittalHeader, [field]: e.target.value})}
                             className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold text-gray-900 focus:bg-white focus:ring-4 focus:ring-primary/5 transition-all outline-none"
                         />
                     </div>
                   ))}
+
+                  <div className="pt-2">
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Remarks</label>
+                    <textarea 
+                        placeholder="Additional notes..."
+                        value={transmittalHeader.remarks}
+                        onChange={e => setTransmittalHeader({...transmittalHeader, remarks: e.target.value})}
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold text-gray-900 focus:bg-white focus:ring-4 focus:ring-primary/5 transition-all outline-none h-20 resize-none"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -625,8 +638,17 @@ export default function UnitTrackingPage() {
           </tbody>
         </table>
 
-        <div className="grid grid-cols-3 gap-12 pt-12 border-t-2 border-gray-50">
-          {['preparedBy', 'receivedBy', 'approvedBy'].map(field => (
+        {transmittalHeader.remarks && (
+          <div className="mb-12">
+            <div className="text-[10px] font-black text-gray-400 uppercase mb-1">Remarks:</div>
+            <div className="text-sm font-medium text-gray-700 whitespace-pre-wrap border-l-4 border-gray-100 pl-4 py-1">
+              {transmittalHeader.remarks}
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-12 pt-12 border-t-2 border-gray-50">
+          {['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy'].map(field => (
             <div key={field} className="space-y-8">
               <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">{field.replace(/By$/, ' By')}:</div>
               <div className="border-b-2 border-gray-900 text-center pb-2">
