@@ -24,7 +24,7 @@ export default function UnitTrackingPage() {
     date: new Date().toLocaleDateString('en-CA'),
     department: '',
     recipient: '',
-    preparedBy: localStorage.getItem('username') || '',
+    preparedBy: '',
     receivedBy: '',
     approvedBy: ''
   });
@@ -32,6 +32,12 @@ export default function UnitTrackingPage() {
   useEffect(() => {
     fetchInventory();
     fetchRequests();
+    
+    // Set preparedBy on client-side
+    const user = localStorage.getItem('username');
+    if (user) {
+      setTransmittalHeader(prev => ({ ...prev, preparedBy: user }));
+    }
   }, []);
 
   const fetchRequests = async () => {
