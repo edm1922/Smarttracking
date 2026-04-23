@@ -187,6 +187,7 @@ model PurchaseRequest {
   position        String?
   sourceSupplier  String?
   subTitle        String?
+  customSubHeader String?
   items           Json     // [{name, unit, quantity, estimatedCost}]
   remarks         String?
   signatoryConfig Json?    // {preparedBy: boolean, checkedBy: boolean, receivedBy: boolean, approvedBy: boolean}
