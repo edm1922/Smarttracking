@@ -42,6 +42,8 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     qty: 15
   });
   
+  const [fieldSuggestions, setFieldSuggestions] = useState<Record<string, string[]>>({});
+  
   const [isSaving, setIsSaving] = useState(false);
   const [loginData, setLoginData] = useState({ username: '', password: '' });
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -141,6 +143,25 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
             });
             setDynamicValues(autoValues);
           }
+
+          // Build suggestion map from all similar items
+          const suggestionMap: Record<string, Set<string>> = {};
+          similarRes.data.items?.forEach((i: any) => {
+            i.fieldValues?.forEach((fv: any) => {
+              const val = typeof fv.value === 'object' ? fv.value.main : fv.value;
+              if (val) {
+                if (!suggestionMap[fv.fieldId]) suggestionMap[fv.fieldId] = new Set();
+                suggestionMap[fv.fieldId].add(String(val));
+              }
+            });
+          });
+
+          const finalSuggestions: Record<string, string[]> = {};
+          Object.keys(suggestionMap).forEach(key => {
+            finalSuggestions[key] = Array.from(suggestionMap[key]).slice(0, 10);
+          });
+          setFieldSuggestions(finalSuggestions);
+
         } catch (err) {
           console.error('Autofill failed', err);
         }
@@ -564,6 +585,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                             required={field.required}
                             type={field.fieldType} 
                             value={displayValue} 
+                            list={`suggestions-${field.id}`}
                             onChange={(e) => {
                               const newVal = e.target.value;
                               if (typeof val === 'object' && val !== null) {
@@ -575,6 +597,11 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                             className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all" 
                           />
                         )}
+                        <datalist id={`suggestions-${field.id}`}>
+                          {fieldSuggestions[field.id]?.map(s => (
+                            <option key={s} value={s} />
+                          ))}
+                        </datalist>
                       </div>
                     );
                   })}
