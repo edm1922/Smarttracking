@@ -31,6 +31,9 @@ export default function UnitTrackingPage() {
     approvedBy: '',
     remarks: ''
   });
+  
+  const [logSearch, setLogSearch] = useState('');
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
   useEffect(() => {
     fetchInventory();
@@ -102,11 +105,32 @@ export default function UnitTrackingPage() {
   );
 
   const getGroupedRequests = () => {
-    if (!groupBySpecs) return requests;
+    let filtered = requests;
+
+    // Apply log-specific search (Asset ID or Requester)
+    if (logSearch) {
+      filtered = filtered.filter(r => 
+        r.item.slug.toLowerCase().includes(logSearch.toLowerCase()) ||
+        r.user.username.toLowerCase().includes(logSearch.toLowerCase()) ||
+        (r.item.name && r.item.name.toLowerCase().includes(logSearch.toLowerCase()))
+      );
+    }
+
+    // Apply date range filter
+    if (dateRange.start) {
+      filtered = filtered.filter(r => new Date(r.createdAt) >= new Date(dateRange.start));
+    }
+    if (dateRange.end) {
+      const end = new Date(dateRange.end);
+      end.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(r => new Date(r.createdAt) <= end);
+    }
+
+    if (!groupBySpecs) return filtered;
 
     const groups: Record<string, any> = {};
     
-    requests.forEach(req => {
+    filtered.forEach(req => {
       // Create a unique key based on name and all field values
       const specKey = `${req.item.name || 'Unnamed'}-${req.item.fieldValues?.map((fv: any) => fv.value).join('|')}`;
       
@@ -356,7 +380,36 @@ export default function UnitTrackingPage() {
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Search Bar for Log */}
+            <div className="relative group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 group-focus-within:text-primary transition-colors" />
+              <input 
+                type="text" 
+                placeholder="Search log..."
+                value={logSearch}
+                onChange={e => setLogSearch(e.target.value)}
+                className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none focus:bg-white focus:ring-4 focus:ring-primary/5 transition-all w-48"
+              />
+            </div>
+
+            {/* Date Range Filters */}
+            <div className="flex items-center gap-2 bg-gray-50 p-1 rounded-xl border border-gray-100">
+              <input 
+                type="date" 
+                value={dateRange.start}
+                onChange={e => setDateRange({...dateRange, start: e.target.value})}
+                className="bg-transparent border-none text-[10px] font-black uppercase outline-none px-2 py-1"
+              />
+              <span className="text-gray-300">/</span>
+              <input 
+                type="date" 
+                value={dateRange.end}
+                onChange={e => setDateRange({...dateRange, end: e.target.value})}
+                className="bg-transparent border-none text-[10px] font-black uppercase outline-none px-2 py-1"
+              />
+            </div>
+
             <button 
               onClick={() => setGroupBySpecs(!groupBySpecs)}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${groupBySpecs ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
