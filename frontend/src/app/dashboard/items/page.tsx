@@ -213,12 +213,22 @@ export default function QRItemsPage() {
             ) : (
               filteredItems.map((item) => (
                 <tr key={item.id} className={`hover:bg-gray-50 transition-colors ${item.status === 'Released' ? 'bg-purple-50/30' : ''}`}>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 relative">
+                    {/* Batch Group Identifier */}
+                    {item.batchId && (
+                      <div 
+                        className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full opacity-60" 
+                        style={{ backgroundColor: `hsl(${parseInt(item.batchId.slice(-4), 16) % 360}, 70%, 50%)` }}
+                        title={`Batch: ${item.batch?.batchCode}`}
+                      />
+                    )}
                     <div className="flex items-center">
                       <QrCode className="h-5 w-5 text-primary mr-3" />
                       <div>
                         <div className="text-sm font-mono font-bold text-primary uppercase">{item.slug}</div>
-                        <div className="text-xs text-gray-500">{item.name || 'Untitled Form'}</div>
+                        <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                          {item.batch?.batchCode || item.name || 'Untitled Form'}
+                        </div>
                       </div>
                     </div>
                   </td>
