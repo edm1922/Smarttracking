@@ -215,7 +215,12 @@ export default function UnitTrackingPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {requests.filter(r => r.status === 'PENDING').map((req) => (
-              <div key={req.id} className="bg-white p-6 rounded-3xl border border-orange-100 shadow-sm hover:shadow-md transition-all group">
+              <div 
+                key={req.id} 
+                onDoubleClick={() => setViewingLog(req)}
+                className="bg-white p-6 rounded-3xl border border-orange-100 shadow-sm hover:shadow-md transition-all group cursor-pointer select-none"
+                title="Double-click to view details & evidence"
+              >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-4">
                     <div className="h-10 w-10 bg-gray-50 rounded-xl flex items-center justify-center group-hover:bg-orange-50 transition-colors">
