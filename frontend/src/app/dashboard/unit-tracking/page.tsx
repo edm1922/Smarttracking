@@ -34,6 +34,7 @@ export default function UnitTrackingPage() {
   
   const [logSearch, setLogSearch] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [viewingLog, setViewingLog] = useState<any>(null);
 
   useEffect(() => {
     fetchInventory();
@@ -450,7 +451,12 @@ export default function UnitTrackingPage() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {displayRequests.map((req) => (
-                <tr key={req.id} className={`hover:bg-gray-50/50 transition-colors group ${selectedRequestIds.includes(req.id) ? 'bg-primary/5' : ''}`}>
+                <tr 
+                  key={req.id} 
+                  onDoubleClick={() => setViewingLog(req)}
+                  className={`hover:bg-gray-50/50 transition-colors group cursor-pointer select-none ${selectedRequestIds.includes(req.id) ? 'bg-primary/5' : ''}`}
+                  title="Double-click to view details"
+                >
                   <td className="px-8 py-5">
                     <input 
                       type="checkbox" 
@@ -718,6 +724,102 @@ export default function UnitTrackingPage() {
             </p>
         </div>
       </div>
+
+      {/* Log Detail Modal */}
+      {viewingLog && (
+        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 no-print">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 bg-gray-900 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-gray-900/20">
+                  <History className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-gray-900 tracking-tight">Request Details</h2>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Historical Entry Reference</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setViewingLog(null)}
+                className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-gray-900 hover:bg-gray-50 transition-all"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Date & Time</p>
+                  <p className="text-sm font-bold text-gray-900">{new Date(viewingLog.createdAt).toLocaleDateString()}</p>
+                  <p className="text-[10px] text-gray-400 font-medium">{new Date(viewingLog.createdAt).toLocaleTimeString()}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Status</p>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                    viewingLog.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 
+                    viewingLog.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 
+                    'bg-orange-100 text-orange-700'
+                  }`}>
+                    {viewingLog.status}
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-6 border-t border-gray-50">
+                <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-2">Asset Information</p>
+                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-[10px] font-black text-gray-400 uppercase">Asset ID:</span>
+                    <span className="text-sm font-mono font-bold text-primary">{viewingLog.item.slug}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] font-black text-gray-400 uppercase">Product:</span>
+                    <span className="text-sm font-bold text-gray-900 text-right">{viewingLog.item.name || 'Unnamed Asset'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] font-black text-gray-400 uppercase">Release Qty:</span>
+                    <span className="text-sm font-black text-gray-900">{viewingLog.qty} {viewingLog.unit}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-6 border-t border-gray-50">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Involved Parties</p>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+                      <User className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-black text-gray-400 uppercase">Requester</p>
+                      <p className="text-sm font-bold text-gray-900">{viewingLog.user.username}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {viewingLog.remarks && (
+                <div className="pt-6 border-t border-gray-50">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">System Remarks</p>
+                  <p className="text-sm text-gray-600 bg-orange-50/50 p-4 rounded-2xl italic font-medium">
+                    "{viewingLog.remarks}"
+                  </p>
+                </div>
+              )}
+
+              <div className="pt-6">
+                <button 
+                  onClick={() => window.open(`/i/${viewingLog.item.slug}`, '_blank')}
+                  className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-gray-900/10 hover:bg-primary transition-all active:scale-95"
+                >
+                  View Digital Twin Record
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx global>{`
         @media print {
