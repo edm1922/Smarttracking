@@ -5,7 +5,7 @@ import {
   Boxes, Package, Search, Filter, ArrowRight, 
   ChevronRight, ChevronDown, ChevronUp, History,
   TrendingDown, TrendingUp, AlertTriangle, Box,
-  QrCode, Clock, User, ArrowUpRight, Check, X, Truck, Activity, FileText
+  QrCode, Clock, User, ArrowUpRight, Check, X, Truck, Activity, FileText, Printer
 } from 'lucide-react';
 import api from '@/lib/api';
 
