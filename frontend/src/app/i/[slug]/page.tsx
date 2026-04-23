@@ -257,6 +257,88 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     </div>
   );
 
+  // --- VIEW: Access Choice ---
+  if (viewMode === 'choice') return (
+    <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-6">
+      <div className="max-w-md w-full space-y-8 text-center">
+        <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl shadow-blue-900/10 border border-white">
+          <div className="h-20 w-20 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <Lock className="h-10 w-10 text-primary" />
+          </div>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tighter mb-2">RECORD LOCKED</h1>
+          <p className="text-sm font-medium text-gray-500 mb-10 leading-relaxed">
+            Scan detected for <span className="font-mono font-bold text-primary">{slug}</span>. This item has been formally submitted. Choose how to proceed:
+          </p>
+          
+          <div className="space-y-4">
+            <button 
+              onClick={() => setViewMode('guest')}
+              className="w-full group flex items-center justify-between p-6 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-all text-left"
+            >
+              <div>
+                <p className="text-sm font-bold text-gray-900">View as Guest</p>
+                <p className="text-xs text-gray-400">Read-only access to item data</p>
+              </div>
+              <Eye className="h-5 w-5 text-gray-300 group-hover:text-primary transition-colors" />
+            </button>
+            
+            <button 
+              onClick={() => setViewMode('login')}
+              className="w-full group flex items-center justify-between p-6 bg-primary text-white rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all text-left"
+            >
+              <div>
+                <p className="text-sm font-bold">Staff Login</p>
+                <p className="text-xs text-white/60">Pull out or edit item record</p>
+              </div>
+              <LogIn className="h-5 w-5 text-white/40 group-hover:text-white transition-colors" />
+            </button>
+          </div>
+        </div>
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Smart Tracking Enterprise v1.0</p>
+      </div>
+    </div>
+  );
+
+  // --- VIEW: Login Form ---
+  if (viewMode === 'login') return (
+    <div className="min-h-screen bg-white p-8 flex flex-col">
+      <button onClick={() => setViewMode('choice')} className="mb-12 flex items-center text-sm font-bold text-gray-400 hover:text-gray-900 transition-colors">
+        <ArrowLeft className="mr-2 h-4 w-4" /> Back to choices
+      </button>
+      
+      <div className="max-w-sm mx-auto w-full pt-12">
+        <h2 className="text-4xl font-black text-gray-900 tracking-tighter mb-2">Staff Login</h2>
+        <p className="text-gray-400 mb-10 font-medium">Enter your assigned credentials to manage <span className="text-primary font-bold">{slug}</span></p>
+        
+        <form onSubmit={handleLogin} className="space-y-4">
+          <input 
+            required
+            type="text" 
+            placeholder="Username" 
+            value={loginData.username}
+            onChange={(e) => setLoginData({...loginData, username: e.target.value})}
+            className="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 focus:bg-white focus:ring-4 focus:ring-primary/10 outline-none transition-all font-medium" 
+          />
+          <input 
+            required
+            type="password" 
+            placeholder="Password" 
+            value={loginData.password}
+            onChange={(e) => setLoginData({...loginData, password: e.target.value})}
+            className="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 focus:bg-white focus:ring-4 focus:ring-primary/10 outline-none transition-all font-medium" 
+          />
+          <button 
+            type="submit" 
+            disabled={isLoggingIn}
+            className="w-full py-5 bg-gray-900 text-white rounded-2xl font-bold shadow-xl active:scale-95 transition-all disabled:opacity-50"
+          >
+            {isLoggingIn ? 'Verifying...' : 'Sign In & Access'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+
   const isGuest = viewMode === 'guest';
   const canAdmin = userRole === 'admin';
   const canInventory = userRole === 'inventory';
