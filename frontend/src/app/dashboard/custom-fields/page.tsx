@@ -243,6 +243,7 @@ export default function CustomFieldsPage() {
                   <option value="number">Number</option>
                   <option value="dropdown">Dropdown (Select)</option>
                   <option value="date">Date</option>
+                  <option value="UNIT_QUANTITY">Unit with Quantity (e.g. Bundle of 15)</option>
                 </select>
               </div>
               {formData.fieldType === 'dropdown' && (
@@ -256,6 +257,11 @@ export default function CustomFieldsPage() {
                     placeholder="Cotton, Silk, Polyester"
                     required
                   />
+                </div>
+              )}
+              {formData.fieldType === 'UNIT_QUANTITY' && (
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                   <p className="text-xs text-blue-800 font-medium">This field type allows users to specify a unit (e.g. Bundle, Roll) and its quantity content (e.g. 15 pcs).</p>
                 </div>
               )}
               <div>
@@ -355,6 +361,11 @@ export default function CustomFieldsPage() {
                             <option value="">Select Option</option>
                             {field.options?.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
                           </select>
+                        ) : field.fieldType === 'UNIT_QUANTITY' ? (
+                           <div className="flex gap-2">
+                              <input type="text" disabled placeholder="Unit (e.g. Bundle)" className="flex-1 rounded-xl border border-gray-200 px-4 py-4 text-sm outline-none bg-white pointer-events-none" />
+                              <input type="number" disabled placeholder="Qty" className="w-24 rounded-xl border border-gray-200 px-4 py-4 text-sm outline-none bg-white pointer-events-none" />
+                           </div>
                         ) : (
                           <input
                             type={field.fieldType}

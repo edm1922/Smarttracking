@@ -385,7 +385,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                   <h3 className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] pt-4">Custom Attributes</h3>
                   {item.fieldValues?.map((fv: any) => (
                     <div key={fv.field.id}>
-                      <label className="block text-xs font-bold text-gray-500 mb-1.5">{fv.field.name} {fv.field.required && <span className="text-red-500">*</span>}</label>
+                      <label className="block text-xs font-bold text-gray-500 mb-1.5">{fv.field.name} {fv.field.required && <span className="text-red-500 ml-1">*</span>}</label>
                       {fv.field.fieldType === 'dropdown' ? (
                          <select 
                           required={fv.field.required}
@@ -396,6 +396,31 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                           <option value="">Select Option</option>
                           {fv.field.options?.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
+                      ) : fv.field.fieldType === 'UNIT_QUANTITY' ? (
+                        <div className="flex gap-2">
+                          <input 
+                            required={fv.field.required}
+                            type="text" 
+                            placeholder="Unit (e.g. Bundle)"
+                            value={dynamicValues[fv.field.id]?.unit || ''} 
+                            onChange={(e) => setDynamicValues({
+                              ...dynamicValues, 
+                              [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), unit: e.target.value }
+                            })} 
+                            className="flex-1 rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all" 
+                          />
+                          <input 
+                            required={fv.field.required}
+                            type="number" 
+                            placeholder="Qty"
+                            value={dynamicValues[fv.field.id]?.qty || ''} 
+                            onChange={(e) => setDynamicValues({
+                              ...dynamicValues, 
+                              [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), qty: parseInt(e.target.value) || 0 }
+                            })} 
+                            className="w-24 rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all" 
+                          />
+                        </div>
                       ) : (
                         <input 
                           required={fv.field.required}
@@ -446,7 +471,12 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                    {item.fieldValues?.map((fv: any) => (
                     <div key={fv.id}>
                       <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">{fv.field.name}</p>
-                      <p className="text-sm font-bold text-gray-700">{fv.value || '—'}</p>
+                      <p className="text-sm font-bold text-gray-700">
+                        {fv.field.fieldType === 'UNIT_QUANTITY' && typeof fv.value === 'object' && fv.value !== null
+                          ? `${fv.value.qty || 0} ${fv.value.unit || ''}`
+                          : fv.value || '—'
+                        }
+                      </p>
                     </div>
                   ))}
                 </div>
