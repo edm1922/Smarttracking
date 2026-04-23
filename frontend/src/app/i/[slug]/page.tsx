@@ -44,6 +44,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
   });
   
   const [fieldSuggestions, setFieldSuggestions] = useState<Record<string, string[]>>({});
+  const [nameTemplates, setNameTemplates] = useState<any[]>([]);
   
   const [isSaving, setIsSaving] = useState(false);
   const [loginData, setLoginData] = useState({ username: '', password: '' });
@@ -57,10 +58,13 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
 
   const fetchData = async () => {
     try {
-      const [itemRes, fieldsRes] = await Promise.all([
+      const [itemRes, fieldsRes, inventoryRes] = await Promise.all([
         api.get(`/items/${slug}`),
-        api.get('/custom-fields')
+        api.get('/custom-fields'),
+        api.get('/items/unit-inventory')
       ]);
+      
+      setNameTemplates(inventoryRes.data);
       
       const itemData = itemRes.data;
       const allFields = fieldsRes.data;
@@ -573,7 +577,52 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
               <form onSubmit={isEditing ? handleUpdate : handleSubmitForm} className="space-y-6">
                 <div>
                   <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Internal Reference Name {isPublicForm && <span className="text-red-500 ml-1">*</span>}</label>
-                  <input required={isPublicForm} type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-primary/10 transition-all" placeholder="Enter reference name..." />
+                  <input 
+                    required={isPublicForm} 
+                    type="text" 
+                    list="reference-names"
+                    value={formData.name} 
+                    onChange={(e) => {
+                      const newName = e.target.value;
+                      setFormData({...formData, name: newName});
+                      
+                      // Attempt Autofill
+                      const template = nameTemplates.find(t => t.name.toLowerCase() === newName.toLowerCase());
+                      if (template && template.items.length > 0) {
+                        const sourceItem = template.items[0]; // Take the first one as template
+                        
+                        // We need the full item to get its field values
+                        // But wait, our unit-inventory now includes fieldValues in each item!
+                        const autoValues = { ...dynamicValues };
+                        sourceItem.fieldValues?.forEach((fv: any) => {
+                          if (availableFields.find(f => f.id === fv.fieldId)) {
+                             // Only autofill if current field is empty
+                             if (!autoValues[fv.fieldId]) {
+                               autoValues[fv.fieldId] = fv.value;
+                             }
+                          }
+                        });
+                        setDynamicValues(autoValues);
+                        
+                        // Also autofill unit tracking if enabled in template
+                        const unitField = sourceItem.fieldValues?.find((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty);
+                        if (unitField) {
+                          setUnitTracking({
+                            useUnitQty: true,
+                            unit: unitField.value.unit || 'Pair',
+                            qty: unitField.value.qty || 0
+                          });
+                        }
+                      }
+                    }} 
+                    className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-primary/10 transition-all" 
+                    placeholder="Enter reference name..." 
+                  />
+                  <datalist id="reference-names">
+                    {nameTemplates.map(t => (
+                      <option key={t.name} value={t.name} />
+                    ))}
+                  </datalist>
                 </div>
                 
                 {isEditing && (
