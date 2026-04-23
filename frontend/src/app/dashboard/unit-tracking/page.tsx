@@ -3,15 +3,12 @@
 import { useEffect, useState } from 'react';
 import { 
   Boxes, Package, Search, Filter, ArrowRight, 
-  ChevronRight, ChevronDown, ChevronUp, Activity, History,
+  ChevronRight, ChevronDown, ChevronUp, History,
   TrendingDown, TrendingUp, AlertTriangle, Box,
   QrCode, Clock, User, ArrowUpRight
 } from 'lucide-react';
 import api from '@/lib/api';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, 
-  Tooltip, ResponsiveContainer, Cell, PieChart, Pie
-} from 'recharts';
+
 
 export default function UnitTrackingPage() {
   const [inventory, setInventory] = useState<any[]>([]);
@@ -181,56 +178,7 @@ export default function UnitTrackingPage() {
         )}
       </div>
 
-      {/* Analytics Hook (Optional Aesthetic) */}
-      <div className="bg-gray-900 rounded-[3rem] p-12 text-white overflow-hidden relative">
-         <div className="absolute top-0 right-0 w-96 h-96 bg-primary/20 rounded-full -mr-48 -mt-48 blur-[100px]" />
-         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-12">
-            <div className="flex-1 space-y-6">
-               <div className="inline-flex items-center px-4 py-1.5 bg-white/10 rounded-full text-xs font-black uppercase tracking-widest text-primary border border-white/5">
-                 <Activity className="h-3 w-3 mr-2" /> Live Analytics
-               </div>
-               <h2 className="text-4xl font-black tracking-tighter leading-tight">Unit Flow Intelligence</h2>
-               <p className="text-gray-400 font-medium text-lg leading-relaxed max-w-md">Every QR pull-out is automatically synchronized with your central warehouse stock logs. Tracking precision is now at 100% across all distribution channels.</p>
-               <div className="flex gap-4">
-                  <div className="p-6 bg-white/5 border border-white/10 rounded-3xl backdrop-blur-xl">
-                     <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-2">Peak Activity</p>
-                     <p className="text-xl font-black">WAREHOUSE A</p>
-                  </div>
-                  <div className="p-6 bg-white/5 border border-white/10 rounded-3xl backdrop-blur-xl">
-                     <p className="text-[10px] font-black text-green-400 uppercase tracking-[0.2em] mb-2">Log Sync Status</p>
-                     <p className="text-xl font-black">REAL-TIME</p>
-                  </div>
-               </div>
-            </div>
-            
-            <div className="w-full md:w-[400px] h-[250px] bg-white/5 border border-white/10 rounded-[2.5rem] p-8 backdrop-blur-sm">
-               <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={inventory.slice(0, 5)}>
-                     <Bar dataKey="totalQty" radius={[6, 6, 0, 0]}>
-                        {inventory.map((entry, index) => (
-                           <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#3b82f6' : '#60a5fa'} />
-                        ))}
-                     </Bar>
-                     <XAxis dataKey="name" hide />
-                     <Tooltip 
-                        cursor={{fill: 'rgba(255,255,255,0.05)'}}
-                        content={({active, payload}) => {
-                          if (active && payload && payload.length) {
-                            return (
-                              <div className="bg-gray-800 border border-white/10 p-4 rounded-2xl shadow-2xl">
-                                <p className="text-[10px] font-black text-primary uppercase mb-1">{payload[0].payload.name}</p>
-                                <p className="text-lg font-black">{payload[0].value} Units</p>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                     />
-                  </BarChart>
-               </ResponsiveContainer>
-            </div>
-         </div>
-      </div>
+
     </div>
   );
 }
