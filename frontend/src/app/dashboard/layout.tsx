@@ -54,8 +54,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const qrSystemItems = [
     { name: 'Generate QR', href: '/dashboard/items', icon: QrCode },
     { name: 'Storage', href: '/dashboard/storage', icon: Database },
-    { name: 'Unit Tracking', href: '/dashboard/unit-tracking', icon: Activity },
     { name: 'QR Logs', href: '/dashboard/logs', icon: ClipboardList },
+    { name: 'Unit Tracking', href: '/dashboard/unit-tracking', icon: Activity },
     { name: 'Custom Fields', href: '/dashboard/custom-fields', icon: Package },
     { name: 'Print Labels', href: '/dashboard/print', icon: Printer },
     { name: 'Accounts', href: '/dashboard/users', icon: User, adminOnly: true },
