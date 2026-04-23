@@ -25,10 +25,10 @@ export default function UnitTrackingPage() {
 
   const fetchRequests = async () => {
     try {
-      const res = await api.get('/pull-out-requests/pending');
+      const res = await api.get('/pull-out-requests');
       setRequests(res.data);
     } catch (err) {
-      console.error('Failed to fetch pending requests', err);
+      console.error('Failed to fetch pull out requests', err);
     }
   };
 
@@ -107,7 +107,7 @@ export default function UnitTrackingPage() {
       </div>
       
       {/* Pending Approvals Section */}
-      {requests.length > 0 && (
+      {requests.filter(r => r.status === 'PENDING').length > 0 && (
         <div className="bg-orange-50 border border-orange-100 rounded-[2.5rem] p-8 space-y-6 animate-in slide-in-from-top-4 duration-500">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -120,12 +120,12 @@ export default function UnitTrackingPage() {
               </div>
             </div>
             <span className="px-4 py-1.5 bg-orange-600 text-white text-[10px] font-black rounded-full uppercase tracking-widest animate-pulse">
-              {requests.length} Action Required
+              {requests.filter(r => r.status === 'PENDING').length} Action Required
             </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {requests.map((req) => (
+            {requests.filter(r => r.status === 'PENDING').map((req) => (
               <div key={req.id} className="bg-white p-6 rounded-3xl border border-orange-100 shadow-sm hover:shadow-md transition-all group">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-4">
@@ -280,6 +280,70 @@ export default function UnitTrackingPage() {
       </div>
 
 
+      {/* Request History Log Section */}
+      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl shadow-gray-200/50 overflow-hidden">
+        <div className="p-8 border-b border-gray-50 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 bg-gray-900 rounded-2xl flex items-center justify-center text-white">
+              <History className="h-6 w-6" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-gray-900 tracking-tight">Pull Out Request Log</h2>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Historical record of all unit release actions</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50/50">
+                <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
+                <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Asset ID</th>
+                <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Requester</th>
+                <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Qty</th>
+                <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {requests.map((req) => (
+                <tr key={req.id} className="hover:bg-gray-50/50 transition-colors group">
+                  <td className="px-8 py-5">
+                    <p className="text-sm font-bold text-gray-700">{new Date(req.createdAt).toLocaleDateString()}</p>
+                    <p className="text-[10px] text-gray-400 font-medium">{new Date(req.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                  </td>
+                  <td className="px-8 py-5">
+                    <span className="text-sm font-mono font-bold text-primary bg-primary/5 px-2 py-1 rounded-md">{req.item.slug}</span>
+                  </td>
+                  <td className="px-8 py-5">
+                    <p className="text-sm font-bold text-gray-900">{req.user.username}</p>
+                  </td>
+                  <td className="px-8 py-5 text-center">
+                    <p className="text-sm font-black text-gray-900">{req.qty} <span className="text-[10px] text-gray-400 uppercase">{req.unit}</span></p>
+                  </td>
+                  <td className="px-8 py-5">
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                      req.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 
+                      req.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 
+                      'bg-orange-100 text-orange-700'
+                    }`}>
+                      {req.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {requests.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-8 py-20 text-center">
+                    <History className="h-12 w-12 text-gray-200 mx-auto mb-4" />
+                    <p className="text-sm font-bold text-gray-400">No requests recorded yet.</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

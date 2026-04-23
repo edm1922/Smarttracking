@@ -15,6 +15,11 @@ export class PullOutRequestsController {
     });
   }
 
+  @Get()
+  async findAll() {
+    return this.pullOutRequestsService.findAll();
+  }
+
   @Get('pending')
   async findAllPending() {
     return this.pullOutRequestsService.findAllPending();

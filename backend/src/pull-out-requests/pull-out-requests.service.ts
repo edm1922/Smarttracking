@@ -22,6 +22,16 @@ export class PullOutRequestsService {
     });
   }
 
+  async findAll() {
+    return this.prisma.pullOutRequest.findMany({
+      include: { 
+        item: true, 
+        user: true 
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async findAllPending() {
     return this.prisma.pullOutRequest.findMany({
       where: { status: 'PENDING' },
