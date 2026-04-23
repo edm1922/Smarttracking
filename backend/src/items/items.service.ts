@@ -205,6 +205,7 @@ export class ItemsService {
     const updatedItem = await this.prisma.item.update({
       where: { slug },
       data: {
+        locked: true, // Auto-lock after admin/staff update
         name: cleanItemData.name,
         description: cleanItemData.description,
         status: cleanItemData.status,
