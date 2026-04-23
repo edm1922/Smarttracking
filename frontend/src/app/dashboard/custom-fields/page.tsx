@@ -308,24 +308,24 @@ export default function CustomFieldsPage() {
                 {formData.hasUnitQuantity && (
                   <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
                     <div>
-                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Unit Label</label>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Fixed Unit Value</label>
                       <input
                         type="text"
                         value={formData.unitLabel}
                         onChange={(e) => setFormData({...formData, unitLabel: e.target.value})}
                         className="w-full rounded-md border border-gray-300 px-3 py-2 text-xs focus:ring-1 focus:ring-primary outline-none"
-                        placeholder="e.g. Bundle / Roll"
+                        placeholder="e.g. Pair / Bundle / Roll"
                         required={formData.hasUnitQuantity}
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Quantity Label</label>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Fixed Quantity Value</label>
                       <input
-                        type="text"
+                        type="number"
                         value={formData.qtyLabel}
                         onChange={(e) => setFormData({...formData, qtyLabel: e.target.value})}
                         className="w-full rounded-md border border-gray-300 px-3 py-2 text-xs focus:ring-1 focus:ring-primary outline-none"
-                        placeholder="e.g. Pcs per Unit"
+                        placeholder="e.g. 15 / 10 / 5"
                         required={formData.hasUnitQuantity}
                       />
                     </div>

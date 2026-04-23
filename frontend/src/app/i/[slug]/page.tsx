@@ -430,48 +430,28 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                         {hasUnitQty && (
                           <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100/50 space-y-4">
                             <div className="flex items-center justify-between">
-                              <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Enable {opts.unitLabel || 'Unit'} tracking?</label>
+                              <div className="flex flex-col">
+                                <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Enable {opts.unitLabel || 'Unit'} tracking?</label>
+                                <p className="text-[10px] text-blue-400 font-bold">This will automatically apply: <span className="text-blue-600">{opts.qtyLabel} {opts.unitLabel}</span></p>
+                              </div>
                               <input 
                                 type="checkbox" 
                                 checked={!!dynamicValues[fv.field.id]?.useUnitQty}
-                                onChange={(e) => setDynamicValues({
-                                  ...dynamicValues, 
-                                  [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), useUnitQty: e.target.checked }
-                                })}
-                                className="h-5 w-5 rounded border-blue-200 text-blue-600 focus:ring-blue-500"
+                                onChange={(e) => {
+                                  const isChecked = e.target.checked;
+                                  setDynamicValues({
+                                    ...dynamicValues, 
+                                    [fv.field.id]: { 
+                                      ...(dynamicValues[fv.field.id] || {}), 
+                                      useUnitQty: isChecked,
+                                      unit: isChecked ? opts.unitLabel : '',
+                                      qty: isChecked ? parseInt(opts.qtyLabel) : 0
+                                    }
+                                  });
+                                }}
+                                className="h-6 w-6 rounded-lg border-blue-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
                               />
                             </div>
-
-                            {dynamicValues[fv.field.id]?.useUnitQty && (
-                              <div className="grid grid-cols-1 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                <div>
-                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">{opts.unitLabel || 'Unit'}</label>
-                                  <input 
-                                    type="text" 
-                                    placeholder={`e.g. Bundle`}
-                                    value={dynamicValues[fv.field.id]?.unit || ''} 
-                                    onChange={(e) => setDynamicValues({
-                                      ...dynamicValues, 
-                                      [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), unit: e.target.value }
-                                    })} 
-                                    className="w-full rounded-2xl bg-white border-blue-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" 
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">{opts.qtyLabel || 'Quantity'}</label>
-                                  <input 
-                                    type="number" 
-                                    placeholder="Enter qty"
-                                    value={dynamicValues[fv.field.id]?.qty || ''} 
-                                    onChange={(e) => setDynamicValues({
-                                      ...dynamicValues, 
-                                      [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), qty: parseInt(e.target.value) || 0 }
-                                    })} 
-                                    className="w-full rounded-2xl bg-white border-blue-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" 
-                                  />
-                                </div>
-                              </div>
-                            )}
                           </div>
                         )}
                       </div>
