@@ -161,8 +161,11 @@ export class ItemsService {
 
     const { fieldValues, tagIds, categoryId, batchId, ...itemData } = data;
 
+    // Destructure logAction so it's not passed to the Prisma update call
+    const { logAction, ...cleanItemData } = itemData;
+
     const finalData: any = {
-      ...itemData,
+      ...cleanItemData,
       categoryId:
         categoryId === undefined ? item.categoryId : categoryId || null,
       batchId: batchId === undefined ? item.batchId : batchId || null,
