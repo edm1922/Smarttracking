@@ -35,6 +35,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     batchId: '',
   });
   const [dynamicValues, setDynamicValues] = useState<Record<string, any>>({});
+  const [availableFields, setAvailableFields] = useState<any[]>([]);
   const [unitTracking, setUnitTracking] = useState<UnitTrackingData>({
     useUnitQty: false,
     unit: 'Pair',
@@ -51,8 +52,14 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
 
   const fetchData = async () => {
     try {
-      const itemRes = await api.get(`/items/${slug}`);
+      const [itemRes, fieldsRes] = await Promise.all([
+        api.get(`/items/${slug}`),
+        api.get('/custom-fields')
+      ]);
+      
       const itemData = itemRes.data;
+      const allFields = fieldsRes.data;
+      
       setItem(itemData);
       setFormData({
         name: itemData.name || '',
@@ -62,9 +69,14 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
         batchId: itemData.batchId || '',
       });
       
+      // Filter fields relevant to this item (Global or matching Batch)
+      const relevantFields = allFields.filter((f: any) => !f.batchId || f.batchId === itemData.batchId);
+      setAvailableFields(relevantFields);
+
       const values: Record<string, any> = {};
       let foundUnitData = false;
       
+      // Initialize with existing values
       itemData.fieldValues?.forEach((fv: any) => {
         values[fv.fieldId] = fv.value;
         if (fv.value && typeof fv.value === 'object' && fv.value.useUnitQty) {
@@ -75,6 +87,13 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
           });
           setPullOutQty(fv.value.qty || 0);
           foundUnitData = true;
+        }
+      });
+      
+      // Ensure all available fields are in dynamicValues even if they have no stored value yet
+      relevantFields.forEach((f: any) => {
+        if (values[f.id] === undefined) {
+          values[f.id] = '';
         }
       });
       
@@ -146,11 +165,18 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
   };
 
   const prepareFieldValues = (baseValues: Record<string, any>) => {
+    // We must have at least one field to attach unit tracking to.
+    // If no fields exist, we might have a problem with the current schema.
+    // However, the fetchData now ensures availableFields are present in dynamicValues.
+    
     const entries = Object.entries(baseValues);
     if (entries.length === 0) return [];
 
-    // Inject unit tracking into the first field value to satisfy the schema/backend
     return entries.map(([fieldId, value], index) => {
+      // Find the field info to see if it's currently relevant
+      const fieldInfo = availableFields.find(f => f.id === fieldId);
+      if (!fieldInfo) return null;
+
       if (index === 0 && unitTracking.useUnitQty) {
         const mainValue = typeof value === 'object' && value !== null ? value.main : value;
         return {
@@ -162,7 +188,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
         };
       }
       return { fieldId, value };
-    });
+    }).filter(Boolean);
   };
 
   const handleConfirmPullOut = async () => {
@@ -171,14 +197,16 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       let finalStatus = formData.status;
       const remaining = unitTracking.qty - pullOutQty;
       
+      const newUnitTracking = { ...unitTracking };
       if (remaining > 0) {
         finalStatus = 'Available';
-        setUnitTracking(prev => ({ ...prev, qty: remaining }));
+        newUnitTracking.qty = remaining;
         alert(`Partially pulled out ${pullOutQty} ${unitTracking.unit}. ${remaining} remaining.`);
       } else {
         finalStatus = 'Released';
-        setUnitTracking(prev => ({ ...prev, qty: 0 }));
+        newUnitTracking.qty = 0;
       }
+      setUnitTracking(newUnitTracking);
 
       const payload = {
         status: finalStatus,
@@ -451,24 +479,24 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
 
                 <div className="space-y-4">
                   <h3 className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] pt-4">Custom Attributes</h3>
-                  {item.fieldValues?.map((fv: any) => {
-                    const fieldOptions = Array.isArray(fv.field.options) ? fv.field.options : (fv.field.options?.dropdownOptions || []);
-                    const val = dynamicValues[fv.field.id];
+                  {availableFields.map((field: any) => {
+                    const fieldOptions = Array.isArray(field.options) ? field.options : (field.options?.dropdownOptions || []);
+                    const val = dynamicValues[field.id];
                     const displayValue = typeof val === 'object' && val !== null ? (val.main || '') : (val || '');
                     
                     return (
-                      <div key={fv.field.id} className="space-y-2">
-                        <label className="block text-xs font-bold text-gray-500 mb-1.5">{fv.field.name} {fv.field.required && <span className="text-red-500 ml-1">*</span>}</label>
-                        {fv.field.fieldType === 'dropdown' ? (
+                      <div key={field.id} className="space-y-2">
+                        <label className="block text-xs font-bold text-gray-500 mb-1.5">{field.name} {field.required && <span className="text-red-500 ml-1">*</span>}</label>
+                        {field.fieldType === 'dropdown' ? (
                           <select 
-                            required={fv.field.required}
+                            required={field.required}
                             value={displayValue} 
                             onChange={(e) => {
                               const newVal = e.target.value;
                               if (typeof val === 'object' && val !== null) {
-                                setDynamicValues({...dynamicValues, [fv.field.id]: { ...val, main: newVal }});
+                                setDynamicValues({...dynamicValues, [field.id]: { ...val, main: newVal }});
                               } else {
-                                setDynamicValues({...dynamicValues, [fv.field.id]: newVal});
+                                setDynamicValues({...dynamicValues, [field.id]: newVal});
                               }
                             }} 
                             className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all"
@@ -478,15 +506,15 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                           </select>
                         ) : (
                           <input 
-                            required={fv.field.required}
-                            type={fv.field.fieldType} 
+                            required={field.required}
+                            type={field.fieldType} 
                             value={displayValue} 
                             onChange={(e) => {
                               const newVal = e.target.value;
                               if (typeof val === 'object' && val !== null) {
-                                setDynamicValues({...dynamicValues, [fv.field.id]: { ...val, main: newVal }});
+                                setDynamicValues({...dynamicValues, [field.id]: { ...val, main: newVal }});
                               } else {
-                                setDynamicValues({...dynamicValues, [fv.field.id]: newVal});
+                                setDynamicValues({...dynamicValues, [field.id]: newVal});
                               }
                             }} 
                             className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all" 
@@ -583,13 +611,13 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                 </div>
 
                 <div className="grid grid-cols-2 gap-6 pt-6 border-t border-gray-50">
-                   {item.fieldValues?.map((fv: any) => {
-                     const val = fv.value;
+                   {availableFields.map((field: any) => {
+                     const val = dynamicValues[field.id];
                      const displayValue = typeof val === 'object' && val !== null ? (val.main || '—') : (val || '—');
 
                      return (
-                      <div key={fv.id}>
-                        <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">{fv.field.name}</p>
+                      <div key={field.id}>
+                        <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">{field.name}</p>
                         <p className="text-sm font-bold text-gray-700">{displayValue}</p>
                       </div>
                      );
