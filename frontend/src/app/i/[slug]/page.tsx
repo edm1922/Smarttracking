@@ -397,29 +397,36 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                           {fv.field.options?.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
                       ) : fv.field.fieldType === 'UNIT_QUANTITY' ? (
-                        <div className="flex gap-2">
-                          <input 
-                            required={fv.field.required}
-                            type="text" 
-                            placeholder="Unit (e.g. Bundle)"
-                            value={dynamicValues[fv.field.id]?.unit || ''} 
-                            onChange={(e) => setDynamicValues({
-                              ...dynamicValues, 
-                              [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), unit: e.target.value }
-                            })} 
-                            className="flex-1 rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all" 
-                          />
-                          <input 
-                            required={fv.field.required}
-                            type="number" 
-                            placeholder="Qty"
-                            value={dynamicValues[fv.field.id]?.qty || ''} 
-                            onChange={(e) => setDynamicValues({
-                              ...dynamicValues, 
-                              [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), qty: parseInt(e.target.value) || 0 }
-                            })} 
-                            className="w-24 rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all" 
-                          />
+                        <div className="space-y-4">
+                          <div>
+                            <input 
+                              required={fv.field.required}
+                              type="text" 
+                              placeholder={`Enter ${fv.field.name.toLowerCase()} (e.g. Bundle)`}
+                              value={dynamicValues[fv.field.id]?.unit || ''} 
+                              onChange={(e) => setDynamicValues({
+                                ...dynamicValues, 
+                                [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), unit: e.target.value }
+                              })} 
+                              className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all" 
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1.5 ml-2">
+                              {fv.field.options?.[0] || 'Quantity'}
+                            </label>
+                            <input 
+                              required={fv.field.required}
+                              type="number" 
+                              placeholder="Enter quantity per unit"
+                              value={dynamicValues[fv.field.id]?.qty || ''} 
+                              onChange={(e) => setDynamicValues({
+                                ...dynamicValues, 
+                                [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), qty: parseInt(e.target.value) || 0 }
+                              })} 
+                              className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all" 
+                            />
+                          </div>
                         </div>
                       ) : (
                         <input 
@@ -469,14 +476,24 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                 {/* Attributes Grid */}
                 <div className="grid grid-cols-2 gap-6 pt-6 border-t border-gray-50">
                    {item.fieldValues?.map((fv: any) => (
-                    <div key={fv.id}>
-                      <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">{fv.field.name}</p>
-                      <p className="text-sm font-bold text-gray-700">
-                        {fv.field.fieldType === 'UNIT_QUANTITY' && typeof fv.value === 'object' && fv.value !== null
-                          ? `${fv.value.qty || 0} ${fv.value.unit || ''}`
-                          : fv.value || '—'
-                        }
-                      </p>
+                    <div key={fv.id} className={fv.field.fieldType === 'UNIT_QUANTITY' ? 'col-span-2 grid grid-cols-2 gap-6' : ''}>
+                      {fv.field.fieldType === 'UNIT_QUANTITY' && typeof fv.value === 'object' && fv.value !== null ? (
+                        <>
+                          <div>
+                            <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">{fv.field.name}</p>
+                            <p className="text-sm font-bold text-gray-700">{fv.value.unit || '—'}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">{fv.field.options?.[0] || 'Quantity'}</p>
+                            <p className="text-sm font-bold text-gray-700">{fv.value.qty || 0}</p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">{fv.field.name}</p>
+                          <p className="text-sm font-bold text-gray-700">{fv.value || '—'}</p>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>

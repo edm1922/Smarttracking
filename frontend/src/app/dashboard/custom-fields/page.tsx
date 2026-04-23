@@ -221,16 +221,31 @@ export default function CustomFieldsPage() {
             <h2 className="text-xl font-bold text-gray-900 mb-4">{editingField ? 'Edit Field' : 'Add New Field'}</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Field Name</label>
+                <label className="block text-sm font-medium text-gray-700">
+                  {formData.fieldType === 'UNIT_QUANTITY' ? 'Unit Label (e.g. Bundle)' : 'Field Name'}
+                </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:ring-1 focus:ring-primary outline-none"
-                  placeholder="e.g. Fabric Weight"
+                  placeholder={formData.fieldType === 'UNIT_QUANTITY' ? 'e.g. Unit Type' : 'e.g. Fabric Weight'}
                   required
                 />
               </div>
+              {formData.fieldType === 'UNIT_QUANTITY' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Quantity Label (e.g. Content Qty)</label>
+                  <input
+                    type="text"
+                    value={formData.optionsString}
+                    onChange={(e) => setFormData({...formData, optionsString: e.target.value})}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:ring-1 focus:ring-primary outline-none"
+                    placeholder="e.g. Quantity per Unit"
+                    required
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Type</label>
                 <select
