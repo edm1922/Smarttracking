@@ -135,7 +135,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
             const autoValues: Record<string, any> = { ...values };
             sourceItem.fieldValues?.forEach((fv: any) => {
               // Only copy values for fields that exist for the current item
-              if (relevantFields.find(f => f.id === fv.fieldId)) {
+              if (relevantFields.find((f: any) => f.id === fv.fieldId)) {
                 autoValues[fv.fieldId] = fv.value;
               }
             });
