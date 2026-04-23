@@ -262,6 +262,12 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     const file = e.target.files?.[0];
     console.log('File selected:', file);
     if (file) {
+      // Type validation
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file (JPG, PNG, etc.)');
+        return;
+      }
+      
       // Basic size check (5MB)
       if (file.size > 5 * 1024 * 1024) {
         alert('Image is too large. Please keep it under 5MB.');
@@ -871,7 +877,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                           >
                             <Camera className="h-6 w-6 text-gray-400 group-hover:text-primary mb-2" />
                             <span className="text-[10px] font-black text-gray-400 group-hover:text-gray-600 uppercase tracking-widest">Capture</span>
-                            <input id="capture-input" type="file" accept="image/jpeg,image/png,image/jpg,image/webp" capture="environment" className="hidden" onChange={handleImageChange} />
+                            <input id="capture-input" type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageChange} />
                           </label>
                           <label 
                             htmlFor="upload-input"
@@ -879,7 +885,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                           >
                             <Upload className="h-6 w-6 text-gray-400 group-hover:text-primary mb-2" />
                             <span className="text-[10px] font-black text-gray-400 group-hover:text-gray-600 uppercase tracking-widest">Upload</span>
-                            <input id="upload-input" type="file" accept="image/jpeg,image/png,image/jpg,image/webp" className="hidden" onChange={handleImageChange} />
+                            <input id="upload-input" type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
                           </label>
                         </div>
                       )}
