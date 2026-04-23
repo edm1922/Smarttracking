@@ -357,10 +357,28 @@ export default function UnitTrackingPage() {
                         className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50 hover:bg-white hover:border-primary/20 transition-all cursor-pointer group/row"
                         onClick={() => window.open(`/i/${item.slug}`, '_blank')}
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
-                          <span className="text-sm font-mono font-bold text-gray-700">{item.slug}</span>
-                          {item.batch && <span className="px-2 py-0.5 bg-gray-200 text-[9px] font-black rounded-md">{item.batch}</span>}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-1.5">
+                            <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+                            <span className="text-sm font-mono font-bold text-gray-700">{item.slug}</span>
+                            {item.batch && <span className="px-2 py-0.5 bg-gray-200 text-[9px] font-black rounded-md">{item.batch}</span>}
+                          </div>
+                          
+                          {/* Form Content / Specs Breakdown */}
+                          <div className="flex flex-wrap gap-x-6 gap-y-1.5 ml-5">
+                            {item.fieldValues?.filter((fv: any) => {
+                              const v = fv.value as any;
+                              // Skip internal unit tracking objects
+                              return !(v && typeof v === 'object' && v.useUnitQty);
+                            }).map((fv: any, idx: number) => (
+                              <div key={idx} className="flex items-center gap-1.5">
+                                <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">{fv.name}:</span>
+                                <span className="text-[10px] font-bold text-gray-600">
+                                  {typeof fv.value === 'object' ? JSON.stringify(fv.value) : String(fv.value)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                         <div className="flex items-center gap-4">
                            <span className="text-sm font-black text-gray-900">{item.qty} <span className="text-[10px] text-gray-400 uppercase">{product.unit}</span></span>

@@ -339,7 +339,11 @@ export class ItemsService {
         slug: item.slug,
         qty,
         batch: item.batch?.batchCode,
-        status: item.status
+        status: item.status,
+        fieldValues: item.fieldValues.map(fv => ({
+          name: fv.field.name,
+          value: fv.value
+        }))
       });
     });
 
