@@ -218,6 +218,8 @@ export default function UnitTrackingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {requests.filter(r => r.status === 'PENDING').map((req) => (
+              <div 
                 key={req.id} 
                 onDoubleClick={() => setViewingLog(req)}
                 className={`relative bg-white p-6 rounded-3xl border border-orange-100 shadow-sm hover:shadow-md transition-all group cursor-pointer select-none overflow-hidden ${processingId === req.id ? 'opacity-70 pointer-events-none' : ''}`}
