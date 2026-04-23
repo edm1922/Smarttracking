@@ -265,24 +265,41 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
   return (
     <div className="min-h-screen bg-[#f1f5f9] pb-12 px-4 sm:px-6">
       <div className="max-w-3xl mx-auto pt-6 flex items-center justify-between mb-4">
-        {isGuest ? (
-          <button onClick={() => setViewMode('choice')} className="flex items-center text-[10px] font-black uppercase text-gray-400">
-            <ArrowLeft className="mr-1 h-3 w-3" /> Exit Preview
-          </button>
-        ) : (
-          <div className="flex items-center">
-             <div className="h-6 w-6 bg-primary/10 rounded-md flex items-center justify-center mr-2">
-                {canAdmin ? <ShieldCheck className="h-4 w-4 text-primary" /> : <User className="h-4 w-4 text-primary" />}
-             </div>
-             <span className="text-[10px] font-black uppercase text-gray-500">{username} ({userRole})</span>
-          </div>
-        )}
+        <div className="flex items-center space-x-4">
+          {isGuest && (
+            <button onClick={() => setViewMode('choice')} className="flex items-center text-[10px] font-black uppercase text-gray-400 hover:text-gray-600 transition-colors">
+              <ArrowLeft className="mr-1 h-3 w-3" /> Exit Preview
+            </button>
+          )}
+          {!isLoggedIn && !isGuest && (
+            <div className="flex items-center text-[10px] font-black uppercase text-gray-400">
+              <Eye className="mr-1.5 h-3 w-3" /> Public Guest View
+            </div>
+          )}
+        </div>
         
-        {isLoggedIn && (
-          <button onClick={handleLogout} className="text-[10px] font-black uppercase text-red-500 flex items-center">
-            Logout <LogOut className="ml-1 h-3 w-3" />
-          </button>
-        )}
+        <div className="flex items-center space-x-4">
+          {isLoggedIn ? (
+            <>
+              <div className="flex items-center">
+                 <div className="h-6 w-6 bg-primary/10 rounded-md flex items-center justify-center mr-2">
+                    {canAdmin ? <ShieldCheck className="h-4 w-4 text-primary" /> : <User className="h-4 w-4 text-primary" />}
+                 </div>
+                 <span className="text-[10px] font-black uppercase text-gray-500">{username} ({userRole})</span>
+              </div>
+              <button onClick={handleLogout} className="text-[10px] font-black uppercase text-red-500 flex items-center hover:opacity-70">
+                Logout <LogOut className="ml-1 h-3 w-3" />
+              </button>
+            </>
+          ) : (
+            <button 
+              onClick={() => setViewMode('login')} 
+              className="flex items-center px-3 py-1.5 bg-white border border-gray-200 rounded-full text-[10px] font-black uppercase text-gray-500 hover:border-primary hover:text-primary transition-all shadow-sm"
+            >
+              <LogIn className="mr-1.5 h-3 w-3" /> Staff Sign In
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="max-w-3xl mx-auto space-y-6">
