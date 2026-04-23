@@ -117,12 +117,12 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
             params: { 
               categoryId, 
               batchId,
-              limit: 5 // Just need a few to check
+              limit: 50 // Increase depth to find items with data
             } 
           });
           
           // Find the most recent one that ISN'T this one and has data
-          const sourceItem = similarRes.data.items?.find((i: any) => 
+          const sourceItem = (similarRes.data || []).find((i: any) => 
             i.id !== itemData.id && (i.name || (i.fieldValues && i.fieldValues.length > 0))
           );
 
@@ -146,7 +146,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
 
           // Build suggestion map from all similar items
           const suggestionMap: Record<string, Set<string>> = {};
-          similarRes.data.items?.forEach((i: any) => {
+          (similarRes.data || []).forEach((i: any) => {
             i.fieldValues?.forEach((fv: any) => {
               const val = typeof fv.value === 'object' ? fv.value.main : fv.value;
               if (val) {
