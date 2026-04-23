@@ -863,12 +863,12 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                           <label className="flex flex-col items-center justify-center p-6 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl hover:bg-gray-100 hover:border-primary/30 transition-all cursor-pointer group">
                             <Camera className="h-6 w-6 text-gray-400 group-hover:text-primary mb-2" />
                             <span className="text-[10px] font-black text-gray-400 group-hover:text-gray-600 uppercase tracking-widest">Capture</span>
-                            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageChange} />
+                            <input type="file" accept="image/*,.jpg,.jpeg,.png,.webp" capture="environment" className="hidden" onChange={handleImageChange} />
                           </label>
                           <label className="flex flex-col items-center justify-center p-6 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl hover:bg-gray-100 hover:border-primary/30 transition-all cursor-pointer group">
                             <Upload className="h-6 w-6 text-gray-400 group-hover:text-primary mb-2" />
                             <span className="text-[10px] font-black text-gray-400 group-hover:text-gray-600 uppercase tracking-widest">Upload</span>
-                            <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                            <input type="file" accept="image/*,.jpg,.jpeg,.png,.webp" className="hidden" onChange={handleImageChange} />
                           </label>
                         </div>
                       )}
