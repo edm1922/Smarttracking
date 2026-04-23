@@ -383,62 +383,100 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
 
                 <div className="space-y-4">
                   <h3 className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] pt-4">Custom Attributes</h3>
-                  {item.fieldValues?.map((fv: any) => (
-                    <div key={fv.field.id}>
-                      <label className="block text-xs font-bold text-gray-500 mb-1.5">{fv.field.name} {fv.field.required && <span className="text-red-500 ml-1">*</span>}</label>
-                      {fv.field.fieldType === 'dropdown' ? (
-                         <select 
-                          required={fv.field.required}
-                          value={dynamicValues[fv.field.id] || ''} 
-                          onChange={(e) => setDynamicValues({...dynamicValues, [fv.field.id]: e.target.value})} 
-                          className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all"
-                        >
-                          <option value="">Select Option</option>
-                          {fv.field.options?.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
-                        </select>
-                      ) : fv.field.fieldType === 'UNIT_QUANTITY' ? (
-                        <div className="space-y-4">
-                          <div>
+                  {item.fieldValues?.map((fv: any) => {
+                    const opts = fv.field.options || {};
+                    const hasUnitQty = opts.hasUnitQuantity;
+                    const fieldOptions = Array.isArray(opts) ? opts : (opts.dropdownOptions || []);
+                    
+                    return (
+                      <div key={fv.field.id} className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 mb-1.5">{fv.field.name} {fv.field.required && <span className="text-red-500 ml-1">*</span>}</label>
+                          {fv.field.fieldType === 'dropdown' ? (
+                            <select 
+                              required={fv.field.required}
+                              value={dynamicValues[fv.field.id]?.main || dynamicValues[fv.field.id] || ''} 
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (hasUnitQty) {
+                                  setDynamicValues({...dynamicValues, [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), main: val }});
+                                } else {
+                                  setDynamicValues({...dynamicValues, [fv.field.id]: val});
+                                }
+                              }} 
+                              className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all"
+                            >
+                              <option value="">Select Option</option>
+                              {fieldOptions.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+                            </select>
+                          ) : (
                             <input 
                               required={fv.field.required}
-                              type="text" 
-                              placeholder={`Enter ${fv.field.name.toLowerCase()} (e.g. Bundle)`}
-                              value={dynamicValues[fv.field.id]?.unit || ''} 
-                              onChange={(e) => setDynamicValues({
-                                ...dynamicValues, 
-                                [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), unit: e.target.value }
-                              })} 
+                              type={fv.field.fieldType} 
+                              value={hasUnitQty ? (dynamicValues[fv.field.id]?.main || '') : (dynamicValues[fv.field.id] || '')} 
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (hasUnitQty) {
+                                  setDynamicValues({...dynamicValues, [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), main: val }});
+                                } else {
+                                  setDynamicValues({...dynamicValues, [fv.field.id]: val});
+                                }
+                              }} 
                               className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all" 
                             />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1.5 ml-2">
-                              {fv.field.options?.[0] || 'Quantity'}
-                            </label>
-                            <input 
-                              required={fv.field.required}
-                              type="number" 
-                              placeholder="Enter quantity per unit"
-                              value={dynamicValues[fv.field.id]?.qty || ''} 
-                              onChange={(e) => setDynamicValues({
-                                ...dynamicValues, 
-                                [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), qty: parseInt(e.target.value) || 0 }
-                              })} 
-                              className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all" 
-                            />
-                          </div>
+                          )}
                         </div>
-                      ) : (
-                        <input 
-                          required={fv.field.required}
-                          type={fv.field.fieldType} 
-                          value={dynamicValues[fv.field.id] || ''} 
-                          onChange={(e) => setDynamicValues({...dynamicValues, [fv.field.id]: e.target.value})} 
-                          className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all" 
-                        />
-                      )}
-                    </div>
-                  ))}
+
+                        {hasUnitQty && (
+                          <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100/50 space-y-4">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Enable {opts.unitLabel || 'Unit'} tracking?</label>
+                              <input 
+                                type="checkbox" 
+                                checked={!!dynamicValues[fv.field.id]?.useUnitQty}
+                                onChange={(e) => setDynamicValues({
+                                  ...dynamicValues, 
+                                  [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), useUnitQty: e.target.checked }
+                                })}
+                                className="h-5 w-5 rounded border-blue-200 text-blue-600 focus:ring-blue-500"
+                              />
+                            </div>
+
+                            {dynamicValues[fv.field.id]?.useUnitQty && (
+                              <div className="grid grid-cols-1 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <div>
+                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">{opts.unitLabel || 'Unit'}</label>
+                                  <input 
+                                    type="text" 
+                                    placeholder={`e.g. Bundle`}
+                                    value={dynamicValues[fv.field.id]?.unit || ''} 
+                                    onChange={(e) => setDynamicValues({
+                                      ...dynamicValues, 
+                                      [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), unit: e.target.value }
+                                    })} 
+                                    className="w-full rounded-2xl bg-white border-blue-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" 
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">{opts.qtyLabel || 'Quantity'}</label>
+                                  <input 
+                                    type="number" 
+                                    placeholder="Enter qty"
+                                    value={dynamicValues[fv.field.id]?.qty || ''} 
+                                    onChange={(e) => setDynamicValues({
+                                      ...dynamicValues, 
+                                      [fv.field.id]: { ...(dynamicValues[fv.field.id] || {}), qty: parseInt(e.target.value) || 0 }
+                                    })} 
+                                    className="w-full rounded-2xl bg-white border-blue-100 px-5 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" 
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div className="flex gap-3 pt-6">
@@ -475,27 +513,35 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
 
                 {/* Attributes Grid */}
                 <div className="grid grid-cols-2 gap-6 pt-6 border-t border-gray-50">
-                   {item.fieldValues?.map((fv: any) => (
-                    <div key={fv.id} className={fv.field.fieldType === 'UNIT_QUANTITY' ? 'col-span-2 grid grid-cols-2 gap-6' : ''}>
-                      {fv.field.fieldType === 'UNIT_QUANTITY' && typeof fv.value === 'object' && fv.value !== null ? (
-                        <>
-                          <div>
-                            <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">{fv.field.name}</p>
-                            <p className="text-sm font-bold text-gray-700">{fv.value.unit || '—'}</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">{fv.field.options?.[0] || 'Quantity'}</p>
-                            <p className="text-sm font-bold text-gray-700">{fv.value.qty || 0}</p>
-                          </div>
-                        </>
-                      ) : (
-                        <>
+                   {item.fieldValues?.map((fv: any) => {
+                     const opts = fv.field.options || {};
+                     const val = fv.value;
+                     const hasUnitData = typeof val === 'object' && val !== null && val.useUnitQty;
+
+                     return (
+                      <div key={fv.id} className={hasUnitData ? 'col-span-2 space-y-4' : ''}>
+                        <div>
                           <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">{fv.field.name}</p>
-                          <p className="text-sm font-bold text-gray-700">{fv.value || '—'}</p>
-                        </>
-                      )}
-                    </div>
-                  ))}
+                          <p className="text-sm font-bold text-gray-700">
+                            {typeof val === 'object' && val !== null ? (val.main || '—') : (val || '—')}
+                          </p>
+                        </div>
+                        
+                        {hasUnitData && (
+                          <div className="grid grid-cols-2 gap-6 p-6 bg-gray-50 rounded-[2rem] border border-gray-100">
+                             <div>
+                                <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-1">{opts.unitLabel || 'Unit'}</p>
+                                <p className="text-sm font-black text-gray-900">{val.unit || '—'}</p>
+                             </div>
+                             <div>
+                                <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-1">{opts.qtyLabel || 'Quantity'}</p>
+                                <p className="text-sm font-black text-gray-900">{val.qty || 0}</p>
+                             </div>
+                          </div>
+                        )}
+                      </div>
+                     );
+                   })}
                 </div>
 
                 {/* Staff Actions */}
