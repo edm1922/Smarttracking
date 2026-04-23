@@ -47,6 +47,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       subItems: [
         { name: 'Product Transmittal', href: '/dashboard/transmittal/product' },
         { name: 'PR Transmittal', href: '/dashboard/transmittal/purchase-request' },
+        { name: 'Unit Tracking Log', href: '/dashboard/transmittal/unit-tracking-log' },
       ]
     },
   ];
