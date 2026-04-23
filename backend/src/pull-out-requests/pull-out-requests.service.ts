@@ -9,7 +9,7 @@ export class PullOutRequestsService {
     private itemsService: ItemsService,
   ) {}
 
-  async create(data: { itemId: string; userId: string; qty: number; unit: string; remarks?: string }) {
+  async create(data: { itemId: string; userId: string; qty: number; unit: string; remarks?: string; imageUrl?: string }) {
     return this.prisma.pullOutRequest.create({
       data: {
         itemId: data.itemId,
@@ -17,6 +17,7 @@ export class PullOutRequestsService {
         qty: data.qty,
         unit: data.unit,
         remarks: data.remarks,
+        imageUrl: data.imageUrl,
       },
       include: { item: true, user: true },
     });

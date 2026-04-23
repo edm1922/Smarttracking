@@ -5,7 +5,8 @@ import {
   Lock, Unlock, ArrowLeft, Save, AlertCircle, Clock, 
   History, ChevronDown, ChevronUp, Image as ImageIcon, 
   ListPlus, LayoutGrid, Tags as TagsIcon, Box, ChevronRight,
-  Eye, LogIn, LogOut, Truck, CheckCircle2, ShieldCheck, User, Activity
+  Eye, LogIn, LogOut, Truck, CheckCircle2, ShieldCheck, User, Activity,
+  Camera, Upload, X
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -51,6 +52,8 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
   const [userRole, setUserRole] = useState('');
   const [username, setUsername] = useState('');
   const [pullOutQty, setPullOutQty] = useState<number>(0);
+  const [pullOutRemarks, setPullOutRemarks] = useState('');
+  const [pullOutImage, setPullOutImage] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
@@ -255,6 +258,22 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     }).filter(Boolean);
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Basic size check (2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        alert('Image is too large. Please keep it under 2MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPullOutImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleConfirmPullOut = async () => {
     if (pullOutQty <= 0) {
       alert('Please enter a valid quantity to pull out.');
@@ -286,11 +305,16 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
         itemId: item.id,
         qty: pullOutQty,
         unit: unitTracking.unit,
-        remarks: `Pull out request for ${pullOutQty} ${unitTracking.unit}`
+        remarks: pullOutRemarks || `Pull out request for ${pullOutQty} ${unitTracking.unit}`,
+        imageUrl: pullOutImage
       };
 
       await api.post('/pull-out-requests', requestPayload);
       alert(`Pull out request for ${pullOutQty} ${unitTracking.unit} has been submitted for approval.`);
+      
+      // Reset pull-out specific state
+      setPullOutRemarks('');
+      setPullOutImage(null);
       setIsPullingOut(false);
 
     } catch (err: any) {
@@ -781,32 +805,75 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                  </div>
 
                  {unitTracking.useUnitQty && (
-                   <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                     <label className="block text-[10px] font-black text-orange-600 uppercase tracking-widest mb-2">Quantity to Pull Out ({unitTracking.unit})</label>
-                     <div className="relative">
-                        <input 
-                          type="number" 
-                          min={1} 
-                          max={unitTracking.qty}
-                          value={pullOutQty}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value) || 0;
-                            // Clamp value between 1 and the available stock
-                            setPullOutQty(Math.min(unitTracking.qty, Math.max(1, val)));
-                          }}
-                          className="w-full rounded-2xl bg-orange-50 border-orange-100 px-5 py-4 text-sm font-bold text-orange-700 outline-none focus:ring-4 focus:ring-orange-500/10"
-                        />
-                        <div className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-black text-orange-300 uppercase">
-                          / {unitTracking.qty} Total
+                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                      <label className="block text-[10px] font-black text-orange-600 uppercase tracking-widest mb-2">Quantity to Pull Out ({unitTracking.unit})</label>
+                      <div className="relative">
+                         <input 
+                           type="number" 
+                           min={1} 
+                           max={unitTracking.qty}
+                           value={pullOutQty}
+                           onChange={(e) => {
+                             const val = parseInt(e.target.value) || 0;
+                             // Clamp value between 1 and the available stock
+                             setPullOutQty(Math.min(unitTracking.qty, Math.max(1, val)));
+                           }}
+                           className="w-full rounded-2xl bg-orange-50 border-orange-100 px-5 py-4 text-sm font-bold text-orange-700 outline-none focus:ring-4 focus:ring-orange-500/10"
+                         />
+                         <div className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-black text-orange-300 uppercase">
+                           / {unitTracking.qty} Total
+                         </div>
+                      </div>
+                      <p className="mt-2 text-[10px] text-gray-400 font-bold italic">
+                         {pullOutQty === unitTracking.qty 
+                           ? "Full pull-out: Item will be marked as Released." 
+                           : `Partial pull-out: ${unitTracking.qty - pullOutQty} ${unitTracking.unit} will remain.`}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="space-y-4 pt-4 border-t border-gray-100">
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Remarks (Optional)</label>
+                      <textarea 
+                        value={pullOutRemarks}
+                        onChange={(e) => setPullOutRemarks(e.target.value)}
+                        placeholder="e.g. For project site release..."
+                        className="w-full rounded-2xl bg-gray-50 border border-gray-100 px-5 py-4 text-sm font-medium h-24 resize-none outline-none focus:ring-4 focus:ring-primary/5 transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Reference Image (Proof)</label>
+                      
+                      {pullOutImage ? (
+                        <div className="relative group rounded-2xl overflow-hidden border-2 border-primary/20 bg-gray-50">
+                          <img src={pullOutImage} alt="Reference" className="w-full h-40 object-cover" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button 
+                              onClick={() => setPullOutImage(null)}
+                              className="bg-white/90 p-2 rounded-xl text-red-500 hover:bg-white transition-all shadow-lg"
+                            >
+                              <X className="h-5 w-5" />
+                            </button>
+                          </div>
                         </div>
-                     </div>
-                     <p className="mt-2 text-[10px] text-gray-400 font-bold italic">
-                        {pullOutQty === unitTracking.qty 
-                          ? "Full pull-out: Item will be marked as Released." 
-                          : `Partial pull-out: ${unitTracking.qty - pullOutQty} ${unitTracking.unit} will remain.`}
-                     </p>
-                   </div>
-                 )}
+                      ) : (
+                        <div className="grid grid-cols-2 gap-3">
+                          <label className="flex flex-col items-center justify-center p-6 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl hover:bg-gray-100 hover:border-primary/30 transition-all cursor-pointer group">
+                            <Camera className="h-6 w-6 text-gray-400 group-hover:text-primary mb-2" />
+                            <span className="text-[10px] font-black text-gray-400 group-hover:text-gray-600 uppercase tracking-widest">Capture</span>
+                            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageChange} />
+                          </label>
+                          <label className="flex flex-col items-center justify-center p-6 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl hover:bg-gray-100 hover:border-primary/30 transition-all cursor-pointer group">
+                            <Upload className="h-6 w-6 text-gray-400 group-hover:text-primary mb-2" />
+                            <span className="text-[10px] font-black text-gray-400 group-hover:text-gray-600 uppercase tracking-widest">Upload</span>
+                            <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                </div>
 
                <div className="flex flex-col gap-3">

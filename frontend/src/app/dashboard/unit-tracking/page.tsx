@@ -808,6 +808,20 @@ export default function UnitTrackingPage() {
                 </div>
               )}
 
+              {viewingLog.imageUrl && (
+                <div className="pt-6 border-t border-gray-50">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Evidence Image</p>
+                  <div className="rounded-3xl overflow-hidden border border-gray-100 shadow-sm">
+                    <img 
+                      src={viewingLog.imageUrl} 
+                      alt="Pull-out Evidence" 
+                      className="w-full h-auto object-cover hover:scale-105 transition-transform duration-500 cursor-zoom-in"
+                      onClick={() => window.open(viewingLog.imageUrl, '_blank')}
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="pt-6">
                 <button 
                   onClick={() => window.open(`/i/${viewingLog.item.slug}`, '_blank')}
