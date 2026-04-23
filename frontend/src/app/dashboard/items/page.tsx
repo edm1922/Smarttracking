@@ -34,7 +34,6 @@ export default function QRItemsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
-  
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -44,6 +43,10 @@ export default function QRItemsPage() {
     tagIds: [] as string[],
     copies: 1,
   });
+
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [currentProgress, setCurrentProgress] = useState(0);
+  const [totalToGenerate, setTotalToGenerate] = useState(0);
 
   const userRole = typeof window !== 'undefined' ? localStorage.getItem('role') : '';
 
@@ -96,12 +99,25 @@ export default function QRItemsPage() {
     try {
       if (editingItem) {
         await api.patch(`/items/${editingItem.slug}`, formData);
+        setIsModalOpen(false);
+        fetchData();
       } else {
-        await api.post('/items', formData);
+        const copies = formData.copies;
+        setIsModalOpen(false); // Close the input modal
+        setIsGenerating(true);
+        setCurrentProgress(0);
+        setTotalToGenerate(copies);
+
+        for (let i = 0; i < copies; i++) {
+          await api.post('/items', { ...formData, copies: 1 });
+          setCurrentProgress(i + 1);
+        }
+        
+        setIsGenerating(false);
+        fetchData();
       }
-      setIsModalOpen(false);
-      fetchData();
     } catch (err: any) {
+      setIsGenerating(false);
       alert(err.response?.data?.message || 'Failed to save item');
     }
   };
@@ -304,6 +320,39 @@ export default function QRItemsPage() {
                 <button type="submit" className="px-6 py-2 text-sm font-bold text-white bg-primary hover:bg-primary-dark rounded-lg shadow-md transition-all active:scale-95">Generate QR</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {isGenerating && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/80 backdrop-blur-md p-4">
+          <div className="w-full max-w-sm bg-white rounded-[2.5rem] p-10 shadow-2xl text-center space-y-8 animate-in zoom-in-95 duration-300">
+            <div className="relative inline-flex items-center justify-center">
+              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+              <div className="relative bg-primary h-20 w-20 rounded-3xl flex items-center justify-center shadow-xl shadow-primary/40 rotate-12 animate-pulse">
+                <QrCode className="h-10 w-10 text-white" />
+              </div>
+            </div>
+            
+            <div>
+              <h2 className="text-2xl font-black text-gray-900 tracking-tight">Generating QR Codes</h2>
+              <p className="text-sm text-gray-500 font-medium mt-2">Please wait while we secure your unique identifiers</p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-xs font-black uppercase tracking-widest text-primary">
+                <span>Progress</span>
+                <span>{currentProgress} / {totalToGenerate}</span>
+              </div>
+              <div className="h-4 w-full bg-gray-100 rounded-full overflow-hidden border border-gray-100">
+                <div 
+                  className="h-full bg-primary transition-all duration-500 ease-out shadow-[0_0_20px_rgba(37,99,235,0.4)]"
+                  style={{ width: `${(currentProgress / totalToGenerate) * 100}%` }}
+                />
+              </div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
+                DO NOT CLOSE THIS TAB UNTIL FINISHED
+              </p>
+            </div>
           </div>
         </div>
       )}
