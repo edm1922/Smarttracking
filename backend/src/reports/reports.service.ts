@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ReportsService {
   constructor(private prisma: PrismaService) {}
 
+  async getAnalytics(locationId?: string) {
     // 1. Summary Stats
     const summaryWhere = locationId ? { locationId } : {};
     const totalRequests = await this.prisma.internalRequest.count({ where: summaryWhere });
@@ -51,18 +52,8 @@ export class ReportsService {
     });
 
     const monthNames = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
     ];
     const monthlyDataMap: Record<string, number> = {};
 
@@ -217,8 +208,6 @@ export class ReportsService {
         }));
 
       case 'pending-requests':
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
         return await this.prisma.internalRequest.findMany({
           where: { status: 'PENDING' },
           include: { product: true, location: true },
@@ -247,18 +236,6 @@ export class ReportsService {
             (analysis[key].items[r.product.name] || 0) + r.quantity;
         });
         return Object.values(analysis);
-
-      case 'custom-item-report':
-        return await this.prisma.product.findMany({
-          include: { stocks: { include: { location: true } } },
-        });
-
-      case 'filter-item':
-        // Fallback to stock summary if no item specified, 
-        // frontend would usually pass options but we handle base case
-        return await this.prisma.product.findMany({
-          include: { stocks: { include: { location: true } } },
-        });
 
       default:
         return [];
