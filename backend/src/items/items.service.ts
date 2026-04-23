@@ -335,6 +335,19 @@ export class ItemsService {
       }
 
       inventory[name].totalQty += qty;
+      
+      // Aggregate unique specs for the group
+      if (!inventory[name].specs) inventory[name].specs = {};
+      item.fieldValues.forEach(fv => {
+        const v = fv.value as any;
+        if (v && typeof v === 'object' && v.useUnitQty) return;
+        
+        if (!inventory[name].specs[fv.field.name]) {
+          inventory[name].specs[fv.field.name] = new Set();
+        }
+        inventory[name].specs[fv.field.name].add(typeof fv.value === 'object' ? JSON.stringify(fv.value) : String(fv.value));
+      });
+
       inventory[name].items.push({
         slug: item.slug,
         qty,
@@ -347,7 +360,17 @@ export class ItemsService {
       });
     });
 
-    return Object.values(inventory);
+    // Convert Sets to Arrays for JSON serialization
+    const result = Object.values(inventory).map((group: any) => {
+      if (group.specs) {
+        Object.keys(group.specs).forEach(key => {
+          group.specs[key] = Array.from(group.specs[key]);
+        });
+      }
+      return group;
+    });
+
+    return result;
   }
 
   async submitForm(slug: string, data: any) {

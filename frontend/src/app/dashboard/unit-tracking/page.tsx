@@ -346,10 +346,28 @@ export default function UnitTrackingPage() {
                 </button>
               </div>
 
-              {/* Expanded QR List */}
+              {/* Expanded content */}
               {expandedProduct === product.name && (
-                <div className="mt-8 pt-8 border-t border-gray-50 space-y-4 animate-in slide-in-from-top-4 duration-300">
-                  <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">QR Reference Breakdown</p>
+                <div className="mt-8 pt-8 border-t border-gray-100 animate-in slide-in-from-top-4 duration-300">
+                  {/* Group Specs Summary */}
+                  {product.specs && Object.keys(product.specs).length > 0 && (
+                    <div className="mb-8 grid grid-cols-2 gap-y-6 gap-x-4">
+                      {Object.entries(product.specs).map(([key, values]: [string, any]) => (
+                        <div key={key} className="animate-in fade-in slide-in-from-left-2 duration-500">
+                          <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{key}</span>
+                          <div className="flex flex-wrap gap-1">
+                            {values.map((val: string, i: number) => (
+                              <span key={i} className="text-sm font-black text-gray-900 bg-gray-50 px-2 py-0.5 rounded-md">
+                                {val}{i < values.length - 1 ? '' : ''}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-4">QR Reference Breakdown</p>
                   <div className="grid grid-cols-1 gap-2">
                     {product.items.map((item: any) => (
                       <div 
