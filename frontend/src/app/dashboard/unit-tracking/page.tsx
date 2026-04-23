@@ -35,6 +35,7 @@ export default function UnitTrackingPage() {
   const [logSearch, setLogSearch] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [viewingLog, setViewingLog] = useState<any>(null);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchInventory();
@@ -58,24 +59,27 @@ export default function UnitTrackingPage() {
 
   const handleApprove = async (id: string) => {
     if (!confirm('Are you sure you want to approve this pull-out? It will deduct stock immediately.')) return;
+    setProcessingId(id);
     try {
       await api.patch(`/pull-out-requests/${id}/approve`);
-      alert('Request approved successfully.');
-      fetchRequests();
-      fetchInventory();
+      await Promise.all([fetchRequests(), fetchInventory()]);
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to approve request');
+    } finally {
+      setProcessingId(null);
     }
   };
 
   const handleReject = async (id: string) => {
     if (!confirm('Reject this pull-out request?')) return;
+    setProcessingId(id);
     try {
       await api.patch(`/pull-out-requests/${id}/reject`);
-      alert('Request rejected.');
-      fetchRequests();
+      await fetchRequests();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to reject request');
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -214,13 +218,18 @@ export default function UnitTrackingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {requests.filter(r => r.status === 'PENDING').map((req) => (
-              <div 
                 key={req.id} 
                 onDoubleClick={() => setViewingLog(req)}
-                className="bg-white p-6 rounded-3xl border border-orange-100 shadow-sm hover:shadow-md transition-all group cursor-pointer select-none"
+                className={`relative bg-white p-6 rounded-3xl border border-orange-100 shadow-sm hover:shadow-md transition-all group cursor-pointer select-none overflow-hidden ${processingId === req.id ? 'opacity-70 pointer-events-none' : ''}`}
                 title="Double-click to view details & evidence"
               >
+                {processingId === req.id && (
+                  <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center animate-in fade-in duration-300">
+                    <div className="h-8 w-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-2" />
+                    <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">Processing...</span>
+                  </div>
+                )}
+                
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-4">
                     <div className="h-10 w-10 bg-gray-50 rounded-xl flex items-center justify-center group-hover:bg-orange-50 transition-colors">
