@@ -40,23 +40,38 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
   const [userRole, setUserRole] = useState('');
   const [username, setUsername] = useState('');
 
+  const [pullOutQty, setPullOutQty] = useState<number>(0);
+  const [unitFieldInfo, setUnitFieldInfo] = useState<any>(null);
+
   const fetchData = async () => {
     try {
       const itemRes = await api.get(`/items/${slug}`);
-      setItem(itemRes.data);
+      const itemData = itemRes.data;
+      setItem(itemData);
       setFormData({
-        name: itemRes.data.name || '',
-        description: itemRes.data.description || '',
-        status: itemRes.data.status,
-        categoryId: itemRes.data.categoryId || '',
-        batchId: itemRes.data.batchId || '',
+        name: itemData.name || '',
+        description: itemData.description || '',
+        status: itemData.status,
+        categoryId: itemData.categoryId || '',
+        batchId: itemData.batchId || '',
       });
       
       const values: Record<string, any> = {};
-      itemRes.data.fieldValues?.forEach((fv: any) => {
+      let unitInfo = null;
+      itemData.fieldValues?.forEach((fv: any) => {
         values[fv.fieldId] = fv.value;
+        if (fv.field.options?.hasUnitQuantity && fv.value?.useUnitQty) {
+          unitInfo = {
+            fieldId: fv.fieldId,
+            unit: fv.value.unit,
+            currentQty: fv.value.qty,
+            label: fv.field.options.qtyLabel || 'Quantity'
+          };
+        }
       });
       setDynamicValues(values);
+      setUnitFieldInfo(unitInfo);
+      if (unitInfo) setPullOutQty(unitInfo.currentQty);
 
       const token = localStorage.getItem('token');
       if (token) {
@@ -122,13 +137,41 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
   const handleConfirmPullOut = async () => {
     setIsSaving(true);
     try {
+      let finalStatus = formData.status;
+      const updatedDynamicValues = { ...dynamicValues };
+
+      if (unitFieldInfo) {
+        const remaining = unitFieldInfo.currentQty - pullOutQty;
+        if (remaining > 0) {
+          // Partial Pull Out - keep Available but update Qty
+          finalStatus = 'Available';
+          updatedDynamicValues[unitFieldInfo.fieldId] = {
+            ...dynamicValues[unitFieldInfo.fieldId],
+            qty: remaining
+          };
+          alert(`Partially pulled out ${pullOutQty} ${unitFieldInfo.unit}. ${remaining} remaining.`);
+        } else {
+          // Full Pull Out
+          finalStatus = 'Released';
+          updatedDynamicValues[unitFieldInfo.fieldId] = {
+            ...dynamicValues[unitFieldInfo.fieldId],
+            qty: 0
+          };
+        }
+      }
+
       const payload = {
-        status: formData.status
+        status: finalStatus,
+        fieldValues: Object.entries(updatedDynamicValues).map(([fieldId, value]) => ({
+          fieldId,
+          value,
+        })),
+        logAction: unitFieldInfo ? `PULL_OUT_${pullOutQty}_${unitFieldInfo.unit.toUpperCase()}` : 'PULL_OUT'
       };
+
       await api.patch(`/items/${slug}`, payload);
       await fetchData();
       setIsPullingOut(false);
-      alert('Item pulled out successfully.');
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to pull out item');
     } finally {
@@ -365,7 +408,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
             {(isEditing || isPublicForm) ? (
               <form onSubmit={isEditing ? handleUpdate : handleSubmitForm} className="space-y-6">
                 <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Internal Reference Name {isPublicForm && <span className="text-red-500">*</span>}</label>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Internal Reference Name {isPublicForm && <span className="text-red-500 ml-1">*</span>}</label>
                   <input required={isPublicForm} type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-primary/10 transition-all" placeholder="Enter reference name..." />
                 </div>
                 
@@ -609,6 +652,30 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                       <option value="Deployed">Deployed</option>
                     </select>
                  </div>
+
+                 {unitFieldInfo && (
+                   <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                     <label className="block text-[10px] font-black text-orange-600 uppercase tracking-widest mb-2">Quantity to Pull Out ({unitFieldInfo.unit})</label>
+                     <div className="relative">
+                        <input 
+                          type="number" 
+                          min={1} 
+                          max={unitFieldInfo.currentQty}
+                          value={pullOutQty}
+                          onChange={(e) => setPullOutQty(Math.min(unitFieldInfo.currentQty, Math.max(1, parseInt(e.target.value) || 0)))}
+                          className="w-full rounded-2xl bg-orange-50 border-orange-100 px-5 py-4 text-sm font-bold text-orange-700 outline-none focus:ring-4 focus:ring-orange-500/10"
+                        />
+                        <div className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-black text-orange-300 uppercase">
+                          / {unitFieldInfo.currentQty} Total
+                        </div>
+                     </div>
+                     <p className="mt-2 text-[10px] text-gray-400 font-bold italic">
+                        {pullOutQty === unitFieldInfo.currentQty 
+                          ? "Full pull-out: Item will be marked as Released." 
+                          : `Partial pull-out: ${unitFieldInfo.currentQty - pullOutQty} ${unitFieldInfo.unit} will remain.`}
+                     </p>
+                   </div>
+                 )}
                </div>
 
                <div className="flex flex-col gap-3">
