@@ -31,6 +31,11 @@ export class ItemsController {
     return this.itemsService.findAll(batchId);
   }
 
+  @Get('unit-inventory')
+  getUnitInventory() {
+    return this.itemsService.getUnitInventory();
+  }
+
   @Get(':slug')
   findOne(@Param('slug') slug: string) {
     return this.itemsService.findOne(slug);

@@ -9,10 +9,10 @@ datasource db {
 }
 
 model User {
-  id          String        @id @default(uuid())
-  username    String        @unique
-  password    String
-  role        String        @default("viewer")
+  id                 String               @id @default(uuid())
+  username           String               @unique
+  password           String
+  role               String               @default("viewer")
   createdAt          DateTime             @default(now())
   ActivityLog        ActivityLog[]
   ProductTransaction ProductTransaction[]
@@ -71,8 +71,8 @@ model Batch {
   batchCode    String        @unique
   description  String?
   createdAt    DateTime      @default(now())
-  items        Item[]
   customFields CustomField[]
+  items        Item[]
 }
 
 model Status {
@@ -100,11 +100,11 @@ model CustomField {
   fieldType   String
   options     Json?
   required    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
   batchId     String?
   orderIndex  Int              @default(0)
-  createdAt   DateTime         @default(now())
-  fieldValues ItemFieldValue[]
   batch       Batch?           @relation(fields: [batchId], references: [id])
+  fieldValues ItemFieldValue[]
 }
 
 model ItemFieldValue {
@@ -129,28 +129,28 @@ model ActivityLog {
 }
 
 model Location {
-  id           String               @id @default(uuid())
-  name         String               @unique
-  description  String?
+  id               String               @id @default(uuid())
+  name             String               @unique
+  description      String?
   createdAt        DateTime             @default(now())
+  internalRequests InternalRequest[]
   stocks           ProductStock[]
   transactions     ProductTransaction[]
-  internalRequests InternalRequest[]
 }
 
 model Product {
-  id           String               @id @default(uuid())
-  sku          String               @unique
-  name         String
-  description  String?
-  unit         String               @default("PCS")
-  price        Float                @default(0)
-  threshold    Float                @default(0)
-  createdAt    DateTime             @default(now())
+  id               String               @id @default(uuid())
+  sku              String               @unique
+  name             String
+  description      String?
+  createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
+  price            Float                @default(0)
+  threshold        Float                @default(0)
+  unit             String               @default("PCS")
+  internalRequests InternalRequest[]
   stocks           ProductStock[]
   transactions     ProductTransaction[]
-  internalRequests InternalRequest[]
 }
 
 model ProductStock {
@@ -158,8 +158,8 @@ model ProductStock {
   productId  String
   locationId String
   quantity   Int      @default(0)
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([productId, locationId])
 }
@@ -168,13 +168,13 @@ model ProductTransaction {
   id         String   @id @default(uuid())
   productId  String
   locationId String
-  type       String   // "IN" | "OUT"
+  type       String
   quantity   Int
   remarks    String?
   createdAt  DateTime @default(now())
   userId     String
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   location   Location @relation(fields: [locationId], references: [id])
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   user       User     @relation(fields: [userId], references: [id])
 }
 
@@ -186,35 +186,34 @@ model PurchaseRequest {
   endUser         String
   position        String?
   sourceSupplier  String?
-  subTitle        String?
-  customSubHeader String?
-  items           Json     // [{name, unit, quantity, estimatedCost}]
-  remarks         String?
-  signatoryConfig Json?    // {preparedBy: boolean, checkedBy: boolean, receivedBy: boolean, approvedBy: boolean}
+  items           Json
   preparedBy      String?
   checkedBy       String?
   receivedBy      String?
   approvedBy      String?
   status          String   @default("PENDING")
   createdAt       DateTime @default(now())
+  subTitle        String?
+  remarks         String?
+  signatoryConfig Json?
+  customSubHeader String?
 }
 
 model InternalRequest {
-  id              String   @id @default(uuid())
-  requestNo       String   @unique
-  date            DateTime @default(now())
-  employeeName    String
-  employeeRole    String
-  departmentArea  String
-  shift           String
-  supervisor      String
-  locationId      String
-  productId       String
-  quantity        Int
-  status          String   @default("PENDING") // PENDING, APPROVED, FULFILLED, REJECTED
-  remarks         String?
-  createdAt       DateTime @default(now())
-  
-  location        Location @relation(fields: [locationId], references: [id])
-  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id             String   @id @default(uuid())
+  requestNo      String   @unique
+  date           DateTime @default(now())
+  employeeName   String
+  employeeRole   String
+  departmentArea String
+  shift          String
+  supervisor     String
+  locationId     String
+  productId      String
+  quantity       Int
+  status         String   @default("PENDING")
+  remarks        String?
+  createdAt      DateTime @default(now())
+  location       Location @relation(fields: [locationId], references: [id])
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 }

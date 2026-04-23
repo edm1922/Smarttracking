@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { SupabaseService } from '../prisma/supabase.service';
 import { WorkflowService } from '../workflow/workflow.service';
+import { ProductsService } from '../products/products.service';
 
 @Injectable()
 export class ItemsService {
@@ -15,6 +16,7 @@ export class ItemsService {
     private logsService: LogsService,
     private supabaseService: SupabaseService,
     private workflowService: WorkflowService,
+    private productsService: ProductsService,
   ) {}
 
   async create(data: any, userId: string) {
@@ -235,7 +237,93 @@ export class ItemsService {
       });
     }
 
+    // Automated Stock Log Integration for Unit Tracking
+    if (data.logAction && data.logAction.startsWith('PULL_OUT_')) {
+      // 1. Check if item has unit tracking
+      const unitField = item.fieldValues.find(fv => fv.field.options?.hasUnitQuantity);
+      if (unitField && unitField.value?.useUnitQty) {
+        // 2. Extract qty from logAction (e.g., PULL_OUT_5_PAIR)
+        const match = data.logAction.match(/PULL_OUT_(\d+)_/);
+        if (match) {
+          const qty = parseInt(match[1]);
+          const productName = item.name;
+
+          // 3. Find matching product
+          const product = await this.prisma.product.findFirst({
+            where: { name: { equals: productName, mode: 'insensitive' } }
+          });
+
+          if (product) {
+            // 4. Log to stock (Default Location: WAREHOUSE - 906271f9-c80c-449c-81f5-60156c83e1d1)
+            await this.productsService.processStock(
+              product.id,
+              '906271f9-c80c-449c-81f5-60156c83e1d1',
+              userId,
+              'OUT',
+              qty,
+              `QR Pull Out: ${item.slug} | User: ${userId}`
+            );
+          }
+        }
+      }
+    }
+
     return updatedItem;
+  }
+
+  async getUnitInventory() {
+    const items = await this.prisma.item.findMany({
+      where: {
+        fieldValues: {
+          some: {
+            field: {
+              options: {
+                path: ['hasUnitQuantity'],
+                equals: true
+              }
+            }
+          }
+        }
+      },
+      include: {
+        fieldValues: {
+          include: { field: true }
+        },
+        batch: true,
+        category: true
+      }
+    });
+
+    // Group and aggregate
+    const inventory: Record<string, any> = {};
+    
+    items.forEach(item => {
+      const unitField = item.fieldValues.find(fv => fv.field.options?.hasUnitQuantity);
+      if (!unitField || !unitField.value?.useUnitQty) return;
+
+      const name = item.name || 'Unnamed Product';
+      const qty = unitField.value.qty || 0;
+      const unit = unitField.value.unit || 'Units';
+
+      if (!inventory[name]) {
+        inventory[name] = {
+          name,
+          totalQty: 0,
+          unit,
+          items: []
+        };
+      }
+
+      inventory[name].totalQty += qty;
+      inventory[name].items.push({
+        slug: item.slug,
+        qty,
+        batch: item.batch?.batchCode,
+        status: item.status
+      });
+    });
+
+    return Object.values(inventory);
   }
 
   async submitForm(slug: string, data: any) {
