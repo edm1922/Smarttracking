@@ -398,56 +398,58 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                   })}
                 </div>
 
-                {/* Global Unit Tracking Section */}
-                <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100/50 space-y-4 mt-8">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 bg-blue-600/10 rounded-xl flex items-center justify-center">
-                        <Activity className="h-5 w-5 text-blue-600" />
+                {/* Global Unit Tracking Section - Only visible to Staff/Admin */}
+                {isLoggedIn && (
+                  <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100/50 space-y-4 mt-8">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 bg-blue-600/10 rounded-xl flex items-center justify-center">
+                          <Activity className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div className="flex flex-col">
+                          <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Enable Unit Tracking?</label>
+                          <p className="text-[10px] text-blue-400 font-bold italic">Link this asset to sub-inventory tracking</p>
+                        </div>
                       </div>
-                      <div className="flex flex-col">
-                        <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Enable Unit Tracking?</label>
-                        <p className="text-[10px] text-blue-400 font-bold italic">Link this asset to sub-inventory tracking</p>
-                      </div>
+                      <input 
+                        type="checkbox" 
+                        checked={unitTracking.useUnitQty}
+                        onChange={(e) => setUnitTracking({ ...unitTracking, useUnitQty: e.target.checked })}
+                        className="h-6 w-6 rounded-lg border-blue-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
+                      />
                     </div>
-                    <input 
-                      type="checkbox" 
-                      checked={unitTracking.useUnitQty}
-                      onChange={(e) => setUnitTracking({ ...unitTracking, useUnitQty: e.target.checked })}
-                      className="h-6 w-6 rounded-lg border-blue-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
-                    />
-                  </div>
 
-                  {unitTracking.useUnitQty && (
-                    <div className="grid grid-cols-1 gap-4 pt-4 border-t border-blue-100/30 animate-in fade-in slide-in-from-top-2 duration-300">
-                      <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Tracking Parameters {(canAdmin || canInventory) ? '(Editable)' : '(Pre-defined)'}</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-gray-400 uppercase">Unit Name</label>
-                          <input 
-                            type="text" 
-                            disabled={!canAdmin && !canInventory}
-                            placeholder="e.g. Pair"
-                            value={unitTracking.unit} 
-                            onChange={(e) => setUnitTracking({ ...unitTracking, unit: e.target.value })} 
-                            className="w-full rounded-2xl bg-white border border-blue-100 px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:ring-4 focus:ring-blue-500/10 transition-all disabled:opacity-50" 
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-gray-400 uppercase">Quantity</label>
-                          <input 
-                            type="number" 
-                            disabled={!canAdmin && !canInventory}
-                            placeholder="15"
-                            value={unitTracking.qty} 
-                            onChange={(e) => setUnitTracking({ ...unitTracking, qty: parseInt(e.target.value) || 0 })} 
-                            className="w-full rounded-2xl bg-white border border-blue-100 px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:ring-4 focus:ring-blue-500/10 transition-all disabled:opacity-50" 
-                          />
+                    {unitTracking.useUnitQty && (
+                      <div className="grid grid-cols-1 gap-4 pt-4 border-t border-blue-100/30 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Tracking Parameters {(canAdmin || canInventory) ? '(Editable)' : '(Pre-defined)'}</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black text-gray-400 uppercase">Unit Name</label>
+                            <input 
+                              type="text" 
+                              disabled={!canAdmin && !canInventory}
+                              placeholder="e.g. Pair"
+                              value={unitTracking.unit} 
+                              onChange={(e) => setUnitTracking({ ...unitTracking, unit: e.target.value })} 
+                              className="w-full rounded-2xl bg-white border border-blue-100 px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:ring-4 focus:ring-blue-500/10 transition-all disabled:opacity-50" 
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black text-gray-400 uppercase">Quantity</label>
+                            <input 
+                              type="number" 
+                              disabled={!canAdmin && !canInventory}
+                              placeholder="15"
+                              value={unitTracking.qty} 
+                              onChange={(e) => setUnitTracking({ ...unitTracking, qty: parseInt(e.target.value) || 0 })} 
+                              className="w-full rounded-2xl bg-white border border-blue-100 px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:ring-4 focus:ring-blue-500/10 transition-all disabled:opacity-50" 
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex gap-3 pt-6">
                   {isEditing && (
