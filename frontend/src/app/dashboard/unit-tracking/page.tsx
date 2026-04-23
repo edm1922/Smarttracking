@@ -365,15 +365,15 @@ export default function UnitTrackingPage() {
                           </div>
                           
                           {/* Form Content / Specs Breakdown */}
-                          <div className="flex flex-wrap gap-x-6 gap-y-1.5 ml-5">
+                          <div className="flex flex-wrap gap-2 ml-5">
                             {item.fieldValues?.filter((fv: any) => {
                               const v = fv.value as any;
                               // Skip internal unit tracking objects
                               return !(v && typeof v === 'object' && v.useUnitQty);
                             }).map((fv: any, idx: number) => (
-                              <div key={idx} className="flex items-center gap-1.5">
-                                <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">{fv.name}:</span>
-                                <span className="text-[10px] font-bold text-gray-600">
+                              <div key={idx} className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-100 rounded-lg shadow-sm">
+                                <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest border-r border-gray-100 pr-1.5">{fv.name}</span>
+                                <span className="text-[10px] font-bold text-gray-800">
                                   {typeof fv.value === 'object' ? JSON.stringify(fv.value) : String(fv.value)}
                                 </span>
                               </div>
