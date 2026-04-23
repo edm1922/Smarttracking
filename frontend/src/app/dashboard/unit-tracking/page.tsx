@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { 
   Boxes, Package, Search, Filter, ArrowRight, 
-  ChevronRight, ChevronDown, Activity, History,
+  ChevronRight, ChevronDown, ChevronUp, Activity, History,
   TrendingDown, TrendingUp, AlertTriangle, Box,
   QrCode, Clock, User, ArrowUpRight
 } from 'lucide-react';
