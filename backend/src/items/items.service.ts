@@ -349,6 +349,7 @@ export class ItemsService {
         }
 
         if (displayValue && displayValue.trim() !== '') {
+          console.log(`[BACKEND] Group: ${name}, Field: ${fv.field.name}, Value: ${displayValue}`);
           if (!inventory[name].specs[fv.field.name]) {
             inventory[name].specs[fv.field.name] = new Set();
           }
