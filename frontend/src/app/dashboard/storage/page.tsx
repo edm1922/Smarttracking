@@ -144,7 +144,15 @@ export default function StoragePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item, idx) => (
+                  {items.filter(item => {
+                    const hasName = item.name && item.name.trim() !== '' && item.name.toLowerCase() !== 'untitled';
+                    const hasContent = item.fieldValues?.some(fv => {
+                      if (!fv.value) return false;
+                      const val = typeof fv.value === 'object' ? fv.value.main : fv.value;
+                      return val && String(val).trim() !== '';
+                    });
+                    return hasName || hasContent;
+                  }).map((item, idx) => (
                     <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       <td className="px-4 py-3 text-[10px] font-mono font-black border border-gray-100 text-gray-900">{item.slug}</td>
                       <td className="px-4 py-3 text-xs font-bold border border-gray-100 text-gray-900">{item.name || 'Untitled'}</td>
