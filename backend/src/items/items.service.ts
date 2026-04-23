@@ -150,13 +150,11 @@ export class ItemsService {
     const item = await this.findOne(slug);
 
     if (item.locked && userRole !== 'admin') {
-      // Allow inventory users to pull out (update status) even if locked
-      const { status, statusId, ...otherData } = data;
-      const isStatusOnly = Object.keys(otherData).length === 0 && (!data.fieldValues || data.fieldValues.length === 0);
+      // Allow inventory users to pull out (update status/fieldValues) even if locked
+      const { status, statusId, fieldValues, logAction, ...otherData } = data;
+      const isInventoryAction = userRole === 'inventory' && Object.keys(otherData).length === 0;
       
-      if (userRole === 'inventory' && isStatusOnly) {
-        // Proceed - inventory users can pull out
-      } else {
+      if (!isInventoryAction) {
         throw new BadRequestException('Item is locked. Only admins can edit core details.');
       }
     }
@@ -239,35 +237,44 @@ export class ItemsService {
 
     // Automated Stock Log Integration for Unit Tracking
     if (data.logAction && data.logAction.startsWith('PULL_OUT_')) {
-      // 1. Check if item has unit tracking (check payload first, then existing)
-      const fieldValuesPayload = data.fieldValues || [];
-      const unitData = fieldValuesPayload.find(fv => fv.value?.useUnitQty)?.value || 
-                       item.fieldValues.find(fv => (fv.value as any)?.useUnitQty)?.value as any;
+      try {
+        // 1. Check if item has unit tracking (check payload first, then existing)
+        const fieldValuesPayload = data.fieldValues || [];
+        const unitData = fieldValuesPayload.find(fv => fv.value?.useUnitQty)?.value || 
+                         item.fieldValues.find(fv => (fv.value as any)?.useUnitQty)?.value as any;
 
-      if (unitData?.useUnitQty) {
-        // 2. Extract qty from logAction (e.g., PULL_OUT_5_PAIR)
-        const match = data.logAction.match(/PULL_OUT_(\d+)_/);
-        if (match) {
-          const qty = parseInt(match[1]);
-          const productName = item.name;
+        if (unitData?.useUnitQty) {
+          // 2. Extract qty from logAction (e.g., PULL_OUT_5_PAIR)
+          const match = data.logAction.match(/PULL_OUT_(\d+)_/);
+          if (match) {
+            const qty = parseInt(match[1]);
+            const productName = item.name;
 
-          // 3. Find matching product
-          const product = await this.prisma.product.findFirst({
-            where: { name: { equals: productName, mode: 'insensitive' } }
-          });
+            if (productName) {
+              // 3. Find matching product
+              const product = await this.prisma.product.findFirst({
+                where: { name: { equals: productName, mode: 'insensitive' } }
+              });
 
-          if (product) {
-            // 4. Log to stock (Default Location: WAREHOUSE - 906271f9-c80c-449c-81f5-60156c83e1d1)
-            await this.productsService.processStock(
-              product.id,
-              '906271f9-c80c-449c-81f5-60156c83e1d1',
-              userId,
-              'OUT',
-              qty,
-              `QR Pull Out: ${item.slug} | User: ${userId}`
-            );
+              if (product) {
+                // 4. Log to stock (Default Location: WAREHOUSE - 906271f9-c80c-449c-81f5-60156c83e1d1)
+                await this.productsService.processStock(
+                  product.id,
+                  '906271f9-c80c-449c-81f5-60156c83e1d1',
+                  userId,
+                  'OUT',
+                  qty,
+                  `QR Pull Out: ${item.slug} | User: ${userId}`
+                ).catch(err => {
+                  console.error('Stock processing failed:', err.message);
+                  // We don't rethrow here to prevent 500, but the audit log will still exist
+                });
+              }
+            }
           }
         }
+      } catch (err) {
+        console.error('Automated stock log failed:', err.message);
       }
     }
 

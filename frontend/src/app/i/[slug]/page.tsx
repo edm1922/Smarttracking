@@ -164,11 +164,12 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     setViewMode('choice');
   };
 
-  const prepareFieldValues = (baseValues: Record<string, any>) => {
+  const prepareFieldValues = (baseValues: Record<string, any>, overrideUnitTracking?: any) => {
     // We must have at least one field to attach unit tracking to.
     // If no fields exist, we might have a problem with the current schema.
     // However, the fetchData now ensures availableFields are present in dynamicValues.
     
+    const activeUnitTracking = overrideUnitTracking || unitTracking;
     const entries = Object.entries(baseValues);
     if (entries.length === 0) return [];
 
@@ -177,13 +178,13 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       const fieldInfo = availableFields.find(f => f.id === fieldId);
       if (!fieldInfo) return null;
 
-      if (index === 0 && unitTracking.useUnitQty) {
+      if (index === 0 && activeUnitTracking.useUnitQty) {
         const mainValue = typeof value === 'object' && value !== null ? value.main : value;
         return {
           fieldId,
           value: {
             main: mainValue,
-            ...unitTracking
+            ...activeUnitTracking
           }
         };
       }
@@ -192,25 +193,35 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
   };
 
   const handleConfirmPullOut = async () => {
+    if (pullOutQty <= 0) {
+      alert('Please enter a valid quantity to pull out.');
+      return;
+    }
+
+    if (pullOutQty > unitTracking.qty) {
+      alert(`Insufficient quantity. Only ${unitTracking.qty} ${unitTracking.unit} available.`);
+      return;
+    }
+
     setIsSaving(true);
     try {
       let finalStatus = formData.status;
       const remaining = unitTracking.qty - pullOutQty;
       
-      const newUnitTracking = { ...unitTracking };
+      const newUnitTracking = { ...unitTracking, qty: remaining };
       if (remaining > 0) {
         finalStatus = 'Available';
-        newUnitTracking.qty = remaining;
         alert(`Partially pulled out ${pullOutQty} ${unitTracking.unit}. ${remaining} remaining.`);
       } else {
         finalStatus = 'Released';
-        newUnitTracking.qty = 0;
       }
+      
+      // Update local state immediately for UI feedback
       setUnitTracking(newUnitTracking);
 
       const payload = {
         status: finalStatus,
-        fieldValues: prepareFieldValues(dynamicValues),
+        fieldValues: prepareFieldValues(dynamicValues, newUnitTracking),
         logAction: `PULL_OUT_${pullOutQty}_${unitTracking.unit.toUpperCase()}`
       };
 
@@ -218,7 +229,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       await fetchData();
       setIsPullingOut(false);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to pull out item');
+      alert(err.response?.data?.message || 'Failed to pull out item. Check stock levels or server connection.');
     } finally {
       setIsSaving(false);
     }
