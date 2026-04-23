@@ -14,6 +14,13 @@ interface Item {
   id: string;
   slug: string;
   name: string | null;
+  batchId?: string;
+  locked?: boolean;
+}
+
+interface Batch {
+  id: string;
+  batchCode: string;
 }
 
 interface QueuedItem {
@@ -23,22 +30,29 @@ interface QueuedItem {
 
 export default function PrintPage() {
   const [availableItems, setAvailableItems] = useState<Item[]>([]);
+  const [batches, setBatches] = useState<Batch[]>([]);
   const [printQueue, setPrintQueue] = useState<QueuedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBatchId, setSelectedBatchId] = useState('all');
+  const [usageFilter, setUsageFilter] = useState<'all' | 'new' | 'used'>('all');
 
   useEffect(() => {
-    const fetchItems = async () => {
+    const fetchData = async () => {
       try {
-        const response = await api.get('/items');
-        setAvailableItems(response.data);
+        const [itemsRes, batchesRes] = await Promise.all([
+          api.get('/items'),
+          api.get('/batches')
+        ]);
+        setAvailableItems(itemsRes.data);
+        setBatches(batchesRes.data);
       } catch (err) {
-        console.error('Failed to fetch items', err);
+        console.error('Failed to fetch print data', err);
       } finally {
         setLoading(false);
       }
     };
-    fetchItems();
+    fetchData();
   }, []);
 
   const addToQueue = (item: Item) => {
@@ -66,7 +80,7 @@ export default function PrintPage() {
   };
 
   const addAll = () => {
-    const newItems = availableItems.filter(ai => !printQueue.some(q => q.item.id === ai.id));
+    const newItems = filteredAvailable.filter(ai => !printQueue.some(q => q.item.id === ai.id));
     setPrintQueue(prev => [...prev, ...newItems.map(item => ({ item, quantity: 1 }))]);
   };
 
@@ -76,10 +90,18 @@ export default function PrintPage() {
     window.print();
   };
 
-  const filteredAvailable = availableItems.filter(item => 
-    item.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (item.name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
-  );
+  const filteredAvailable = availableItems.filter(item => {
+    const matchesSearch = item.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.name?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+    
+    const matchesBatch = selectedBatchId === 'all' || item.batchId === selectedBatchId;
+    
+    const matchesUsage = usageFilter === 'all' || 
+      (usageFilter === 'new' && !item.locked) || 
+      (usageFilter === 'used' && item.locked);
+      
+    return matchesSearch && matchesBatch && matchesUsage;
+  });
 
   // Flatten queue for printing
   const printFlattened = printQueue.flatMap(q => 
@@ -131,15 +153,38 @@ export default function PrintPage() {
               </button>
             </div>
             
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input 
-                type="text" 
-                placeholder="Search slug or name..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-100 bg-gray-50 text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
-              />
+            <div className="flex flex-col space-y-4 mb-4">
+              <div className="flex space-x-2">
+                <select 
+                  value={selectedBatchId}
+                  onChange={(e) => setSelectedBatchId(e.target.value)}
+                  className="flex-1 bg-gray-50 border border-gray-100 text-gray-900 text-[10px] font-black uppercase rounded-xl px-3 py-2 focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer"
+                >
+                  <option value="all">All Batches</option>
+                  {batches.map(batch => (
+                    <option key={batch.id} value={batch.id}>{batch.batchCode}</option>
+                  ))}
+                </select>
+                <select 
+                  value={usageFilter}
+                  onChange={(e) => setUsageFilter(e.target.value as any)}
+                  className="flex-1 bg-gray-50 border border-gray-100 text-gray-900 text-[10px] font-black uppercase rounded-xl px-3 py-2 focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer"
+                >
+                  <option value="all">All Status</option>
+                  <option value="new">New Generated</option>
+                  <option value="used">Already Used</option>
+                </select>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input 
+                  type="text" 
+                  placeholder="Search slug or name..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-100 bg-gray-50 text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
+                />
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto pr-2 space-y-2 scrollbar-thin scrollbar-thumb-gray-200">
