@@ -256,8 +256,8 @@ export class ItemsService {
       try {
         // 1. Check if item has unit tracking (check payload first, then existing)
         const fieldValuesPayload = data.fieldValues || [];
-        const unitData = fieldValuesPayload.find(fv => fv.value?.useUnitQty)?.value || 
-                         item.fieldValues.find(fv => (fv.value as any)?.useUnitQty)?.value as any;
+        const unitData = fieldValuesPayload.find((fv: any) => fv.value?.useUnitQty)?.value || 
+                         item.fieldValues.find((fv: any) => (fv.value as any)?.useUnitQty)?.value as any;
 
         if (unitData?.useUnitQty) {
           // 2. Extract qty from logAction (e.g., PULL_OUT_5_PAIR)
