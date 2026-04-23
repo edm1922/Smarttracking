@@ -34,9 +34,12 @@ export default function UnitTrackingLogPage() {
     subTitle: 'Sub-Inventory Tracking & Unit Release Authorization',
     customSubHeader: '',
     preparedBy: '',
+    checkedBy: '',
     receivedBy: '',
     approvedBy: '',
+    remarks: '',
     showPrepared: true,
+    showChecked: false,
     showReceived: true,
     showApproved: true
   });
@@ -156,8 +159,9 @@ export default function UnitTrackingLogPage() {
 
             <div className="pt-4 border-t border-gray-100 space-y-3">
               <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Signatories</h4>
-              {['preparedBy', 'receivedBy', 'approvedBy'].map(field => {
+              {['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy'].map(field => {
                 const showField = field === 'preparedBy' ? 'showPrepared' : 
+                                field === 'checkedBy' ? 'showChecked' :
                                 field === 'receivedBy' ? 'showReceived' : 'showApproved';
                 return (
                   <div key={field} className="space-y-1">
@@ -181,6 +185,16 @@ export default function UnitTrackingLogPage() {
                   </div>
                 );
               })}
+            </div>
+
+            <div className="pt-4 border-t border-gray-100">
+              <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-widest">Remarks</label>
+              <textarea 
+                value={headerInfo.remarks} 
+                onChange={e => setHeaderInfo({ ...headerInfo, remarks: e.target.value })} 
+                placeholder="Additional notes..."
+                className="w-full rounded-md border border-gray-200 px-3 py-2 text-xs outline-none focus:ring-1 h-20 resize-none"
+              />
             </div>
           </div>
 
@@ -309,9 +323,19 @@ export default function UnitTrackingLogPage() {
           </tbody>
         </table>
 
+        {headerInfo.remarks && (
+          <div className="mb-12">
+            <div className="text-[10px] font-black text-gray-400 uppercase mb-1">Remarks:</div>
+            <div className="text-sm font-medium text-gray-700 whitespace-pre-wrap border border-gray-100 p-4 rounded-lg bg-gray-50/50">
+              {headerInfo.remarks}
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-3 gap-x-12 gap-y-12 pt-12">
-          {['preparedBy', 'receivedBy', 'approvedBy'].filter(field => {
+          {['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy'].filter(field => {
             const showField = field === 'preparedBy' ? 'showPrepared' : 
+                            field === 'checkedBy' ? 'showChecked' :
                             field === 'receivedBy' ? 'showReceived' : 'showApproved';
             return (headerInfo as any)[showField];
           }).map(field => (
