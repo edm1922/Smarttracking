@@ -789,7 +789,11 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                           min={1} 
                           max={unitTracking.qty}
                           value={pullOutQty}
-                          onChange={(e) => setPullOutQty(Math.min(unitTracking.qty, Math.max(1, parseInt(e.target.value) || 0)))}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value) || 0;
+                            // Clamp value between 1 and the available stock
+                            setPullOutQty(Math.min(unitTracking.qty, Math.max(1, val)));
+                          }}
                           className="w-full rounded-2xl bg-orange-50 border-orange-100 px-5 py-4 text-sm font-bold text-orange-700 outline-none focus:ring-4 focus:ring-orange-500/10"
                         />
                         <div className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-black text-orange-300 uppercase">
