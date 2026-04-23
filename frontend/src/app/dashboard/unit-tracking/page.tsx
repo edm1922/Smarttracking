@@ -86,6 +86,7 @@ export default function UnitTrackingPage() {
   const fetchInventory = async () => {
     try {
       const res = await api.get('/items/unit-inventory');
+      console.log('Unit Inventory Data:', res.data);
       setInventory(res.data);
     } catch (err) {
       console.error('Failed to fetch unit inventory', err);
