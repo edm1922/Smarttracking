@@ -32,6 +32,7 @@ export default function QRItemsPage() {
   const [customFields, setCustomFields] = useState<any[]>([]);
   
   const [loading, setLoading] = useState(true);
+  const [togglingLock, setTogglingLock] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
@@ -258,10 +259,18 @@ export default function QRItemsPage() {
                     <div className="flex justify-end space-x-2">
                       <button 
                         onClick={() => handleToggleLock(item.slug)} 
+                        disabled={togglingLock.includes(item.slug)}
                         title={item.locked ? 'Unlock (Admin Only)' : 'Lock Form'}
-                        className={`p-1.5 rounded-md ${item.locked ? 'text-red-600 hover:bg-red-50' : 'text-gray-400 hover:bg-gray-100'}`}
+                        className={`p-1.5 rounded-md transition-all ${
+                          togglingLock.includes(item.slug) ? 'opacity-50 cursor-wait' :
+                          item.locked ? 'text-red-600 hover:bg-red-50' : 'text-gray-400 hover:bg-gray-100'
+                        }`}
                       >
-                        {item.locked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                        {togglingLock.includes(item.slug) ? (
+                          <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          item.locked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />
+                        )}
                       </button>
                       <a 
                         href={`/i/${item.slug}`} 

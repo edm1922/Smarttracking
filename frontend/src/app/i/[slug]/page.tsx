@@ -22,6 +22,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
   const [item, setItem] = useState<any>(null);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [togglingLock, setTogglingLock] = useState(false);
   const [error, setError] = useState('');
   
   const [viewMode, setViewMode] = useState<'loading' | 'choice' | 'guest' | 'login' | 'form'>('loading');
@@ -552,19 +553,27 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
             {canAdmin && (
               <div className="absolute top-6 right-6">
                 <button 
+                  disabled={togglingLock}
                   onClick={async () => {
                     if (confirm(`Are you sure you want to ${item.locked ? 'unlock' : 'lock'} this item?`)) {
+                      setTogglingLock(true);
                       try {
                         await api.patch(`/items/${slug}/lock`);
                         await fetchData();
                       } catch(err) {
                         alert('Failed to toggle lock');
+                      } finally {
+                        setTogglingLock(false);
                       }
                     }
                   }}
-                  className={`p-3 rounded-2xl shadow-lg backdrop-blur bg-white/90 transition-all ${item.locked ? 'text-red-600' : 'text-green-600'}`}
+                  className={`p-3 rounded-2xl shadow-lg backdrop-blur bg-white/90 transition-all ${togglingLock ? 'opacity-50 cursor-wait' : item.locked ? 'text-red-600' : 'text-green-600'}`}
                 >
-                  {item.locked ? <Lock className="h-6 w-6" /> : <Unlock className="h-6 w-6" />}
+                  {togglingLock ? (
+                    <div className="h-6 w-6 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    item.locked ? <Lock className="h-6 w-6" /> : <Unlock className="h-6 w-6" />
+                  )}
                 </button>
               </div>
             )}
