@@ -273,6 +273,19 @@ export default function ProductsPage() {
     }
   };
 
+  const handleRemoveImage = async (productId: string) => {
+    if (!confirm('Are you sure you want to remove this product image?')) return;
+    try {
+      await api.patch(`/products/${productId}`, { imageUrl: null });
+      fetchData();
+      if (editingProduct && editingProduct.id === productId) {
+        setEditingProduct({ ...editingProduct, imageUrl: null });
+      }
+    } catch (err) {
+      alert('Failed to remove image');
+    }
+  };
+
   const fetchLogs = async () => {
     try {
       const res = await api.get('/products/logs');
@@ -923,12 +936,23 @@ export default function ProductsPage() {
                           if (file) handleImageUpload(editingProduct.id, file);
                         }}
                       />
-                      <label 
-                        htmlFor="product-image-upload"
-                        className="w-full py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all text-center cursor-pointer shadow-sm"
-                      >
-                        {editingProduct.imageUrl ? 'Replace Image' : 'Upload Product Media'}
-                      </label>
+                      <div className="flex w-full gap-2 mt-4">
+                        <label 
+                          htmlFor="product-image-upload"
+                          className="flex-1 py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all text-center cursor-pointer shadow-sm"
+                        >
+                          {editingProduct.imageUrl ? 'Replace Image' : 'Upload Product Media'}
+                        </label>
+                        {editingProduct.imageUrl && (
+                          <button 
+                            type="button"
+                            onClick={() => handleRemoveImage(editingProduct.id)}
+                            className="px-4 py-3 bg-red-50 text-red-600 border border-red-100 rounded-xl text-xs font-bold hover:bg-red-100 transition-all shadow-sm"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
 
