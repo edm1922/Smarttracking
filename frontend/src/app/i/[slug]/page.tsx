@@ -835,7 +835,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                         <Truck className="mr-2 h-5 w-5" /> Request Pull Out
                       </button>
                       
-                      {canAdmin && (
+                      {(canAdmin || canInventory) && (
                          <button 
                             onClick={() => setIsEditing(true)}
                             className="w-full py-4 border-2 border-gray-100 text-gray-400 rounded-3xl font-black uppercase tracking-widest text-[10px] hover:border-primary hover:text-primary transition-all"
