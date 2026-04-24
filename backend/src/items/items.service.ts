@@ -301,6 +301,16 @@ export class ItemsService {
   async getUnitInventory() {
     // Find all items where any field value has useUnitQty: true
     const items = await this.prisma.item.findMany({
+      where: {
+        fieldValues: {
+          some: {
+            value: {
+              path: ['useUnitQty'],
+              equals: true
+            }
+          }
+        }
+      },
       include: {
         fieldValues: {
           include: { field: true }
@@ -358,9 +368,26 @@ export class ItemsService {
         }
       });
 
+      let threshold = 5;
+      let totalCapacity = qty;
+
+      item.fieldValues.forEach(fv => {
+        const v = fv.value as any;
+        if (v && typeof v === 'object' && v.useUnitQty) {
+          if (v.threshold !== undefined) threshold = v.threshold;
+          // We can assume the initial qty set during generation was the capacity
+          // or we can look for a capacity field if the user adds one.
+          // For now, let's treat the current qty as capacity if it's the first time, 
+          // but better if we had a dedicated capacity field.
+          // The user said "the apparels/products will be place on large cellophanes... each cellophane will have its own QR code which correspond to quantity"
+          // So the 'qty' is the current count.
+        }
+      });
+
       inventory[name].items.push({
         slug: item.slug,
         qty,
+        threshold,
         batch: item.batch?.batchCode,
         status: item.status,
         fieldValues: item.fieldValues.map(fv => ({

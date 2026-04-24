@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { 
   Database, Folder, ChevronRight, Search, 
   Filter, Calendar, ArrowLeft, ListFilter,
-  Eye, QrCode, Clock, Printer, X
+  Eye, QrCode, Clock, Printer, X, Trash2
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -95,6 +95,22 @@ export default function StoragePage() {
     }
     
     return String(value);
+  };
+
+  const handleDeleteBatch = async (e: React.MouseEvent, batch: Batch) => {
+    e.stopPropagation();
+    if (!confirm(`Are you sure you want to delete the batch "${batch.batchCode}"? This will NOT delete the items inside, but they will no longer be grouped under this batch.`)) return;
+    
+    try {
+      await api.delete(`/batches/${batch.id}`);
+      if (selectedBatch?.id === batch.id) {
+        setSelectedBatch(null);
+        setViewMode('grid');
+      }
+      fetchData();
+    } catch (err) {
+      alert('Failed to delete batch. Make sure it is not being used by other records.');
+    }
   };
 
   const filteredBatches = batches.filter(b => 
@@ -218,6 +234,13 @@ export default function StoragePage() {
             </div>
           </div>
           <div className="flex space-x-3">
+            <button 
+              onClick={(e) => handleDeleteBatch(e, selectedBatch)}
+              className="inline-flex items-center rounded-xl bg-white border border-red-100 px-4 py-2 text-sm font-bold text-red-500 shadow-sm hover:bg-red-50 transition-all"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Batch
+            </button>
             <button 
               onClick={() => setIsPreviewOpen(true)}
               className="inline-flex items-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-gray-200 hover:scale-[1.02] active:scale-95 transition-all"
@@ -363,6 +386,15 @@ export default function StoragePage() {
             <div className="bg-primary/5 h-16 w-16 rounded-3xl flex items-center justify-center mb-6 group-hover:rotate-6 transition-transform duration-500">
               <Folder className="h-8 w-8 text-primary fill-primary/10" />
             </div>
+            
+            <button 
+              onClick={(e) => handleDeleteBatch(e, batch)}
+              className="absolute top-8 right-8 p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100 z-10"
+              title="Delete Batch"
+            >
+              <Trash2 className="h-5 w-5" />
+            </button>
+
             <h3 className="text-xl font-black text-gray-900 mb-1">{batch.batchCode}</h3>
             <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{batch._count?.items || 0} Submissions</p>
             <div className="mt-8 flex items-center text-xs font-bold text-primary group-hover:translate-x-2 transition-transform">

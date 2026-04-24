@@ -14,6 +14,7 @@ interface UnitTrackingData {
   useUnitQty: boolean;
   unit: string;
   qty: number;
+  threshold: number;
 }
 
 export default function ItemPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -40,7 +41,8 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
   const [unitTracking, setUnitTracking] = useState<UnitTrackingData>({
     useUnitQty: false,
     unit: 'Pair',
-    qty: 15
+    qty: 0,
+    threshold: 5
   });
   
   const [fieldSuggestions, setFieldSuggestions] = useState<Record<string, string[]>>({});
@@ -58,13 +60,15 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
 
   const fetchData = async () => {
     try {
-      const [itemRes, fieldsRes, inventoryRes] = await Promise.all([
+      const [itemRes, fieldsRes] = await Promise.all([
         api.get(`/items/${slug}`),
         api.get('/custom-fields'),
-        api.get('/items/unit-inventory')
       ]);
       
-      setNameTemplates(inventoryRes.data);
+      // Defer loading of suggestions to speed up initial form render
+      api.get('/items/unit-inventory').then(res => {
+        setNameTemplates(res.data);
+      }).catch(err => console.error('Failed to load suggestions', err));
       
       const itemData = itemRes.data;
       const allFields = fieldsRes.data;
@@ -73,7 +77,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       setFormData({
         name: itemData.name || '',
         description: itemData.description || '',
-        status: itemData.status,
+        status: itemData.status || '',
         categoryId: itemData.categoryId || '',
         batchId: itemData.batchId || '',
       });
@@ -88,13 +92,15 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       // Initialize with existing values
       itemData.fieldValues?.forEach((fv: any) => {
         values[fv.fieldId] = fv.value;
-        if (fv.value && typeof fv.value === 'object' && fv.value.useUnitQty) {
+        const val = fv.value;
+        if (val && typeof val === 'object' && val.useUnitQty) {
           setUnitTracking({
             useUnitQty: true,
-            unit: fv.value.unit || 'Pair',
-            qty: fv.value.qty || 0
+            unit: val.unit || 'Pair',
+            qty: val.qty || 0,
+            threshold: val.threshold || 5
           });
-          setPullOutQty(fv.value.qty || 0);
+          setPullOutQty(val.qty || 0);
           foundUnitData = true;
         }
       });
@@ -107,71 +113,63 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       });
       
       if (!foundUnitData) {
-        setUnitTracking({ useUnitQty: false, unit: 'Pair', qty: 15 });
+        setUnitTracking({ useUnitQty: false, unit: 'Pair', qty: 15, threshold: 5 });
         setPullOutQty(0);
       }
       
       setDynamicValues(values);
 
-      // SMART AUTOFILL: If the item is empty, try to find similar items in the same category/batch
+      // SMART AUTOFILL: Defer this so the main form renders immediately
       if (!itemData.name && (!itemData.fieldValues || itemData.fieldValues.length === 0)) {
-        try {
-          const categoryId = itemData.categoryId;
-          const batchId = itemData.batchId;
-          
-          // Get items from same category/batch
-          const similarRes = await api.get('/items', { 
-            params: { 
-              categoryId, 
-              batchId,
-              limit: 50 // Increase depth to find items with data
-            } 
-          });
-          
-          // Find the most recent one that ISN'T this one and has data
-          const sourceItem = (similarRes.data || []).find((i: any) => 
-            i.id !== itemData.id && (i.name || (i.fieldValues && i.fieldValues.length > 0))
-          );
-
-          if (sourceItem) {
-            console.log('Autofilling from similar item:', sourceItem.slug);
-            setFormData(prev => ({
-              ...prev,
-              name: sourceItem.name || prev.name,
-              description: sourceItem.description || prev.description,
-            }));
-
-            const autoValues: Record<string, any> = { ...values };
-            sourceItem.fieldValues?.forEach((fv: any) => {
-              // Only copy values for fields that exist for the current item
-              if (relevantFields.find((f: any) => f.id === fv.fieldId)) {
-                autoValues[fv.fieldId] = fv.value;
-              }
+        setTimeout(async () => {
+          try {
+            const categoryId = itemData.categoryId;
+            const batchId = itemData.batchId;
+            
+            const similarRes = await api.get('/items', { 
+              params: { categoryId, batchId, limit: 50 } 
             });
-            setDynamicValues(autoValues);
+            
+            const sourceItem = (similarRes.data || []).find((i: any) => 
+              i.id !== itemData.id && (i.name || (i.fieldValues && i.fieldValues.length > 0))
+            );
+
+            if (sourceItem) {
+              setFormData(prev => ({
+                ...prev,
+                name: sourceItem.name || prev.name,
+                description: sourceItem.description || prev.description,
+              }));
+
+              const autoValues: Record<string, any> = { ...values };
+              sourceItem.fieldValues?.forEach((fv: any) => {
+                if (relevantFields.find((f: any) => f.id === fv.fieldId)) {
+                  autoValues[fv.fieldId] = fv.value;
+                }
+              });
+              setDynamicValues(autoValues);
+            }
+
+            const suggestionMap: Record<string, Set<string>> = {};
+            (similarRes.data || []).forEach((i: any) => {
+              i.fieldValues?.forEach((fv: any) => {
+                const val = typeof fv.value === 'object' ? fv.value.main : fv.value;
+                if (val) {
+                  if (!suggestionMap[fv.fieldId]) suggestionMap[fv.fieldId] = new Set();
+                  suggestionMap[fv.fieldId].add(String(val));
+                }
+              });
+            });
+
+            const finalSuggestions: Record<string, string[]> = {};
+            Object.keys(suggestionMap).forEach(key => {
+              finalSuggestions[key] = Array.from(suggestionMap[key]).slice(0, 10);
+            });
+            setFieldSuggestions(finalSuggestions);
+          } catch (err) {
+            console.error('Autofill failed', err);
           }
-
-          // Build suggestion map from all similar items
-          const suggestionMap: Record<string, Set<string>> = {};
-          (similarRes.data || []).forEach((i: any) => {
-            i.fieldValues?.forEach((fv: any) => {
-              const val = typeof fv.value === 'object' ? fv.value.main : fv.value;
-              if (val) {
-                if (!suggestionMap[fv.fieldId]) suggestionMap[fv.fieldId] = new Set();
-                suggestionMap[fv.fieldId].add(String(val));
-              }
-            });
-          });
-
-          const finalSuggestions: Record<string, string[]> = {};
-          Object.keys(suggestionMap).forEach(key => {
-            finalSuggestions[key] = Array.from(suggestionMap[key]).slice(0, 10);
-          });
-          setFieldSuggestions(finalSuggestions);
-
-        } catch (err) {
-          console.error('Autofill failed', err);
-        }
+        }, 0);
       }
 
       const token = localStorage.getItem('token');
@@ -610,7 +608,8 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                           setUnitTracking({
                             useUnitQty: true,
                             unit: unitField.value.unit || 'Pair',
-                            qty: unitField.value.qty || 0
+                            qty: unitField.value.qty || 0,
+                            threshold: unitField.value.threshold || 5
                           });
                         }
                       }
@@ -628,7 +627,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                 {isEditing && (
                   <div>
                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Status</label>
-                    <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-primary/10 transition-all">
+                    <select value={formData.status || ''} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-primary/10 transition-all">
                       <option value="Available">Available</option>
                       <option value="Used">Used</option>
                       <option value="Defective">Defective</option>
@@ -739,6 +738,18 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                             />
                           </div>
                         </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-gray-400 uppercase">Restock Alert Threshold</label>
+                          <input 
+                            type="number" 
+                            disabled={!canAdmin && !canInventory}
+                            placeholder="Low stock alert number..."
+                            value={unitTracking.threshold} 
+                            onChange={(e) => setUnitTracking({ ...unitTracking, threshold: parseInt(e.target.value) || 0 })} 
+                            className="w-full rounded-2xl bg-white border border-blue-100 px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:ring-4 focus:ring-red-500/10 transition-all disabled:opacity-50" 
+                          />
+                          <p className="text-[9px] text-gray-400 font-bold italic">Item will pulse red in dashboard when quantity is ≤ this number</p>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -802,7 +813,11 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                          </div>
                          <div>
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Current Stock</p>
-                            <p className="text-sm font-black text-gray-900">{unitTracking.qty}</p>
+                            <p className="text-sm font-black text-gray-900">{unitTracking.qty} {unitTracking.unit}</p>
+                         </div>
+                         <div>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Alert Threshold</p>
+                            <p className="text-sm font-black text-gray-900">≤ {unitTracking.threshold}</p>
                          </div>
                       </div>
                    )}
@@ -857,7 +872,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                <div className="space-y-4 mb-8">
                  <div>
                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">New Status</label>
-                    <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-bold">
+                    <select value={formData.status || ''} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-bold">
                       <option value="Released">Released</option>
                       <option value="Used">Used</option>
                       <option value="Deployed">Deployed</option>

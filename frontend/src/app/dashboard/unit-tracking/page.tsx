@@ -15,6 +15,7 @@ export default function UnitTrackingPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'inventory' | 'summary' | 'logs'>('inventory');
 
   const [requests, setRequests] = useState<any[]>([]);
   const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
@@ -95,6 +96,39 @@ export default function UnitTrackingPage() {
     }
   };
 
+  const totalUnitsAvailable = inventory.reduce((acc, p) => acc + p.totalQty, 0);
+  const lowStockItems = inventory.flatMap(p => 
+    p.items.filter((item: any) => item.qty <= (item.threshold || 0))
+  );
+
+  const handleRefill = async (item: any) => {
+    const newQtyStr = prompt(`Refill Cellophane ${item.slug}\nEnter new quantity:`, item.qty);
+    if (newQtyStr === null) return;
+    
+    const qtyNum = parseInt(newQtyStr);
+    if (isNaN(qtyNum)) {
+      alert('Invalid quantity');
+      return;
+    }
+
+    try {
+      const fieldValues = item.fieldValues.map((fv: any) => {
+        if (fv.value && typeof fv.value === 'object' && fv.value.useUnitQty) {
+          return {
+            fieldId: fv.fieldId,
+            value: { ...fv.value, qty: qtyNum }
+          };
+        }
+        return { fieldId: fv.fieldId, value: fv.value };
+      });
+
+      await api.patch(`/items/${item.slug}`, { fieldValues });
+      fetchInventory();
+    } catch (err) {
+      alert('Failed to refill item');
+    }
+  };
+
   const toggleRequestSelection = (id: string) => {
     setSelectedRequestIds(prev => 
       prev.includes(id) ? prev.filter(rid => rid !== id) : [...prev, id]
@@ -164,7 +198,7 @@ export default function UnitTrackingPage() {
 
   const displayRequests = getGroupedRequests();
 
-  const totalStock = inventory.reduce((acc, p) => acc + p.totalQty, 0);
+  const totalStock = totalUnitsAvailable;
   const totalProducts = inventory.length;
   const totalQRs = inventory.reduce((acc, p) => acc + p.items.length, 0);
 
@@ -184,7 +218,27 @@ export default function UnitTrackingPage() {
       {/* Header & Stats */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-4xl font-black text-gray-900 tracking-tighter mb-2">Unit Tracking Hub</h1>
+          <h1 className="text-4xl font-black text-gray-900 tracking-tighter mb-4">Unit Tracking Hub</h1>
+          <div className="flex items-center gap-2 mb-2">
+             <button 
+               onClick={() => setActiveTab('inventory')}
+               className={`px-4 py-2 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'inventory' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-400 hover:text-gray-900 bg-gray-50'}`}
+             >
+               Detailed List
+             </button>
+             <button 
+               onClick={() => setActiveTab('summary')}
+               className={`px-4 py-2 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'summary' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-400 hover:text-gray-900 bg-gray-50'}`}
+             >
+               Summary Dashboard
+             </button>
+             <button 
+               onClick={() => setActiveTab('logs')}
+               className={`px-4 py-2 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'logs' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-400 hover:text-gray-900 bg-gray-50'}`}
+             >
+               Release Logs
+             </button>
+          </div>
           <p className="text-gray-500 font-medium">Live sub-inventory of all QR-tracked units and stock levels.</p>
         </div>
         
@@ -278,25 +332,105 @@ export default function UnitTrackingPage() {
         </div>
       )}
 
-      {/* Control Bar */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 group">
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-primary transition-colors" />
-          <input 
-            type="text" 
-            placeholder="Search items by product name..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-14 pr-6 py-5 bg-white border border-gray-100 rounded-[1.5rem] shadow-sm outline-none focus:ring-4 focus:ring-primary/10 transition-all font-medium text-gray-900"
-          />
-        </div>
-        <button className="p-5 bg-white border border-gray-100 rounded-[1.5rem] shadow-sm hover:bg-gray-50 transition-all">
-          <Filter className="h-6 w-6 text-gray-400" />
-        </button>
-      </div>
+      {activeTab === 'summary' && (
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+           {/* Stats Grid */}
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl flex items-center gap-6">
+                 <div className="h-16 w-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
+                    <Boxes className="h-8 w-8" />
+                 </div>
+                 <div>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Available Units</p>
+                    <p className="text-3xl font-black text-gray-900 tracking-tighter">{totalUnitsAvailable.toLocaleString()}</p>
+                 </div>
+              </div>
 
-      {/* Inventory Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className={`bg-white p-8 rounded-[2.5rem] border shadow-xl flex items-center gap-6 transition-colors ${lowStockItems.length > 0 ? 'border-red-100 bg-red-50/10' : 'border-gray-100'}`}>
+                 <div className={`h-16 w-16 rounded-2xl flex items-center justify-center ${lowStockItems.length > 0 ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-green-50 text-green-600'}`}>
+                    <AlertTriangle className="h-8 w-8" />
+                 </div>
+                 <div>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Critical Refills Needed</p>
+                    <p className={`text-3xl font-black tracking-tighter ${lowStockItems.length > 0 ? 'text-red-600' : 'text-gray-900'}`}>{lowStockItems.length}</p>
+                 </div>
+              </div>
+
+              <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl flex items-center gap-6">
+                 <div className="h-16 w-16 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600">
+                    <LayoutGrid className="h-8 w-8" />
+                 </div>
+                 <div>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Tracked Product Types</p>
+                    <p className="text-3xl font-black text-gray-900 tracking-tighter">{inventory.length}</p>
+                 </div>
+              </div>
+           </div>
+
+           {/* Quick Refill Queue */}
+           <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden">
+              <div className="p-8 border-b border-gray-50 flex items-center justify-between">
+                 <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 bg-red-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-red-200">
+                       <Truck className="h-6 w-6" />
+                    </div>
+                    <div>
+                       <h2 className="text-xl font-black text-gray-900 tracking-tight">Priority Refill Queue</h2>
+                       <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Cellophanes that have dropped below your custom threshold</p>
+                    </div>
+                 </div>
+              </div>
+              
+              <div className="p-8">
+                 {lowStockItems.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                       {lowStockItems.map((item: any) => (
+                          <div key={item.slug} className="p-6 rounded-3xl border border-red-100 bg-red-50/30 flex items-center justify-between group hover:bg-red-50 transition-all">
+                             <div>
+                                <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-1">QR ID: {item.slug}</p>
+                                <p className="text-lg font-black text-gray-900 tracking-tight">{item.qty} Remaining</p>
+                                <p className="text-[10px] font-bold text-red-600">Threshold: {item.threshold}</p>
+                             </div>
+                             <button 
+                                onClick={() => handleRefill(item)}
+                                className="p-4 bg-red-600 text-white rounded-2xl shadow-lg shadow-red-200 hover:scale-105 active:scale-95 transition-all"
+                             >
+                                <Activity className="h-5 w-5" />
+                             </button>
+                          </div>
+                       ))}
+                    </div>
+                 ) : (
+                    <div className="py-12 text-center">
+                       <Check className="h-12 w-12 text-green-500 mx-auto mb-4 bg-green-50 p-3 rounded-full" />
+                       <p className="text-sm font-bold text-gray-400">All cellophanes are currently above their thresholds.</p>
+                    </div>
+                 ) }
+              </div>
+           </div>
+        </div>
+      )}
+
+      {activeTab === 'inventory' && (
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          {/* Control Bar */}
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1 group">
+              <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-primary transition-colors" />
+              <input 
+                type="text" 
+                placeholder="Search items by product name..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-14 pr-6 py-5 bg-white border border-gray-100 rounded-[1.5rem] shadow-sm outline-none focus:ring-4 focus:ring-primary/10 transition-all font-medium text-gray-900"
+              />
+            </div>
+            <button className="p-5 bg-white border border-gray-100 rounded-[1.5rem] shadow-sm hover:bg-gray-50 transition-all">
+              <Filter className="h-6 w-6 text-gray-400" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {filteredInventory.map((product, idx) => (
           <div 
             key={product.name}
@@ -370,18 +504,26 @@ export default function UnitTrackingPage() {
 
                   <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-4">QR Reference Breakdown</p>
                   <div className="grid grid-cols-1 gap-2">
-                    {product.items.map((item: any) => (
-                      <div 
-                        key={item.slug}
-                        className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50 hover:bg-white hover:border-primary/20 transition-all cursor-pointer group/row"
-                        onClick={() => window.open(`/i/${item.slug}`, '_blank')}
-                      >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-1.5">
-                            <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
-                            <span className="text-sm font-mono font-bold text-gray-700">{item.slug}</span>
-                            {item.batch && <span className="px-2 py-0.5 bg-gray-200 text-[9px] font-black rounded-md">{item.batch}</span>}
-                          </div>
+                    {product.items.map((item: any) => {
+                      const isLowStock = item.qty <= (item.threshold || 0);
+                      return (
+                        <div 
+                          key={item.slug}
+                          className={`flex items-center justify-between p-4 rounded-2xl border transition-all group/row ${
+                            isLowStock 
+                              ? 'bg-red-50 border-red-200 animate-pulse-slow shadow-[0_0_15px_rgba(239,68,68,0.1)]' 
+                              : 'bg-gray-50/50 border-gray-100/50 hover:bg-white hover:border-primary/20'
+                          }`}
+                        >
+                          <div className="flex-1 cursor-pointer" onClick={() => window.open(`/i/${item.slug}`, '_blank')}>
+                            <div className="flex items-center gap-3 mb-1.5">
+                              <div className={`w-2 h-2 rounded-full ${isLowStock ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]'}`} />
+                              <span className="text-sm font-mono font-bold text-gray-700">{item.slug}</span>
+                              {item.batch && <span className="px-2 py-0.5 bg-gray-200 text-[9px] font-black rounded-md">{item.batch}</span>}
+                              {isLowStock && (
+                                <span className="px-2 py-0.5 bg-red-600 text-white text-[8px] font-black rounded-md uppercase tracking-tighter">Needs Refill</span>
+                              )}
+                            </div>
                           
                           {/* Form Content / Specs Breakdown */}
                           <div className="flex flex-wrap gap-2 ml-5">
@@ -408,11 +550,32 @@ export default function UnitTrackingPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-4">
-                           <span className="text-sm font-black text-gray-900">{item.qty} <span className="text-[10px] text-gray-400 uppercase">{product.unit}</span></span>
-                           <ArrowUpRight className="h-4 w-4 text-gray-300 group-hover/row:text-primary transition-colors" />
+                           <div className="text-right mr-2">
+                             <span className={`text-sm font-black ${isLowStock ? 'text-red-600' : 'text-gray-900'}`}>{item.qty} <span className="text-[10px] text-gray-400 uppercase">{product.unit}</span></span>
+                             {isLowStock && <p className="text-[8px] font-bold text-red-400 uppercase tracking-tighter">Limit: {item.threshold}</p>}
+                           </div>
+                           <button 
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               handleRefill(item);
+                             }}
+                             className={`p-2 rounded-xl transition-all ${
+                               isLowStock 
+                                 ? 'bg-red-600 text-white shadow-lg shadow-red-200' 
+                                 : 'bg-white border border-gray-100 text-gray-400 hover:text-primary hover:border-primary/20'
+                             }`}
+                             title="Refill Stock"
+                           >
+                             <Activity className="h-4 w-4" />
+                           </button>
+                           <ArrowUpRight 
+                             className="h-4 w-4 text-gray-300 group-hover/row:text-primary transition-colors cursor-pointer" 
+                             onClick={() => window.open(`/i/${item.slug}`, '_blank')}
+                           />
                         </div>
                       </div>
-                    ))}
+                    );
+                  })}
                   </div>
                 </div>
               )}
@@ -420,17 +583,20 @@ export default function UnitTrackingPage() {
           </div>
         ))}
 
-        {filteredInventory.length === 0 && (
-          <div className="col-span-2 py-20 text-center">
-            <Boxes className="h-16 w-16 text-gray-200 mx-auto mb-4" />
-            <p className="text-xl font-bold text-gray-400 tracking-tight">No unit-tracked products found.</p>
-            <p className="text-sm text-gray-400 mt-1">Try a different search term or check your custom fields.</p>
-          </div>
-        )}
+          {filteredInventory.length === 0 && (
+            <div className="col-span-2 py-20 text-center">
+              <Boxes className="h-16 w-16 text-gray-200 mx-auto mb-4" />
+              <p className="text-xl font-bold text-gray-400 tracking-tight">No unit-tracked products found.</p>
+              <p className="text-sm text-gray-400 mt-1">Try a different search term or check your custom fields.</p>
+            </div>
+          )}
+        </div>
       </div>
+    )}
 
       {/* Request History Log Section */}
-      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl shadow-gray-200/50 overflow-hidden no-print">
+      {activeTab === 'logs' && (
+        <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl shadow-gray-200/50 overflow-hidden no-print animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="p-8 border-b border-gray-50 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="h-12 w-12 bg-gray-900 rounded-2xl flex items-center justify-center text-white">
@@ -570,6 +736,7 @@ export default function UnitTrackingPage() {
           </table>
         </div>
       </div>
+    )}
 
       {/* Transmittal Builder Overlay */}
       {isBuildingTransmittal && (
@@ -620,7 +787,7 @@ export default function UnitTrackingPage() {
                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Department</label>
                     <input 
                         type="text" 
-                        placeholder="e.g. Operations / Logistics"
+                        placeholder="e.g. Operations - Logistics"
                         value={transmittalHeader.department}
                         onChange={e => setTransmittalHeader({...transmittalHeader, department: e.target.value})}
                         className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold text-gray-900 focus:bg-white focus:ring-4 focus:ring-primary/5 transition-all outline-none"
@@ -642,7 +809,7 @@ export default function UnitTrackingPage() {
                   <h3 className="text-[10px] font-black text-primary uppercase tracking-widest">Signatories</h3>
                   {['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy'].map(field => (
                     <div key={field}>
-                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">{field.replace(/By$/, ' By')}</label>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">{field.endsWith('By') ? field.slice(0, -2) + ' By' : field}</label>
                         <input 
                             type="text" 
                             placeholder={field === 'checkedBy' ? 'Optional' : 'Name'}
@@ -729,7 +896,7 @@ export default function UnitTrackingPage() {
         <div className="grid grid-cols-2 gap-12 mb-12">
           <div className="space-y-4">
             <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">Department:</div><div className="text-lg font-bold border-b-2 border-gray-100 pb-1">{transmittalHeader.department || '____________________'}</div></div>
-            <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">Recipient / End-User:</div><div className="text-lg font-bold border-b-2 border-gray-100 pb-1">{transmittalHeader.recipient || '____________________'}</div></div>
+            <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">Recipient - End-User:</div><div className="text-lg font-bold border-b-2 border-gray-100 pb-1">{transmittalHeader.recipient || '____________________'}</div></div>
           </div>
           <div className="space-y-4">
             <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">Date:</div><div className="text-lg font-bold border-b-2 border-gray-100 pb-1">{new Date(transmittalHeader.date).toLocaleDateString(undefined, { dateStyle: 'long' })}</div></div>
@@ -770,11 +937,11 @@ export default function UnitTrackingPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-12 pt-12 border-t-2 border-gray-50">
           {['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy'].map(field => (
             <div key={field} className="space-y-8">
-              <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">{field.replace(/By$/, ' By')}:</div>
+              <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">{field.endsWith('By') ? field.slice(0, -2) + ' By' : field}:</div>
               <div className="border-b-2 border-gray-900 text-center pb-2">
                 <span className="text-sm font-black uppercase">{(transmittalHeader as any)[field] || '____________________'}</span>
               </div>
-              <div className="text-center text-[8px] font-bold text-gray-400 uppercase italic tracking-tighter">Signature / Date</div>
+              <div className="text-center text-[8px] font-bold text-gray-400 uppercase italic tracking-tighter">Signature - Date</div>
             </div>
           ))}
         </div>
@@ -896,14 +1063,6 @@ export default function UnitTrackingPage() {
         </div>
       )}
 
-      <style jsx global>{`
-        @media print {
-          @page { size: A4; margin: 0; }
-          body { background: white; color: black; }
-          .no-print { display: none !important; }
-          main { padding: 0 !important; margin: 0 !important; }
-        }
-      `}</style>
 
 
     </div>
