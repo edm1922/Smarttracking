@@ -165,6 +165,7 @@ model Product {
   price            Float                @default(0)
   threshold        Float                @default(0)
   unit             String               @default("PCS")
+  imageUrl         String?
   internalRequests InternalRequest[]
   stocks           ProductStock[]
   transactions     ProductTransaction[]

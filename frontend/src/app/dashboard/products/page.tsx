@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { 
   Plus, Search, Box, ArrowDownLeft, ArrowUpRight, 
-  History, MapPin, X, Info, Tag, Trash2, User, Calendar, Building2
+  History, MapPin, X, Info, Tag, Trash2, User, Calendar, Building2,
+  Eye, ImageIcon
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -15,6 +16,7 @@ interface Product {
   unit: string;
   price: number;
   threshold: number;
+  imageUrl?: string | null;
   stocks: {
     locationId: string;
     quantity: number;
@@ -45,6 +47,8 @@ export default function ProductsPage() {
   const [logSearchTerm, setLogSearchTerm] = useState('');
   const [editableStock, setEditableStock] = useState(0);
   const [releaseSearchInput, setReleaseSearchInput] = useState('');
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState('');
   
   // Selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -162,6 +166,7 @@ export default function ProductsPage() {
         unit: editingProduct.unit,
         price: editingProduct.price,
         threshold: editingProduct.threshold,
+        imageUrl: editingProduct.imageUrl,
       });
       
       // Handle stock adjustment if value changed
@@ -249,6 +254,23 @@ export default function ProductsPage() {
       ...releaseForm,
       items: releaseForm.items.map(i => i.productId === productId ? { ...i, quantity: qty } : i)
     });
+  };
+
+  const handleImageUpload = async (productId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    try {
+      await api.post(`/products/${productId}/image`, formData);
+      fetchData();
+      if (editingProduct && editingProduct.id === productId) {
+        // Refresh editing product to see the new image
+        const res = await api.get('/products');
+        const updated = res.data.find((p: any) => p.id === productId);
+        if (updated) setEditingProduct(updated);
+      }
+    } catch (err) {
+      alert('Failed to upload image');
+    }
   };
 
   const fetchLogs = async () => {
@@ -500,19 +522,28 @@ export default function ProductsPage() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end space-x-2">
+                      {product.imageUrl && (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewImageUrl(product.imageUrl!);
+                            setIsPreviewOpen(true);
+                          }}
+                          className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all"
+                          title="View Product Image"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                      )}
                       <button 
-                        onClick={() => handleOpenStockModal(product, 'IN')}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenStockModal(product, 'IN');
+                        }}
                         className="inline-flex items-center px-2.5 py-1.5 bg-green-50 text-green-700 text-xs font-bold rounded-md hover:bg-green-100 transition-colors"
                       >
                         <ArrowDownLeft className="h-3.5 w-3.5 mr-1" />
                         IN
-                      </button>
-                      <button 
-                        onClick={() => handleOpenStockModal(product, 'OUT')}
-                        className="inline-flex items-center px-2.5 py-1.5 bg-red-50 text-red-700 text-xs font-bold rounded-md hover:bg-red-100 transition-colors"
-                      >
-                        <ArrowUpRight className="h-3.5 w-3.5 mr-1" />
-                        OUT
                       </button>
                     </div>
                   </td>
@@ -854,8 +885,53 @@ export default function ProductsPage() {
               <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-gray-900"><X className="h-5 w-5" /></button>
             </div>
             <form onSubmit={handleEditSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  {/* Image Upload Section */}
+                  <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Product Media</label>
+                    <div className="flex flex-col items-center">
+                      {editingProduct.imageUrl ? (
+                        <div className="relative group w-full aspect-video rounded-xl overflow-hidden mb-4 border border-gray-200">
+                          <img src={editingProduct.imageUrl} alt={editingProduct.name} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                setPreviewImageUrl(editingProduct.imageUrl!);
+                                setIsPreviewOpen(true);
+                              }}
+                              className="p-2 bg-white rounded-full text-gray-900 shadow-xl"
+                            >
+                              <Eye className="h-5 w-5" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-full aspect-video rounded-xl bg-gray-100 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 mb-4">
+                          <ImageIcon className="h-10 w-10 mb-2 opacity-20" />
+                          <p className="text-[10px] font-bold uppercase tracking-tighter">No Media Attached</p>
+                        </div>
+                      )}
+                      <input 
+                        type="file" 
+                        id="product-image-upload" 
+                        className="hidden" 
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageUpload(editingProduct.id, file);
+                        }}
+                      />
+                      <label 
+                        htmlFor="product-image-upload"
+                        className="w-full py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all text-center cursor-pointer shadow-sm"
+                      >
+                        {editingProduct.imageUrl ? 'Replace Image' : 'Upload Product Media'}
+                      </label>
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Item Name:</label>
                     <input required type="text" value={editingProduct.name} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary outline-none" />
@@ -1218,6 +1294,25 @@ export default function ProductsPage() {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Image Preview Modal */}
+      {isPreviewOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 animate-in fade-in duration-300">
+          <button 
+            onClick={() => setIsPreviewOpen(false)} 
+            className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all"
+          >
+            <X className="h-6 w-6" />
+          </button>
+          <div className="max-w-4xl w-full flex flex-col items-center">
+             <img 
+               src={previewImageUrl} 
+               alt="Product Preview" 
+               className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl border border-white/10" 
+             />
+             <p className="mt-6 text-white/60 font-medium text-sm tracking-widest uppercase">Product Media Preview</p>
           </div>
         </div>
       )}

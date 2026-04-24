@@ -1,9 +1,13 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SupabaseService } from '../prisma/supabase.service';
 
 @Injectable()
 export class ProductsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private supabaseService: SupabaseService
+  ) {}
 
   findAll() {
     return this.prisma.product.findMany({
@@ -221,6 +225,19 @@ export class ProductsService {
           remarks: `${remarks} (Previous: ${currentQty}, New: ${newTotalQuantity})`,
         },
       });
+    });
+  }
+
+  async uploadImage(id: string, file: any) {
+    const product = await this.prisma.product.findUnique({ where: { id } });
+    if (!product) throw new BadRequestException('Product not found');
+
+    const fileName = `prod-${id}-${Date.now()}`;
+    const imageUrl = await this.supabaseService.uploadImage(file, fileName);
+
+    return this.prisma.product.update({
+      where: { id },
+      data: { imageUrl },
     });
   }
 

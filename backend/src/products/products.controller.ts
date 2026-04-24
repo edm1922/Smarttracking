@@ -8,9 +8,12 @@ import {
   Request,
   Patch,
   Delete,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { AuthGuard } from '../auth/auth.guard';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('products')
 @UseGuards(AuthGuard)
@@ -93,5 +96,14 @@ export class ProductsController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.productsService.remove(id);
+  }
+
+  @Post(':id/image')
+  @UseInterceptors(FileInterceptor('image'))
+  uploadImage(
+    @Param('id') id: string,
+    @UploadedFile() file: any,
+  ) {
+    return this.productsService.uploadImage(id, file);
   }
 }
