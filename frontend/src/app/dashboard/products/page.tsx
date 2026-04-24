@@ -522,6 +522,19 @@ export default function ProductsPage() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end space-x-2">
+                      {product.imageUrl && (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewImageUrl(product.imageUrl!);
+                            setIsPreviewOpen(true);
+                          }}
+                          className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all"
+                          title="View Product Image"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                      )}
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
