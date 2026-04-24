@@ -125,11 +125,14 @@ export default function QRItemsPage() {
   };
 
   const handleToggleLock = async (slug: string) => {
+    setTogglingLock(prev => [...prev, slug]);
     try {
       await api.patch(`/items/${slug}/lock`);
-      fetchData();
+      await fetchData();
     } catch (err) {
       alert('Only admins can unlock forms.');
+    } finally {
+      setTogglingLock(prev => prev.filter(s => s !== slug));
     }
   };
 

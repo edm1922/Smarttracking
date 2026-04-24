@@ -799,7 +799,18 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                 <div className="grid grid-cols-2 gap-6 pt-6 border-t border-gray-50">
                    {availableFields.map((field: any) => {
                      const val = dynamicValues[field.id];
-                     const displayValue = typeof val === 'object' && val !== null ? (val.main || '—') : (val || '—');
+                     let displayValue = '—';
+                      
+                     if (typeof val === 'object' && val !== null) {
+                       if (val.useUnitQty) {
+                         const qtyStr = `${val.qty ?? 0} ${val.unit ?? ''}`.trim();
+                         displayValue = val.main ? `${qtyStr} (${val.main})` : qtyStr;
+                       } else {
+                         displayValue = val.main || '—';
+                       }
+                     } else if (val) {
+                       displayValue = String(val);
+                     }
 
                      return (
                       <div key={field.id}>

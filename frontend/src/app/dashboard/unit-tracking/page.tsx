@@ -532,8 +532,8 @@ export default function UnitTrackingPage() {
                               let displayValue = '';
                               
                               if (v && typeof v === 'object' && v.useUnitQty) {
-                                if (v.main) displayValue = String(v.main);
-                                else return null; // Hide if it's just a technical qty object
+                                const qtyStr = `${v.qty ?? 0} ${v.unit ?? ''}`.trim();
+                                displayValue = v.main ? `${qtyStr} (${v.main})` : qtyStr;
                               } else {
                                 displayValue = typeof fv.value === 'object' ? JSON.stringify(fv.value) : String(fv.value);
                               }
