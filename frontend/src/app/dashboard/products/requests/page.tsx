@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { 
-  Plus, Search, Box, MapPin, X, Info, User, ClipboardList, CheckCircle, Clock, AlertCircle, Trash2, History, Send, Eraser, Printer
+  Plus, Search, Box, MapPin, X, Info, User, ClipboardList, CheckCircle, Clock, AlertCircle, Trash2, History, Send, Eraser, Printer, ArrowDownToLine
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -22,6 +22,7 @@ interface Request {
   remarks: string | null;
   createdAt: string;
   location: { name: string };
+  targetLocation?: { name: string } | null;
   product: { name: string; sku: string };
   previousIssuancesCount?: number;
 }
@@ -69,6 +70,7 @@ export default function RequestsPage() {
     shift: 'SHIFT 1',
     supervisor: '',
     locationId: '',
+    targetLocationId: '', // Added for transfers
     productId: '',
     quantity: 1,
     remarks: ''
@@ -119,18 +121,19 @@ export default function RequestsPage() {
     const product = products.find(p => p.id === form.productId);
     if (!product) return;
 
-    const newDraft: DraftItem = {
+    const newDraft: DraftItem & { targetLocationId: string } = {
       id: Math.random().toString(36).substr(2, 9),
       productId: form.productId,
       productName: product.name,
       sku: product.sku,
       quantity: form.quantity,
-      remarks: form.remarks
+      remarks: form.remarks,
+      targetLocationId: form.targetLocationId
     };
 
-    setDrafts([...drafts, newDraft]);
-    // Clear item fields but keep employee info
-    setForm({ ...form, productId: '', quantity: 1, remarks: '' });
+    setDrafts([...drafts, newDraft] as any);
+    // Clear item fields but keep employee info and location
+    setForm({ ...form, productId: '', quantity: 1, remarks: '', targetLocationId: '' });
     setProductSearch('');
   };
 
@@ -382,6 +385,14 @@ export default function RequestsPage() {
                   </div>
 
                   <div>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target (Optional: for Transfers)</label>
+                    <select value={form.targetLocationId} onChange={e => setForm({...form, targetLocationId: e.target.value})} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm bg-white outline-none">
+                      <option value="">None (Direct Issuance)</option>
+                      {locations.filter(l => l.id !== form.locationId).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
                     <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Search Stock</label>
                     <div className="relative product-search-container">
                       <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
@@ -565,7 +576,15 @@ export default function RequestsPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-xs font-bold text-gray-900">{req.employeeName}</div>
-                        <div className="text-[10px] text-gray-500 uppercase">{req.departmentArea} • {req.shift}</div>
+                        <div className="text-[10px] text-gray-500 uppercase">
+                          {req.departmentArea} • {req.shift}
+                        </div>
+                        {req.targetLocation && (
+                          <div className="mt-1 flex items-center gap-1 text-[9px] font-black text-primary uppercase">
+                            <ArrowDownToLine className="h-3 w-3" />
+                            To: {req.targetLocation.name}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-xs font-bold text-gray-900">{req.product.name}</div>

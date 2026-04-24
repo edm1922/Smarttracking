@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import { LocationsService } from './locations.service';
 import { AuthGuard } from '../auth/auth.guard';
@@ -19,6 +20,12 @@ export class LocationsController {
   @Get()
   findAll() {
     return this.locationsService.findAll();
+  }
+
+  @Get('personal')
+  findPersonal(@Request() req: any) {
+    const userId = req.user.sub; // sub usually holds the userId in JWT
+    return this.locationsService.findPersonal(userId);
   }
 
   @Post()

@@ -34,20 +34,33 @@ export class UsersService {
     
     const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
-    const user = await this.prisma.user.create({
-      data: {
-        username: data.username,
-        password: hashedPassword,
-        role: data.role,
-      },
-    });
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          username: data.username,
+          password: hashedPassword,
+          role: data.role,
+        },
+      });
 
-    return {
-      id: user.id,
-      username: user.username,
-      role: user.role,
-      plainPassword, // Return the plain password ONCE so the admin can give it to the user
-    };
+      // Automatically create a personal inventory location for inventory staff
+      if (data.role === 'inventory') {
+        await tx.location.create({
+          data: {
+            name: `Personal: ${data.username}`,
+            description: `Inventory custody for staff user ${data.username}`,
+            userId: user.id,
+          },
+        });
+      }
+
+      return {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        plainPassword,
+      };
+    });
   }
 
   async remove(id: string) {

@@ -23,6 +23,7 @@ export class InternalRequestsService {
       include: {
         product: true,
         location: true,
+        targetLocation: true,
       },
     });
   }
@@ -55,6 +56,7 @@ export class InternalRequestsService {
       include: {
         product: true,
         location: true,
+        targetLocation: true,
       },
     });
 
@@ -84,7 +86,7 @@ export class InternalRequestsService {
   ) {
     const request = await this.prisma.internalRequest.findUnique({
       where: { id },
-      include: { product: true, location: true },
+      include: { product: true, location: true, targetLocation: true },
     });
 
     if (!request) throw new NotFoundException('Request not found');
@@ -109,23 +111,55 @@ export class InternalRequestsService {
 
       // 2. Perform transaction in a prisma transaction
       return this.prisma.$transaction(async (tx) => {
-        // Update stock
+        // Update source stock
         await tx.productStock.update({
           where: { id: stock.id },
           data: { quantity: { decrement: request.quantity } },
         });
 
-        // Create Issuance Log (Transaction)
+        // Create Issuance Log (Transaction OUT from Source)
         await tx.productTransaction.create({
           data: {
             productId: request.productId,
             locationId: request.locationId,
             quantity: request.quantity,
             type: 'OUT',
-            remarks: `Fulfilled Internal Request ${request.requestNo}. Issued to ${request.employeeName}`,
+            remarks: `Fulfilled Internal Request ${request.requestNo}. ${request.targetLocationId ? `Transferred to ${request.targetLocation?.name}` : `Issued to ${request.employeeName}`}`,
             userId: userId,
           },
         });
+
+        // Handle Target Location (Stock IN)
+        if (request.targetLocationId) {
+          await tx.productStock.upsert({
+            where: {
+              productId_locationId: {
+                productId: request.productId,
+                locationId: request.targetLocationId,
+              },
+            },
+            create: {
+              productId: request.productId,
+              locationId: request.targetLocationId,
+              quantity: request.quantity,
+            },
+            update: {
+              quantity: { increment: request.quantity },
+            },
+          });
+
+          // Create Transaction IN for Target
+          await tx.productTransaction.create({
+            data: {
+              productId: request.productId,
+              locationId: request.targetLocationId,
+              quantity: request.quantity,
+              type: 'IN',
+              remarks: `Received via Transfer from ${request.location.name} (Req ${request.requestNo})`,
+              userId: userId,
+            },
+          });
+        }
 
         // Update request status
         return tx.internalRequest.update({
@@ -149,19 +183,32 @@ export class InternalRequestsService {
           data: { quantity: { increment: request.quantity } },
         });
 
-        // 2. Create Reversal Log
-        await tx.productTransaction.create({
-          data: {
-            productId: request.productId,
-            locationId: request.locationId,
-            quantity: request.quantity,
-            type: 'IN',
-            remarks: `REVERSED Internal Request ${request.requestNo}. Returned by ${request.employeeName}`,
-            userId: userId,
-          },
-        });
+        // 3. Handle Target Location Reversal (Stock OUT)
+        if (request.targetLocationId) {
+          await tx.productStock.update({
+            where: {
+              productId_locationId: {
+                productId: request.productId,
+                locationId: request.targetLocationId,
+              },
+            },
+            data: { quantity: { decrement: request.quantity } },
+          });
 
-        // 3. Update status
+          // Create Transaction OUT for Target
+          await tx.productTransaction.create({
+            data: {
+              productId: request.productId,
+              locationId: request.targetLocationId,
+              quantity: request.quantity,
+              type: 'OUT',
+              remarks: `Transfer REVERSED (Req ${request.requestNo})`,
+              userId: userId,
+            },
+          });
+        }
+
+        // 4. Update status
         return tx.internalRequest.update({
           where: { id },
           data: { status, remarks: remarks || 'Fulfillment reversed' },

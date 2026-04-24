@@ -149,8 +149,10 @@ model Location {
   id               String               @id @default(uuid())
   name             String               @unique
   description      String?
+  userId           String?              @unique // Link to a staff user for personal inventory
   createdAt        DateTime             @default(now())
-  internalRequests InternalRequest[]
+  internalRequests InternalRequest[]    @relation("SourceLocation")
+  targetRequests   InternalRequest[]    @relation("TargetLocation")
   stocks           ProductStock[]
   transactions     ProductTransaction[]
 }
@@ -218,20 +220,22 @@ model PurchaseRequest {
 }
 
 model InternalRequest {
-  id             String   @id @default(uuid())
-  requestNo      String   @unique
-  date           DateTime @default(now())
-  employeeName   String
-  employeeRole   String
-  departmentArea String
-  shift          String
-  supervisor     String
-  locationId     String
-  productId      String
-  quantity       Int
-  status         String   @default("PENDING")
-  remarks        String?
-  createdAt      DateTime @default(now())
-  location       Location @relation(fields: [locationId], references: [id])
-  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id               String   @id @default(uuid())
+  requestNo        String   @unique
+  date             DateTime @default(now())
+  employeeName     String
+  employeeRole     String
+  departmentArea   String
+  shift            String
+  supervisor       String
+  locationId       String   // Source Location
+  targetLocationId String?  // Optional Target Location (for transfers)
+  productId        String
+  quantity         Int
+  status           String   @default("PENDING")
+  remarks          String?
+  createdAt        DateTime @default(now())
+  location         Location @relation("SourceLocation", fields: [locationId], references: [id])
+  targetLocation   Location? @relation("TargetLocation", fields: [targetLocationId], references: [id])
+  product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 }

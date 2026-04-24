@@ -10,7 +10,25 @@ export class LocationsService {
   }
 
   findOne(id: string) {
-    return this.prisma.location.findUnique({ where: { id } });
+    return this.prisma.location.findUnique({ 
+      where: { id },
+      include: {
+        stocks: {
+          include: { product: true }
+        }
+      }
+    });
+  }
+
+  findPersonal(userId: string) {
+    return this.prisma.location.findUnique({ 
+      where: { userId },
+      include: {
+        stocks: {
+          include: { product: true }
+        }
+      }
+    });
   }
 
   create(data: { name: string; description?: string }) {

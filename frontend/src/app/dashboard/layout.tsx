@@ -61,6 +61,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Accounts', href: '/dashboard/users', icon: User, adminOnly: true },
   ];
 
+  const staffItems = [
+    { name: 'My Inventory', href: '/dashboard/staff/inventory', icon: Database },
+    { name: 'Pull Requests', href: '/dashboard/products/requests', icon: ClipboardList },
+  ];
+
   /* const settingsItems = [
     { name: 'Settings', href: '/dashboard/settings', icon: Settings },
   ]; */
@@ -121,6 +126,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <p className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">QR Form System</p>
             <div className="space-y-1">
               {qrSystemItems.map((item: any) => {
+                if (item.adminOnly && role !== 'admin') return null;
+                const Icon = item.icon;
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={`flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-primary text-white'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                  >
+                    <Icon className="mr-3 h-5 w-5" />
+                    {item.name}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <p className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Staff Workspace</p>
+            <div className="space-y-1">
+              {staffItems.map((item: any) => {
                 if (item.adminOnly && role !== 'admin') return null;
                 const Icon = item.icon;
                 const isActive = pathname === item.href;
