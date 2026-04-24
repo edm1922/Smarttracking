@@ -31,7 +31,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const inventoryItems = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { 
-      name: 'Products', 
+      name: 'Stocks', 
       href: '/dashboard/products', 
       icon: Box,
       subItems: [
@@ -46,7 +46,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       href: '/dashboard/transmittal', 
       icon: FileText,
       subItems: [
-        { name: 'Product Transmittal', href: '/dashboard/transmittal/product' },
+        { name: 'Stock Transmittal', href: '/dashboard/transmittal/product' },
         { name: 'PR Transmittal', href: '/dashboard/transmittal/purchase-request' },
         { name: 'Unit Tracking Log', href: '/dashboard/transmittal/unit-tracking-log' },
       ]

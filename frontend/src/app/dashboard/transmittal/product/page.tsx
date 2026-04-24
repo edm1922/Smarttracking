@@ -188,7 +188,7 @@ export default function ProductTransmittalPage() {
       <div className="no-print space-y-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Product Transmittal Builder</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Stock Transmittal Builder</h1>
             <p className="text-sm text-gray-500">Create transmittals for stock issuance and movements</p>
           </div>
           <button
@@ -289,7 +289,7 @@ export default function ProductTransmittalPage() {
                   Select Items
                 </h3>
                 <div className="flex bg-gray-100 p-1 rounded-lg">
-                  <button onClick={() => { setSelectionMode('PRODUCT'); updateSubject('PRODUCT', logFilter); }} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${selectionMode === 'PRODUCT' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}>Products</button>
+                  <button onClick={() => { setSelectionMode('PRODUCT'); updateSubject('PRODUCT', logFilter); }} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${selectionMode === 'PRODUCT' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}>Stocks</button>
                   <button onClick={() => { setSelectionMode('LOG'); updateSubject('LOG', logFilter); }} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${selectionMode === 'LOG' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}>Stock History</button>
                 </div>
               </div>
@@ -352,7 +352,7 @@ export default function ProductTransmittalPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Product</th>
+                    <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Stock Item</th>
                     <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Quantity</th>
                     <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Action</th>
                   </tr>

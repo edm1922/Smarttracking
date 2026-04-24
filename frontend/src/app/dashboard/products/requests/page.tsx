@@ -250,7 +250,7 @@ export default function RequestsPage() {
         </head>
         <body>
           <div class="header">
-            <h1>Internal Product Issuance Log</h1>
+            <h1>Internal Stock Issuance Log</h1>
             <p>Generated on ${new Date().toLocaleString()}</p>
           </div>
           <table>
@@ -322,7 +322,7 @@ export default function RequestsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Requisition Workspace</h1>
-          <p className="text-sm text-gray-500">Fast-entry mode for multiple product requests</p>
+          <p className="text-sm text-gray-500">Fast-entry mode for multiple stock requests</p>
         </div>
       </div>
 
@@ -382,12 +382,12 @@ export default function RequestsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Search Product</label>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Search Stock</label>
                     <div className="relative product-search-container">
                       <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                       <input
                         type="text"
-                        placeholder="Type item name..."
+                        placeholder="Type stock name..."
                         value={productSearch}
                         onChange={(e) => {
                           setProductSearch(e.target.value);
@@ -542,7 +542,7 @@ export default function RequestsPage() {
                   </th>
                   <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Request Info</th>
                   <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Employee / Dept</th>
-                  <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Product</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Stock Item</th>
                   <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Qty</th>
                   <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
                   <th className="px-6 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Actions</th>

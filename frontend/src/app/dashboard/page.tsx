@@ -115,7 +115,7 @@ function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: (
             <div>
               <h2 className="text-xl font-black text-gray-900 tracking-tight">Report Generator</h2>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
-                {section === 'product' ? 'Product & Inventory Intelligence' : 'Organizational Insights'}
+                {section === 'product' ? 'Stock & Inventory Intelligence' : 'Organizational Insights'}
               </p>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
@@ -301,7 +301,7 @@ export default function DashboardPage() {
       <section className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.25em] flex items-center">
-            <Box className="mr-2 h-4 w-4 text-primary" /> SECTION 01: PRODUCT & STOCK INTELLIGENCE
+            <Box className="mr-2 h-4 w-4 text-primary" /> SECTION 01: STOCK & INVENTORY INTELLIGENCE
           </h2>
           <div className="flex items-center space-x-3">
             <button 
@@ -479,7 +479,7 @@ export default function DashboardPage() {
           {/* Most Requested Items */}
           <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-8">
-              <h3 className="text-sm font-bold text-gray-800">High-Demand Products</h3>
+              <h3 className="text-sm font-bold text-gray-800">High-Demand Stocks</h3>
               <TrendingUp className="h-4 w-4 text-primary" />
             </div>
             <div className="space-y-6">

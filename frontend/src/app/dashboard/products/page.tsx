@@ -382,7 +382,7 @@ export default function ProductsPage() {
     <div className="space-y-8 relative">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Products</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Stocks</h1>
           <p className="text-sm text-gray-500">Bulk inventory tracking and stock management</p>
         </div>
         <div className="flex space-x-3">
@@ -398,7 +398,7 @@ export default function ProductsPage() {
             className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-dark transition-colors"
           >
             <Plus className="mr-2 h-4 w-4" />
-            Add Product
+            Add Stock
           </button>
           <button
             onClick={() => {
@@ -441,7 +441,7 @@ export default function ProductsPage() {
         </div>
         <input
           type="text"
-          placeholder="Search products by SKU or name..."
+          placeholder="Search stocks by SKU or name..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="block w-full rounded-md border border-gray-300 bg-white py-3 pl-10 pr-3 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary"
@@ -460,7 +460,7 @@ export default function ProductsPage() {
                   onChange={toggleSelectAll}
                 />
               </th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Product Info</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Stock Info</th>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Stock Breakdown</th>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actual Stock</th>
               <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
@@ -468,9 +468,9 @@ export default function ProductsPage() {
           </thead>
           <tbody className="divide-y divide-gray-100 bg-white">
             {loading ? (
-              <tr><td colSpan={4} className="px-6 py-10 text-center text-sm text-gray-500">Loading products...</td></tr>
+              <tr><td colSpan={4} className="px-6 py-10 text-center text-sm text-gray-500">Loading stocks...</td></tr>
             ) : filteredProducts.length === 0 ? (
-              <tr><td colSpan={4} className="px-6 py-10 text-center text-sm text-gray-500">No products found.</td></tr>
+              <tr><td colSpan={4} className="px-6 py-10 text-center text-sm text-gray-500">No stocks found.</td></tr>
             ) : (
               filteredProducts.map((product) => (
                 <tr 
