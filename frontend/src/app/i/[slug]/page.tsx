@@ -376,7 +376,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     }
   };
 
-  if (loading || viewMode === 'loading') return (
+  if (!error && (loading || viewMode === 'loading')) return (
     <div className="min-h-screen flex items-center justify-center bg-white">
       <div className="flex flex-col items-center">
         <div className="h-12 w-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
