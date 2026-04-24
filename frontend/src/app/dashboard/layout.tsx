@@ -37,6 +37,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       subItems: [
         { name: 'Inventory', href: '/dashboard/products' },
         { name: 'Issuance Requests', href: '/dashboard/products/requests' },
+        { name: 'Unit Tracking', href: '/dashboard/unit-tracking' },
       ]
     },
     { name: 'Locations', href: '/dashboard/locations', icon: MapPin },
@@ -50,7 +51,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { name: 'Unit Tracking Log', href: '/dashboard/transmittal/unit-tracking-log' },
       ]
     },
-    { name: 'Unit Tracking', href: '/dashboard/unit-tracking', icon: Activity },
   ];
 
   const qrSystemItems = [
