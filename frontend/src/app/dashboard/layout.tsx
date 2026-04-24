@@ -50,12 +50,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { name: 'Unit Tracking Log', href: '/dashboard/transmittal/unit-tracking-log' },
       ]
     },
+    { name: 'Unit Tracking', href: '/dashboard/unit-tracking', icon: Activity },
   ];
 
   const qrSystemItems = [
     { name: 'Generate QR', href: '/dashboard/items', icon: QrCode },
     { name: 'Storage', href: '/dashboard/storage', icon: Database },
-    { name: 'Unit Tracking', href: '/dashboard/unit-tracking', icon: Activity },
     { name: 'Custom Fields', href: '/dashboard/custom-fields', icon: Package },
     { name: 'Print Labels', href: '/dashboard/print', icon: Printer },
     { name: 'Accounts', href: '/dashboard/users', icon: User, adminOnly: true },
