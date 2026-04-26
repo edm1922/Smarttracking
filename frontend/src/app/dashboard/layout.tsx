@@ -5,6 +5,9 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { LayoutDashboard, LogOut, Package, Printer, User, Box, Settings, MapPin, FileText, QrCode, ClipboardList, Database, Activity, Users, Info, X } from 'lucide-react';
 import AdminNotifications from './AdminNotifications';
+import FloatingChatButton from '@/components/chat/FloatingChatButton';
+import ChatDrawer from '@/components/chat/ChatDrawer';
+import { useChatPolling } from '@/hooks/useChatPolling';
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -12,10 +15,13 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const currentTab = searchParams.get('tab');
   const [username, setUsername] = useState('');
+  const [userId, setUserId] = useState('');
   const [role, setRole] = useState('');
   const [showDevNotice, setShowDevNotice] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const { totalUnread } = useChatPolling(8000);
 
-  useEffect(() => {
+useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
       router.push('/');
@@ -23,6 +29,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     }
     const storedRole = localStorage.getItem('role') || 'viewer';
     setUsername(localStorage.getItem('username') || 'User');
+    setUserId(localStorage.getItem('userId') || '');
     setRole(storedRole);
 
     // Show dev notice for staff members once per session
@@ -398,6 +405,18 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Chat Components */}
+      <FloatingChatButton onClick={() => setShowChat(true)} unreadCount={totalUnread} />
+      {showChat && (
+        <ChatDrawer 
+          isOpen={showChat} 
+          onClose={() => setShowChat(false)} 
+          currentUserId={userId}
+          currentUsername={username}
+          currentUserRole={role}
+        />
       )}
     </div>
   );

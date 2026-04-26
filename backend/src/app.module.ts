@@ -14,6 +14,7 @@ import { InternalRequestsModule } from './internal-requests/internal-requests.mo
 import { UsersModule } from './users/users.module';
 import { PullOutRequestsModule } from './pull-out-requests/pull-out-requests.module';
 import { StaffInventoryModule } from './staff-inventory/staff-inventory.module';
+import { ChatModule } from './chat/chat.module';
 
 
 @Module({
@@ -31,6 +32,7 @@ import { StaffInventoryModule } from './staff-inventory/staff-inventory.module';
     UsersModule,
     PullOutRequestsModule,
     StaffInventoryModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],

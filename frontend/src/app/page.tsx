@@ -18,11 +18,12 @@ export default function LoginPage() {
 
     try {
       const response = await api.post('/auth/login', { username, password });
-      const { access_token, role } = response.data;
+      const { access_token, role, userId } = response.data;
       
       localStorage.setItem('token', access_token);
       localStorage.setItem('role', role);
       localStorage.setItem('username', username);
+      localStorage.setItem('userId', userId);
 
       router.push('/dashboard');
     } catch (err: any) {
