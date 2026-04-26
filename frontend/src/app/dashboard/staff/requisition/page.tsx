@@ -7,16 +7,19 @@ import {
 import api from '@/lib/api';
 import { PageHeaderSkeleton, CardSkeleton } from '@/components/ui/LoadingSkeletons';
 
+interface ProductStock {
+  locationId?: string;
+  location?: { id: string; name: string };
+  quantity: number;
+}
+
 interface Product {
   id: string;
   sku: string;
   name: string;
   description: string | null;
   imageUrl?: string | null;
-  stocks: {
-    locationId: string;
-    quantity: number;
-  }[];
+  stocks: ProductStock[];
   totalStock?: number;
 }
 
