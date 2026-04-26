@@ -67,8 +67,8 @@ export default function ProductTransmittalPage() {
 
     const fetchProducts = async () => {
       try {
-        const res = await api.get('/products');
-        setProducts(res.data);
+        const res = await api.get('/products', { params: { take: 1000 } });
+        setProducts(res.data.data);
 
         // Load pending items from multi-select
         const pending = localStorage.getItem('pending_transmittal');

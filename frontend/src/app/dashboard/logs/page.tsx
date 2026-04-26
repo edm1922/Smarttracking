@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Search, ClipboardList, Clock, User, QrCode, ArrowRight, History } from 'lucide-react';
+import { useDebounce } from '@/hooks/useDebounce';
 import api from '@/lib/api';
 
 interface LogEntry {
@@ -24,10 +25,18 @@ export default function QRLogsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
+  const [page, setPage] = useState(1);
+  const [totalLogs, setTotalLogs] = useState(0);
+  const pageSize = 20;
+  const debouncedSearch = useDebounce(searchTerm, 300);
+
   const fetchLogs = async () => {
+    setLoading(true);
     try {
-      const response = await api.get('/logs');
-      setLogs(response.data);
+      const skip = (page - 1) * pageSize;
+      const response = await api.get('/logs', { params: { skip, take: pageSize, search: debouncedSearch } });
+      setLogs(response.data.data);
+      setTotalLogs(response.data.total);
     } catch (err) {
       console.error('Failed to fetch logs', err);
     } finally {
@@ -37,14 +46,13 @@ export default function QRLogsPage() {
 
   useEffect(() => {
     fetchLogs();
-  }, []);
+  }, [page, debouncedSearch]);
 
-  const filteredLogs = logs.filter(log => 
-    log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.item?.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.item?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  const filteredLogs = logs;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -55,7 +63,7 @@ export default function QRLogsPage() {
         </div>
         <div className="flex items-center space-x-3">
           <div className="bg-primary/5 px-4 py-2 rounded-lg border border-primary/10">
-            <span className="text-xs font-bold text-primary uppercase tracking-widest">Total Activities: {logs.length}</span>
+            <span className="text-xs font-bold text-primary uppercase tracking-widest">Total Activities: {totalLogs}</span>
           </div>
         </div>
       </div>
@@ -164,6 +172,28 @@ export default function QRLogsPage() {
               )}
             </tbody>
           </table>
+        </div>
+        
+        <div className="flex items-center justify-between p-4 border-t border-gray-100 bg-white">
+          <div className="text-xs font-bold text-gray-500">
+            Showing {totalLogs === 0 ? 0 : ((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, totalLogs)} of {totalLogs} entries
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-black uppercase disabled:opacity-50 hover:bg-gray-50 transition-colors shadow-sm"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage(p => p + 1)}
+              disabled={page * pageSize >= totalLogs}
+              className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-black uppercase disabled:opacity-50 hover:bg-gray-50 transition-colors shadow-sm"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class ReportsService {
@@ -16,48 +17,36 @@ export class ReportsService {
       where: { ...summaryWhere, status: 'PENDING' },
     });
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayRequests = await this.prisma.internalRequest.count({
+      where: {
+        ...summaryWhere,
+        createdAt: { gte: today },
+      },
+    });
+
     // 2. Stock Distribution (Sufficient vs Need Restock)
-    const stockWhere = locationId ? { locationId } : {};
-    const stocks = await this.prisma.productStock.findMany({
-      where: stockWhere,
-      include: { product: true },
-    });
-
-    let sufficient = 0;
-    let needRestock = 0;
-    stocks.forEach((s) => {
-      if (s.quantity <= s.product.threshold) {
-        needRestock++;
-      } else {
-        sufficient++;
-      }
-    });
-
+    const stockFilter = locationId ? Prisma.sql`WHERE ps."locationId" = ${locationId}` : Prisma.empty;
+    const stockRaw = await this.prisma.$queryRaw<any[]>`
+      SELECT 
+        COUNT(CASE WHEN ps.quantity <= p.threshold THEN 1 END)::int as "needRestock",
+        COUNT(CASE WHEN ps.quantity > p.threshold THEN 1 END)::int as "sufficient"
+      FROM "ProductStock" ps
+      JOIN "Product" p ON ps."productId" = p.id
+      ${stockFilter}
+    `;
     const stockDistribution = [
-      { name: 'Sufficient', value: sufficient },
-      { name: 'Need Restock', value: needRestock },
+      { name: 'Sufficient', value: Number(stockRaw[0]?.sufficient || 0) },
+      { name: 'Need Restock', value: Number(stockRaw[0]?.needRestock || 0) },
     ];
 
     // 3. Monthly Issuance Trends (Last 6 months)
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-    const requests = await this.prisma.internalRequest.findMany({
-      where: {
-        ...summaryWhere,
-        status: 'FULFILLED',
-        date: { gte: sixMonthsAgo },
-      },
-      select: { date: true },
-    });
-
-    const monthNames = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const monthlyDataMap: Record<string, number> = {};
-
-    // Initialize last 6 months
     for (let i = 0; i < 6; i++) {
       const d = new Date();
       d.setMonth(d.getMonth() - i);
@@ -65,11 +54,20 @@ export class ReportsService {
       monthlyDataMap[key] = 0;
     }
 
-    requests.forEach((r) => {
-      const d = new Date(r.date);
-      const key = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
-      if (monthlyDataMap[key] !== undefined) {
-        monthlyDataMap[key]++;
+    const irFilter = locationId ? Prisma.sql`AND "locationId" = ${locationId}` : Prisma.empty;
+    const monthlyCountsRaw = await this.prisma.$queryRaw<any[]>`
+      SELECT 
+        TO_CHAR(date, 'FMMon YYYY') as month,
+        COUNT(*)::int as count
+      FROM "InternalRequest"
+      WHERE status = 'FULFILLED' AND date >= ${sixMonthsAgo}
+      ${irFilter}
+      GROUP BY TO_CHAR(date, 'FMMon YYYY')
+    `;
+
+    monthlyCountsRaw.forEach((row) => {
+      if (monthlyDataMap[row.month] !== undefined) {
+        monthlyDataMap[row.month] = row.count;
       }
     });
 
@@ -122,35 +120,68 @@ export class ReportsService {
       .slice(0, 15);
 
     // 5. Employee/Dept Insights
-    const allInternalRequests = await this.prisma.internalRequest.findMany({
+    const topDepartments = await this.prisma.internalRequest.groupBy({
+      by: ['departmentArea'],
+      _count: { departmentArea: true },
       where: summaryWhere,
-      include: { product: true },
-    });
+      orderBy: { _count: { departmentArea: 'desc' } },
+      take: 5
+    }).then(res => res.map(d => ({ name: d.departmentArea, value: d._count.departmentArea })));
 
-    const deptCounts: Record<string, number> = {};
-    const productCounts: Record<string, number> = {};
+    const topProductsRaw = await this.prisma.$queryRaw<any[]>`
+      SELECT p.name, SUM(ir.quantity)::int as count
+      FROM "InternalRequest" ir
+      JOIN "Product" p ON ir."productId" = p.id
+      WHERE ir.status = 'FULFILLED' ${locationId ? Prisma.sql`AND ir."locationId" = ${locationId}` : Prisma.empty}
+      GROUP BY p.name
+      ORDER BY count DESC
+      LIMIT 5
+    `;
+    const topProducts = topProductsRaw.map(p => ({ name: p.name, count: p.count }));
 
-    allInternalRequests.forEach((r) => {
-      deptCounts[r.departmentArea] = (deptCounts[r.departmentArea] || 0) + 1;
-      productCounts[r.product.name] =
-        (productCounts[r.product.name] || 0) + r.quantity;
-    });
+    // 6. Admin Stock Transaction Summaries (OUT)
+    const outTransactionsRaw = await this.prisma.$queryRaw<any[]>`
+      SELECT 
+        p.id as "productId",
+        p.name as "productName",
+        p.description as "productDescription",
+        SUM(pt.quantity)::int as count
+      FROM "ProductTransaction" pt
+      JOIN "Product" p ON pt."productId" = p.id
+      WHERE pt.type = 'OUT' ${locationId ? Prisma.sql`AND pt."locationId" = ${locationId}` : Prisma.empty}
+      GROUP BY p.id, p.name, p.description
+      ORDER BY count DESC
+      LIMIT 5
+    `;
+    const topConsumedStock = outTransactionsRaw.map(t => ({
+      name: t.productName,
+      description: t.productDescription || '',
+      count: t.count
+    }));
 
-    const topDepartments = Object.entries(deptCounts)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
-
-    const topProducts = Object.entries(productCounts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+    const topUsersRaw = await this.prisma.$queryRaw<any[]>`
+      SELECT 
+        COALESCE(
+          (REGEXP_MATCH(pt.remarks, 'Req by:\\s*([^|]+)'))[1],
+          (REGEXP_MATCH(pt.remarks, 'To:\\s*([^|]+)'))[1],
+          'Admin (' || COALESCE(u.username, 'Unknown') || ')'
+        ) as name,
+        SUM(pt.quantity)::int as count
+      FROM "ProductTransaction" pt
+      LEFT JOIN "User" u ON pt."userId" = u.id
+      WHERE pt.type = 'OUT' ${locationId ? Prisma.sql`AND pt."locationId" = ${locationId}` : Prisma.empty}
+      GROUP BY name
+      ORDER BY count DESC
+      LIMIT 5
+    `;
+    const topStockUsers = topUsersRaw.map(u => ({ name: u.name, count: u.count }));
 
     return {
       summary: {
         totalRequests,
         fulfilledRequests,
         pendingRequests,
+        todayRequests,
         totalItems: await this.prisma.product.count(),
         totalLocations: await this.prisma.location.count(),
       },
@@ -159,6 +190,8 @@ export class ReportsService {
       activityLog,
       topDepartments,
       topProducts,
+      topConsumedStock,
+      topStockUsers,
     };
   }
 
@@ -172,13 +205,19 @@ export class ReportsService {
         });
 
       case 'need-restock':
-        const allProducts = await this.prisma.product.findMany({
-          include: { stocks: true },
-        });
-        return allProducts.filter((p) => {
-          const totalStock = p.stocks.reduce((sum, s) => sum + s.quantity, 0);
-          return totalStock <= p.threshold;
-        });
+        const productsRaw = await this.prisma.$queryRaw<any[]>`
+          SELECT 
+            p.id, p.name, p.sku, p.threshold,
+            COALESCE(SUM(ps.quantity), 0)::int as "totalStock"
+          FROM "Product" p
+          LEFT JOIN "ProductStock" ps ON p.id = ps."productId"
+          GROUP BY p.id, p.name, p.sku, p.threshold
+          HAVING COALESCE(SUM(ps.quantity), 0) <= p.threshold
+        `;
+        return productsRaw.map((p) => ({
+          ...p,
+          stocks: [{ quantity: p.totalStock }]
+        }));
 
       case 'inventory-distribution':
         return await this.prisma.location.findMany({
@@ -188,24 +227,16 @@ export class ReportsService {
         });
 
       case 'supply-demand':
-        // Get fulfilled vs pending for each product
-        const products = await this.prisma.product.findMany({
-          include: {
-            internalRequests: true,
-            stocks: true,
-          },
-        });
-        return products.map((p) => ({
-          name: p.name,
-          sku: p.sku,
-          onHand: p.stocks.reduce((sum, s) => sum + s.quantity, 0),
-          pending: p.internalRequests
-            .filter((r) => r.status === 'PENDING')
-            .reduce((sum, r) => sum + r.quantity, 0),
-          fulfilled: p.internalRequests
-            .filter((r) => r.status === 'FULFILLED')
-            .reduce((sum, r) => sum + r.quantity, 0),
-        }));
+        const sdRaw = await this.prisma.$queryRaw<any[]>`
+          SELECT 
+            p.name, 
+            p.sku,
+            COALESCE((SELECT SUM(quantity) FROM "ProductStock" WHERE "productId" = p.id), 0)::int as "onHand",
+            COALESCE((SELECT SUM(quantity) FROM "InternalRequest" WHERE "productId" = p.id AND status = 'PENDING'), 0)::int as "pending",
+            COALESCE((SELECT SUM(quantity) FROM "InternalRequest" WHERE "productId" = p.id AND status = 'FULFILLED'), 0)::int as "fulfilled"
+          FROM "Product" p
+        `;
+        return sdRaw;
 
       case 'pending-requests':
         return await this.prisma.internalRequest.findMany({
@@ -215,27 +246,71 @@ export class ReportsService {
         });
 
       case 'consumption-analysis':
-        const requests = await this.prisma.internalRequest.findMany({
-          where: { status: 'FULFILLED' },
-          include: { product: true },
-        });
-
+        const analysisRaw = await this.prisma.$queryRaw<any[]>`
+          SELECT 
+            ir."employeeName" as employee, 
+            ir."departmentArea" as dept, 
+            p.name as "productName", 
+            SUM(ir.quantity)::int as count
+          FROM "InternalRequest" ir
+          JOIN "Product" p ON ir."productId" = p.id
+          WHERE ir.status = 'FULFILLED'
+          GROUP BY ir."employeeName", ir."departmentArea", p.name
+        `;
+        
         const analysis: Record<string, any> = {};
-        requests.forEach((r) => {
-          const key = `${r.employeeName} (${r.departmentArea})`;
+        analysisRaw.forEach((r) => {
+          const key = `${r.employee} (${r.dept})`;
           if (!analysis[key]) {
             analysis[key] = {
-              employee: r.employeeName,
-              dept: r.departmentArea,
+              employee: r.employee,
+              dept: r.dept,
               totalItems: 0,
               items: {},
             };
           }
-          analysis[key].totalItems += r.quantity;
-          analysis[key].items[r.product.name] =
-            (analysis[key].items[r.product.name] || 0) + r.quantity;
+          analysis[key].totalItems += r.count;
+          analysis[key].items[r.productName] = r.count;
         });
         return Object.values(analysis);
+
+      case 'top-consumed-stock':
+        const outTransactionsRaw = await this.prisma.$queryRaw<any[]>`
+          SELECT 
+            p.id as "productId",
+            p.name as "productName",
+            p.description as "productDescription",
+            SUM(pt.quantity)::int as count
+          FROM "ProductTransaction" pt
+          JOIN "Product" p ON pt."productId" = p.id
+          WHERE pt.type = 'OUT'
+          GROUP BY p.id, p.name, p.description
+          ORDER BY count DESC
+          LIMIT 50
+        `;
+        return outTransactionsRaw.map((t) => ({
+          name: t.productName,
+          description: t.productDescription || '',
+          count: t.count
+        }));
+
+      case 'top-requesters':
+        const topUsersRaw = await this.prisma.$queryRaw<any[]>`
+          SELECT 
+            COALESCE(
+              (REGEXP_MATCH(pt.remarks, 'Req by:\\s*([^|]+)'))[1],
+              (REGEXP_MATCH(pt.remarks, 'To:\\s*([^|]+)'))[1],
+              'Admin (' || COALESCE(u.username, 'Unknown') || ')'
+            ) as name,
+            SUM(pt.quantity)::int as count
+          FROM "ProductTransaction" pt
+          LEFT JOIN "User" u ON pt."userId" = u.id
+          WHERE pt.type = 'OUT'
+          GROUP BY name
+          ORDER BY count DESC
+          LIMIT 50
+        `;
+        return topUsersRaw.map((u) => ({ name: u.name, count: u.count }));
 
       default:
         return [];

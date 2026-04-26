@@ -58,6 +58,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
   const [pullOutQty, setPullOutQty] = useState<number>(0);
   const [pullOutRemarks, setPullOutRemarks] = useState('');
   const [pullOutImage, setPullOutImage] = useState<string | null>(null);
+  const [pullOutSupervisor, setPullOutSupervisor] = useState('');
 
   const fetchData = async () => {
     try {
@@ -299,40 +300,32 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       return;
     }
 
-    setIsSaving(true);
+    // Instead of sending to backend, save to local "Inbox"
     try {
-      let finalStatus = formData.status;
-      const remaining = unitTracking.qty - pullOutQty;
-      
-      const newUnitTracking = { ...unitTracking, qty: remaining };
-      if (remaining > 0) {
-        finalStatus = 'Available';
-        alert(`Partially pulled out ${pullOutQty} ${unitTracking.unit}. ${remaining} remaining.`);
-      } else {
-        finalStatus = 'Released';
-      }
-      
-      // Update local state immediately for UI feedback
-      setUnitTracking(newUnitTracking);
-
-      const requestPayload = {
-        itemId: item.id,
+      const inboxData = {
+        id: Math.random().toString(36).substr(2, 9),
+        slug: slug,
+        productName: item.name || 'Unknown Asset',
         qty: pullOutQty,
         unit: unitTracking.unit,
-        remarks: pullOutRemarks || `Pull out request for ${pullOutQty} ${unitTracking.unit}`,
-        imageUrl: pullOutImage
+        remarks: pullOutRemarks,
+        imagePreview: pullOutImage,
+        supervisor: pullOutSupervisor,
+        timestamp: new Date().toISOString()
       };
 
-      await api.post('/pull-out-requests', requestPayload);
-      alert(`Pull out request for ${pullOutQty} ${unitTracking.unit} has been submitted for approval.`);
+      const existingInbox = JSON.parse(localStorage.getItem('unit_requisition_inbox') || '[]');
+      localStorage.setItem('unit_requisition_inbox', JSON.stringify([...existingInbox, inboxData]));
       
-      // Reset pull-out specific state
+      alert(`Added ${slug} to your Requisition Inbox. You can now go to the Unit Requisition Portal to print and submit the form.`);
+      
+      // Reset state
       setPullOutRemarks('');
       setPullOutImage(null);
+      setPullOutSupervisor('');
       setIsPullingOut(false);
-
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to pull out item. Check stock levels or server connection.');
+    } catch (err) {
+      alert('Failed to save to inbox. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -802,12 +795,11 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                      let displayValue = '—';
                       
                      if (typeof val === 'object' && val !== null) {
-                       if (val.useUnitQty) {
-                         const qtyStr = `${val.qty ?? 0} ${val.unit ?? ''}`.trim();
-                         displayValue = val.main ? `${qtyStr} (${val.main})` : qtyStr;
-                       } else {
-                         displayValue = val.main || '—';
-                       }
+                        if (val.useUnitQty) {
+                          displayValue = val.main || `${val.qty ?? 0} ${val.unit ?? ''}`;
+                        } else {
+                          displayValue = val.main || '—';
+                        }
                      } else if (val) {
                        displayValue = String(val);
                      }
@@ -882,14 +874,17 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
 
         {isPullingOut && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="w-full max-w-sm bg-white rounded-[2.5rem] p-8 shadow-2xl animate-in slide-in-from-bottom duration-300">
+          <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh]">
+            <div className="p-8 pb-4 border-b border-gray-50 bg-gray-50/50 rounded-t-[2.5rem]">
                <div className="h-16 w-16 bg-orange-100 rounded-full flex items-center justify-center mb-6">
                  <Truck className="h-8 w-8 text-orange-600" />
                </div>
                <h2 className="text-2xl font-black text-gray-900 mb-2">Request Pull Out</h2>
-               <p className="text-sm text-gray-500 mb-8 font-medium">Submit a request to release this asset from inventory.</p>
-               
-               <div className="space-y-4 mb-8">
+               <p className="text-sm text-gray-500 font-medium">Submit a request to release this asset from inventory.</p>
+            </div>
+            
+            <div className="p-8 flex-1 overflow-y-auto space-y-6">
+               <div className="space-y-4 mb-2">
                  <div>
                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">New Status</label>
                     <select value={formData.status || ''} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full rounded-2xl bg-gray-50 border-gray-100 px-5 py-4 text-sm font-bold">
@@ -900,7 +895,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                  </div>
 
                  {unitTracking.useUnitQty && (
-                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="animate-in fade-in slide-in-from-top-2 duration-300 pt-2">
                       <label className="block text-[10px] font-black text-orange-600 uppercase tracking-widest mb-2">Quantity to Pull Out ({unitTracking.unit})</label>
                       <div className="relative">
                          <input 
@@ -910,7 +905,6 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                            value={pullOutQty}
                            onChange={(e) => {
                              const val = parseInt(e.target.value) || 0;
-                             // Clamp value between 1 and the available stock
                              setPullOutQty(Math.min(unitTracking.qty, Math.max(1, val)));
                            }}
                            className="w-full rounded-2xl bg-orange-50 border-orange-100 px-5 py-4 text-sm font-bold text-orange-700 outline-none focus:ring-4 focus:ring-orange-500/10"
@@ -935,6 +929,17 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                         onChange={(e) => setPullOutRemarks(e.target.value)}
                         placeholder="e.g. For project site release..."
                         className="w-full rounded-2xl bg-gray-50 border border-gray-100 px-5 py-4 text-sm font-medium h-24 resize-none outline-none focus:ring-4 focus:ring-primary/5 transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Supervisor Name</label>
+                      <input 
+                        type="text"
+                        value={pullOutSupervisor}
+                        onChange={(e) => setPullOutSupervisor(e.target.value)}
+                        placeholder="Enter supervisor name..."
+                        className="w-full rounded-2xl bg-gray-50 border border-gray-100 px-5 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-primary/5 transition-all"
                       />
                     </div>
 
@@ -976,23 +981,24 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                     </div>
                   </div>
                </div>
-
-               <div className="flex flex-col gap-3">
-                  <button 
-                    onClick={handleConfirmPullOut}
-                    disabled={isSaving}
-                    className="w-full py-5 bg-gray-900 text-white rounded-2xl font-bold shadow-xl active:scale-95 disabled:opacity-50"
-                  >
-                    {isSaving ? 'Submitting...' : 'Confirm Request'}
-                  </button>
-                  <button 
-                    onClick={() => setIsPullingOut(false)}
-                    className="w-full py-4 text-sm font-bold text-gray-400"
-                  >
-                    Cancel
-                  </button>
-               </div>
             </div>
+
+            <div className="p-8 pt-4 border-t border-gray-50 flex flex-col gap-3 bg-gray-50/30 rounded-b-[2.5rem]">
+              <button 
+                onClick={handleConfirmPullOut}
+                disabled={isSaving}
+                className="w-full py-5 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl shadow-gray-900/20 active:scale-[0.98] disabled:opacity-50 transition-all"
+              >
+                {isSaving ? 'Submitting...' : 'Confirm Request'}
+              </button>
+              <button 
+                onClick={() => setIsPullingOut(false)}
+                className="w-full py-4 text-xs font-black text-gray-400 uppercase tracking-widest hover:text-gray-900 transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
           </div>
         )}
 

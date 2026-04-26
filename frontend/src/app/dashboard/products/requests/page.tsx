@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useDebounce } from '@/hooks/useDebounce';
 import { 
-  Plus, Search, Box, MapPin, X, Info, User, ClipboardList, CheckCircle, Clock, AlertCircle, Trash2, History, Send, Eraser, Printer
+  Plus, Search, Box, MapPin, X, Info, User, ClipboardList, CheckCircle, Clock, AlertCircle, Trash2, History, Send, Eraser, Printer, Loader2, FileText, ImageIcon, XCircle
 } from 'lucide-react';
 import api from '@/lib/api';
+import { TableSkeleton, Spinner } from '@/components/ui/LoadingSkeletons';
 
 interface Request {
   id: string;
@@ -20,6 +22,8 @@ interface Request {
   quantity: number;
   status: string;
   remarks: string | null;
+  attachmentUrl?: string | null;
+  additionalImages?: string[] | null;
   createdAt: string;
   location: { name: string };
   product: { name: string; sku: string };
@@ -59,152 +63,117 @@ export default function RequestsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'PENDING' | 'APPROVED' | 'FULFILLED' | 'REJECTED' | 'ALL'>('PENDING');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  // Form state
-  const [form, setForm] = useState({
-    date: '',
-    employeeName: '',
-    employeeRole: '',
-    departmentArea: '',
-    shift: 'SHIFT 1',
-    supervisor: '',
-    locationId: '',
-    productId: '',
-    quantity: 1,
-    remarks: ''
-  });
-  
-  const [productSearch, setProductSearch] = useState('');
-  const [showProductDropdown, setShowProductDropdown] = useState(false);
-  const [drafts, setDrafts] = useState<DraftItem[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchData = async () => {
+
+  const [page, setPage] = useState(1);
+  const [totalRequests, setTotalRequests] = useState(0);
+  const pageSize = 20;
+  const debouncedSearch = useDebounce(searchTerm, 300);
+
+  const fetchInitialData = async () => {
     try {
-      const [reqsRes, prodsRes, locsRes] = await Promise.all([
-        api.get('/internal-requests'),
-        api.get('/products'),
+      const [prodsRes, locsRes] = await Promise.all([
+        api.get('/products', { params: { take: 1000 } }),
         api.get('/locations')
       ]);
-      setRequests(reqsRes.data);
-      setProducts(prodsRes.data);
+      setProducts(prodsRes.data.data);
       setLocations(locsRes.data);
-      if (locsRes.data.length > 0 && !form.locationId) {
-        setForm(f => ({ ...f, locationId: locsRes.data[0].id }));
-      }
     } catch (err) {
-      console.error('Failed to fetch data', err);
+      console.error('Failed to fetch initial data', err);
+    }
+  };
+
+  const fetchRequests = async () => {
+    setLoading(true);
+    try {
+      const skip = (page - 1) * pageSize;
+      const res = await api.get('/internal-requests', {
+        params: { skip, take: pageSize, search: debouncedSearch, status: activeTab }
+      });
+      setRequests(res.data.data);
+      setTotalRequests(res.data.total);
+    } catch (err) {
+      console.error('Failed to fetch requests', err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (!form.date) {
-      setForm(prev => ({ ...prev, date: new Date().toLocaleDateString('en-CA') }));
-    }
-    fetchData();
+  const fetchData = async () => {
+    await fetchRequests();
+  };
 
-    const handleClickOutside = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest('.product-search-container')) {
-        setShowProductDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+  useEffect(() => {
+    fetchInitialData();
   }, []);
 
-  const addRowToDraft = () => {
-    if (!form.productId) return alert('Please select a product first');
-    const product = products.find(p => p.id === form.productId);
-    if (!product) return;
+  useEffect(() => {
+    fetchRequests();
+    setSelectedIds([]);
+  }, [page, debouncedSearch, activeTab]);
 
-    const newDraft: DraftItem = {
-      id: Math.random().toString(36).substr(2, 9),
-      productId: form.productId,
-      productName: product.name,
-      sku: product.sku,
-      quantity: form.quantity,
-      remarks: form.remarks
-    };
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, activeTab]);
 
-    setDrafts([...drafts, newDraft]);
-    // Clear item fields but keep employee info
-    setForm({ ...form, productId: '', quantity: 1, remarks: '' });
-    setProductSearch('');
-  };
 
-  const removeDraft = (id: string) => {
-    setDrafts(drafts.filter(d => d.id !== id));
-  };
-
-  const submitAllDrafts = async () => {
-    if (drafts.length === 0) return alert('No items in draft');
-    if (!form.employeeName || !form.locationId) return alert('Employee info and Location are required');
-
-    setIsSubmitting(true);
-    try {
-      // Prepare bulk data
-      const requestsData = drafts.map(draft => ({
-        ...form,
-        productId: draft.productId,
-        quantity: draft.quantity,
-        remarks: draft.remarks
-      }));
-
-      await api.post('/internal-requests/bulk', { requests: requestsData });
-      
-      setDrafts([]);
-      alert('All requests submitted successfully!');
-      fetchData();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to submit some requests');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleUpdateStatus = async (id: string, status: string) => {
     const remarks = prompt('Any remarks for this status update?');
+    setActionLoading(id);
     try {
       await api.patch(`/internal-requests/${id}/status`, { status, remarks });
-      fetchData();
+      await fetchData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to update status');
+    } finally {
+      setActionLoading(null);
     }
   };
 
   const handleBulkUpdateStatus = async (status: string) => {
     if (selectedIds.length === 0) return alert('No requests selected');
     const remarks = prompt(`Enter remarks for bulk ${status.toLowerCase()} of ${selectedIds.length} items:`);
+    setActionLoading('bulk');
     try {
       await api.post('/internal-requests/bulk-status', { ids: selectedIds, status, remarks });
       setSelectedIds([]);
-      fetchData();
+      await fetchData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to update requests');
+    } finally {
+      setActionLoading(null);
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this request? Stock will be reverted if previously issued.')) return;
+    setActionLoading(id);
     try {
       await api.delete(`/internal-requests/${id}`);
-      fetchData();
+      await fetchData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to delete request');
+    } finally {
+      setActionLoading(null);
     }
   };
 
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
     if (!confirm(`Delete ${selectedIds.length} selected requests? Stock will be reverted for fulfilled items.`)) return;
+    setActionLoading('bulk');
     try {
       await api.post('/internal-requests/bulk-delete', { ids: selectedIds });
       setSelectedIds([]);
-      fetchData();
+      await fetchData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to delete requests');
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -281,7 +250,6 @@ export default function RequestsPage() {
           </table>
           <div class="footer">
             <div class="sign-box">Prepared By</div>
-            <div class="sign-box">Received By (Employee)</div>
             <div class="sign-box">Approved By (Supervisor)</div>
           </div>
           <script>window.print();</script>
@@ -293,19 +261,9 @@ export default function RequestsPage() {
     printWindow.document.close();
   };
 
-  const filteredRequests = requests.filter(r => {
-    const matchesSearch = 
-      r.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.requestNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.product.name.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    if (activeTab === 'ALL') return matchesSearch;
-    return matchesSearch && r.status === activeTab;
-  });
+  const filteredRequests = requests;
 
-  const availableProducts = products.filter(p => 
-    p.stocks.some(s => s.locationId === form.locationId && s.quantity > 0)
-  );
+
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -326,166 +284,9 @@ export default function RequestsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* LEFT COLUMN: Entry Form */}
-        <div className="lg:col-span-4 space-y-6 sticky top-8">
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="bg-primary px-6 py-4">
-              <h2 className="text-sm font-bold text-white flex items-center">
-                <Plus className="mr-2 h-4 w-4" />
-                New Requisition Form
-              </h2>
-            </div>
-            
-            <div className="p-6 space-y-6">
-              {/* Employee Info Section (Sticky Fields) */}
-              <div className="space-y-4">
-                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center">
-                  <User className="mr-2 h-3 w-3" />
-                  Employee Details
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Request Date</label>
-                    <input type="date" value={form.date || ''} onChange={e => setForm({...form, date: e.target.value})} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-1 ring-primary outline-none" />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Employee Name</label>
-                    <input type="text" placeholder="Juan Dela Cruz" value={form.employeeName || ''} onChange={e => setForm({...form, employeeName: e.target.value})} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-1 ring-primary outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Shift</label>
-                    <input type="text" placeholder="SHIFT 1" value={form.shift || ''} onChange={e => setForm({...form, shift: e.target.value.toUpperCase()})} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-1 ring-primary outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Dept/Area</label>
-                    <input type="text" placeholder="Production" value={form.departmentArea || ''} onChange={e => setForm({...form, departmentArea: e.target.value})} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-1 ring-primary outline-none" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="h-px bg-gray-100" />
-
-              {/* Product Entry Section */}
-              <div className="space-y-4">
-                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center">
-                  <Box className="mr-2 h-3 w-3" />
-                  Item Selection
-                </h3>
-                
-                <div className="space-y-4 bg-gray-50 p-4 rounded-lg border border-gray-100">
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Storage Source</label>
-                    <select value={form.locationId} onChange={e => setForm({...form, locationId: e.target.value})} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm bg-white outline-none">
-                      {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Search Stock</label>
-                    <div className="relative product-search-container">
-                      <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Type stock name..."
-                        value={productSearch}
-                        onChange={(e) => {
-                          setProductSearch(e.target.value);
-                          setShowProductDropdown(true);
-                          setForm({ ...form, productId: '' });
-                        }}
-                        onFocus={() => setShowProductDropdown(true)}
-                        className={`w-full rounded-md border pl-10 pr-3 py-2 text-sm outline-none bg-white transition-all ${
-                          !form.productId && productSearch && availableProducts.filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase())).length === 0
-                            ? 'border-red-500 bg-red-50'
-                            : 'border-gray-200 focus:border-primary'
-                        }`}
-                      />
-                      {showProductDropdown && productSearch && (
-                        <div className="absolute z-[60] left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-xl">
-                          {availableProducts.filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase())).map(p => (
-                            <button key={p.id} type="button" onClick={() => { setForm({ ...form, productId: p.id }); setProductSearch(p.name); setShowProductDropdown(false); }} className="w-full px-4 py-2 text-left text-sm hover:bg-primary/5 transition-colors border-b border-gray-50 last:border-0">
-                              <div className="font-bold text-gray-900">{p.name}</div>
-                              <div className="text-[10px] text-gray-500 font-mono">
-                                {p.sku} • {p.stocks.find(s => s.locationId === form.locationId)?.quantity} in stock
-                              </div>
-                              {p.description && <div className="text-[10px] text-gray-400 italic mt-0.5 line-clamp-1">{p.description}</div>}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Quantity</label>
-                      <input type="number" min="1" value={form.quantity} onChange={e => setForm({...form, quantity: parseInt(e.target.value) || 1})} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm bg-white outline-none" />
-                    </div>
-                    <div className="flex-[2]">
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Remarks</label>
-                      <input type="text" placeholder="Optional" value={form.remarks} onChange={e => setForm({...form, remarks: e.target.value})} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm bg-white outline-none" />
-                    </div>
-                  </div>
-
-                  <button 
-                    onClick={addRowToDraft}
-                    disabled={!form.productId}
-                    className="w-full py-2 bg-gray-900 text-white rounded-md text-xs font-bold hover:bg-black transition-all disabled:opacity-50 flex items-center justify-center"
-                  >
-                    <Plus className="mr-2 h-3 w-3" />
-                    Add to Request List
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* DRAFT LIST */}
-          {drafts.length > 0 && (
-            <div className="bg-white rounded-xl border-2 border-primary/20 shadow-lg overflow-hidden animate-in zoom-in-95 duration-300">
-              <div className="bg-primary/5 px-6 py-3 border-b border-primary/10 flex items-center justify-between">
-                <h2 className="text-xs font-bold text-primary flex items-center">
-                  <ClipboardList className="mr-2 h-4 w-4" />
-                  Items to Request ({drafts.length})
-                </h2>
-                <button onClick={() => setDrafts([])} className="text-[10px] font-bold text-gray-400 hover:text-red-500 flex items-center">
-                  <Eraser className="mr-1 h-3 w-3" /> Clear List
-                </button>
-              </div>
-              <div className="max-h-60 overflow-y-auto">
-                {drafts.map((draft, idx) => (
-                  <div key={draft.id} className="p-4 border-b border-gray-50 flex items-center justify-between group">
-                    <div>
-                      <div className="text-xs font-bold text-gray-900">{draft.productName}</div>
-                      <div className="text-[10px] text-gray-500 font-bold">{draft.quantity} UNITS • {draft.sku}</div>
-                    </div>
-                    <button onClick={() => removeDraft(draft.id)} className="text-gray-300 hover:text-red-500 transition-colors">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <div className="p-4 bg-gray-50">
-                <button 
-                  onClick={submitAllDrafts}
-                  disabled={isSubmitting}
-                  className="w-full py-3 bg-primary text-white rounded-lg text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary-dark transition-all flex items-center justify-center"
-                >
-                  {isSubmitting ? (
-                    <Clock className="animate-spin mr-2 h-4 w-4" />
-                  ) : (
-                    <Send className="mr-2 h-4 w-4" />
-                  )}
-                  Submit All Requests
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* RIGHT COLUMN: Dashboard List */}
-        <div className="lg:col-span-8 space-y-6">
+      <div className="w-full">
+        {/* Dashboard List */}
+        <div className="w-full space-y-6">
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
             <div className="flex space-x-1 rounded-lg bg-gray-100 p-1 w-fit">
               {(['PENDING', 'APPROVED', 'FULFILLED', 'REJECTED', 'ALL'] as const).map((tab) => (
@@ -520,12 +321,18 @@ export default function RequestsPage() {
                 <button onClick={handlePrintIssuanceLog} className="px-3 py-1.5 bg-gray-100 text-gray-700 text-[10px] font-black rounded-md uppercase flex items-center">
                   <Printer className="mr-1 h-3 w-3" /> Print Log
                 </button>
-                <button onClick={() => handleBulkUpdateStatus('APPROVED')} className="px-3 py-1.5 bg-blue-600 text-white text-[10px] font-black rounded-md uppercase">Approve</button>
-                <button onClick={() => handleBulkUpdateStatus('REJECTED')} className="px-3 py-1.5 bg-red-600 text-white text-[10px] font-black rounded-md uppercase">Reject</button>
+                {(activeTab === 'PENDING' || activeTab === 'ALL' || activeTab === 'REJECTED') && (
+                  <button onClick={() => handleBulkUpdateStatus('APPROVED')} className="px-3 py-1.5 bg-blue-600 text-white text-[10px] font-black rounded-md uppercase">Approve</button>
+                )}
+                {(activeTab === 'PENDING' || activeTab === 'ALL' || activeTab === 'APPROVED') && (
+                  <button onClick={() => handleBulkUpdateStatus('REJECTED')} className="px-3 py-1.5 bg-red-600 text-white text-[10px] font-black rounded-md uppercase">Reject</button>
+                )}
                 {activeTab !== 'PENDING' && (
                   <button onClick={() => handleBulkUpdateStatus('PENDING')} className="px-3 py-1.5 bg-gray-600 text-white text-[10px] font-black rounded-md uppercase">Reset to Pending</button>
                 )}
-                {activeTab === 'APPROVED' && <button onClick={() => handleBulkUpdateStatus('FULFILLED')} className="px-3 py-1.5 bg-green-600 text-white text-[10px] font-black rounded-md uppercase">Fulfill</button>}
+                {(activeTab === 'APPROVED' || activeTab === 'ALL') && (
+                  <button onClick={() => handleBulkUpdateStatus('FULFILLED')} className="px-3 py-1.5 bg-green-600 text-white text-[10px] font-black rounded-md uppercase">Fulfill</button>
+                )}
                 <button onClick={handleBulkDelete} className="px-3 py-1.5 bg-gray-900 text-white text-[10px] font-black rounded-md uppercase flex items-center">
                   <Trash2 className="mr-1 h-3 w-3" /> Delete Selected
                 </button>
@@ -550,17 +357,24 @@ export default function RequestsPage() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {loading ? (
-                  <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-gray-400 italic">Loading requests...</td></tr>
+                  <TableSkeleton columns={7} rows={6} />
                 ) : filteredRequests.length === 0 ? (
                   <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-gray-400 italic">No requests found.</td></tr>
                 ) : (
                   filteredRequests.map((req) => (
-                    <tr key={req.id} className={`hover:bg-gray-50 transition-colors group ${selectedIds.includes(req.id) ? 'bg-primary/5' : ''}`}>
+                    <tr key={req.id} onDoubleClick={() => setSelectedRequest(req)} className={`hover:bg-gray-50 transition-colors group cursor-pointer ${selectedIds.includes(req.id) ? 'bg-primary/5' : ''}`}>
                       <td className="px-6 py-4 text-center">
                         <input type="checkbox" checked={selectedIds.includes(req.id)} onChange={() => toggleSelectOne(req.id)} className="rounded border-gray-300 text-primary" />
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-xs font-bold text-gray-900">{req.requestNo}</div>
+                        <div className="text-xs font-bold text-gray-900 flex items-center gap-2">
+                          {req.requestNo}
+                          {req.attachmentUrl && (
+                            <a href={req.attachmentUrl} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700 p-0.5 rounded-sm bg-blue-50 hover:bg-blue-100 transition-colors" title="View Signed Document">
+                              <ClipboardList className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                        </div>
                         <div className="text-[10px] text-gray-500">{new Date(req.date).toLocaleDateString()}</div>
                       </td>
                       <td className="px-6 py-4">
@@ -585,33 +399,44 @@ export default function RequestsPage() {
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black border uppercase ${getStatusColor(req.status)}`}>
                           {req.status}
                         </span>
+                        {req.remarks && (
+                          <div className="text-[9px] text-gray-500 mt-1 italic max-w-[150px] leading-tight" title={req.remarks}>
+                            "{req.remarks}"
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {req.status === 'PENDING' ? (
-                            <>
-                              <button onClick={() => handleUpdateStatus(req.id, 'APPROVED')} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Approve"><CheckCircle className="h-4 w-4" /></button>
-                              <button onClick={() => handleUpdateStatus(req.id, 'REJECTED')} className="p-1 text-red-600 hover:bg-red-50 rounded" title="Reject"><X className="h-4 w-4" /></button>
-                            </>
+                          {actionLoading === req.id ? (
+                            <div className="p-1"><Spinner className="h-4 w-4" /></div>
                           ) : (
-                            <button 
-                              onClick={() => {
-                                if(confirm('Undo this action and move back to Pending? Stock will be reverted if previously issued.')) {
-                                  handleUpdateStatus(req.id, 'PENDING');
-                                }
-                              }} 
-                              className="flex items-center text-[10px] font-black text-gray-400 hover:text-primary uppercase tracking-tighter"
-                            >
-                              <History className="mr-1 h-3 w-3" />
-                              Undo / Reset
-                            </button>
+                            <>
+                              {req.status === 'PENDING' ? (
+                                <>
+                                  <button onClick={() => handleUpdateStatus(req.id, 'APPROVED')} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Approve"><CheckCircle className="h-4 w-4" /></button>
+                                  <button onClick={() => handleUpdateStatus(req.id, 'REJECTED')} className="p-1 text-red-600 hover:bg-red-50 rounded" title="Reject"><X className="h-4 w-4" /></button>
+                                </>
+                              ) : (
+                                <button 
+                                  onClick={() => {
+                                    if(confirm('Undo this action and move back to Pending? Stock will be reverted if previously issued.')) {
+                                      handleUpdateStatus(req.id, 'PENDING');
+                                    }
+                                  }} 
+                                  className="flex items-center text-[10px] font-black text-gray-400 hover:text-primary uppercase tracking-tighter"
+                                >
+                                  <History className="mr-1 h-3 w-3" />
+                                  Undo / Reset
+                                </button>
+                              )}
+                              {req.status === 'APPROVED' && (
+                                <button onClick={() => handleUpdateStatus(req.id, 'FULFILLED')} className="text-[10px] font-black text-green-600 hover:underline">ISSUE</button>
+                              )}
+                              <button onClick={() => handleDelete(req.id)} className="p-1 text-gray-300 hover:text-red-500 rounded transition-colors" title="Delete">
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </>
                           )}
-                          {req.status === 'APPROVED' && (
-                            <button onClick={() => handleUpdateStatus(req.id, 'FULFILLED')} className="text-[10px] font-black text-green-600 hover:underline">ISSUE</button>
-                          )}
-                          <button onClick={() => handleDelete(req.id)} className="p-1 text-gray-300 hover:text-red-500 rounded transition-colors" title="Delete">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
                         </div>
                       </td>
                     </tr>
@@ -620,8 +445,165 @@ export default function RequestsPage() {
               </tbody>
             </table>
           </div>
+
+          <div className="flex items-center justify-between mt-4">
+            <div className="text-xs font-bold text-gray-500">
+              Showing {totalRequests === 0 ? 0 : ((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, totalRequests)} of {totalRequests} entries
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-black uppercase disabled:opacity-50 hover:bg-gray-50 transition-colors shadow-sm"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setPage(p => p + 1)}
+                disabled={page * pageSize >= totalRequests}
+                className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-black uppercase disabled:opacity-50 hover:bg-gray-50 transition-colors shadow-sm"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       </div>
+
+      {selectedRequest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
+              <div>
+                <h2 className="text-lg font-black text-gray-900 tracking-tight">Request Details</h2>
+                <p className="text-xs text-gray-500 mt-1 uppercase font-bold tracking-widest">{selectedRequest.requestNo}</p>
+              </div>
+              <button onClick={() => setSelectedRequest(null)} className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-200 rounded-full transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-auto flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-gray-100">
+              <div className="p-6 space-y-6 flex-1 bg-white">
+                <div>
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Employee Information</h3>
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-xs font-bold text-gray-500">Name</span>
+                      <span className="text-xs font-black text-gray-900">{selectedRequest.employeeName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-xs font-bold text-gray-500">Department</span>
+                      <span className="text-xs font-black text-gray-900">{selectedRequest.departmentArea}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-xs font-bold text-gray-500">Shift</span>
+                      <span className="text-xs font-black text-gray-900">{selectedRequest.shift}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Item Details</h3>
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-xs font-bold text-gray-500">Item Name</span>
+                      <span className="text-xs font-black text-gray-900">{selectedRequest.product.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-xs font-bold text-gray-500">Tracking No.</span>
+                      <span className="text-xs font-black text-gray-900 font-mono">{selectedRequest.product.sku}</span>
+                    </div>
+                    <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-200">
+                      <span className="text-xs font-black text-gray-500 uppercase">Quantity Requested</span>
+                      <span className="text-lg font-black text-primary">{selectedRequest.quantity}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Current Status</h3>
+                  <div className={`p-4 rounded-xl border flex items-center gap-3 ${getStatusColor(selectedRequest.status)}`}>
+                    {selectedRequest.status === 'PENDING' && <Clock className="h-5 w-5" />}
+                    {selectedRequest.status === 'APPROVED' && <CheckCircle className="h-5 w-5" />}
+                    {selectedRequest.status === 'REJECTED' && <XCircle className="h-5 w-5" />}
+                    {selectedRequest.status === 'FULFILLED' && <CheckCircle className="h-5 w-5" />}
+                    <span className="font-black text-xs uppercase tracking-widest">{selectedRequest.status}</span>
+                  </div>
+                </div>
+
+                {selectedRequest.remarks && (
+                  <div>
+                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Remarks / Reason</h3>
+                    <p className="text-xs text-gray-700 bg-yellow-50 p-3 rounded-lg border border-yellow-100 leading-relaxed italic">{selectedRequest.remarks}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 flex flex-col bg-gray-50/50 p-6">
+                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex justify-between items-center">
+                  <span>Attached Document</span>
+                  {selectedRequest.attachmentUrl && (
+                    <a href={selectedRequest.attachmentUrl} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700 underline text-[9px]">Open in new tab</a>
+                  )}
+                </h3>
+                
+                <div className="flex-1 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-inner flex items-center justify-center min-h-[300px]">
+                  {selectedRequest.attachmentUrl ? (
+                    selectedRequest.attachmentUrl.toLowerCase().endsWith('.pdf') ? (
+                      <iframe src={selectedRequest.attachmentUrl} className="w-full h-full border-0" title="Attached Document"></iframe>
+                    ) : (
+                      <img src={selectedRequest.attachmentUrl} alt="Attached Document" className="max-w-full max-h-full object-contain p-2" />
+                    )
+                  ) : (
+                    <div className="text-center text-gray-400">
+                      <FileText className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                      <p className="text-xs font-medium">No document attached</p>
+                    </div>
+                  )}
+                </div>
+
+                {selectedRequest.additionalImages && selectedRequest.additionalImages.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center">
+                      <ImageIcon className="mr-2 h-3 w-3" />
+                      Optional Support Photos
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      {selectedRequest.additionalImages.map((url, idx) => (
+                        <a key={idx} href={url} target="_blank" rel="noreferrer" className="aspect-square rounded-xl border border-gray-200 overflow-hidden hover:opacity-80 transition-opacity bg-white">
+                          <img src={url} alt={`Support ${idx + 1}`} className="w-full h-full object-cover" />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-gray-100 bg-white flex justify-end">
+              <button onClick={() => setSelectedRequest(null)} className="px-6 py-2 bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-gray-800 transition-colors shadow-sm">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {actionLoading === 'bulk' && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gray-900/10 backdrop-blur-[2px] animate-in fade-in duration-300">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl flex flex-col items-center space-y-4 border border-gray-100 scale-90 animate-in zoom-in-95">
+            <div className="relative">
+              <div className="h-12 w-12 border-4 border-primary/20 rounded-full animate-pulse"></div>
+              <Loader2 className="h-12 w-12 text-primary animate-spin absolute inset-0" />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-black text-gray-900 uppercase tracking-widest">Processing</p>
+              <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-tighter">Please wait while we process the selected items...</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

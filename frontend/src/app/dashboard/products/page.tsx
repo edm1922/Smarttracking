@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useDebounce } from '@/hooks/useDebounce';
 import { 
   Plus, Search, Box, ArrowDownLeft, ArrowUpRight, 
   History, MapPin, X, Info, Tag, Trash2, User, Calendar, Building2,
@@ -88,24 +89,52 @@ export default function ProductsPage() {
 
   const [releaseSearchTerm, setReleaseSearchTerm] = useState('');
 
-  const fetchData = async () => {
+  const [page, setPage] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const pageSize = 20;
+  const debouncedSearch = useDebounce(searchTerm, 300);
+
+  const fetchInitialData = async () => {
     try {
-      const [productsRes, locationsRes] = await Promise.all([
-        api.get('/products'),
-        api.get('/locations')
-      ]);
-      setProducts(productsRes.data);
-      setLocations(locationsRes.data);
+      const locsRes = await api.get('/locations');
+      setLocations(locsRes.data);
     } catch (err) {
-      console.error('Failed to fetch data', err);
+      console.error('Failed to fetch locations', err);
+    }
+  };
+
+  const fetchProducts = async () => {
+    setLoading(true);
+    try {
+      const skip = (page - 1) * pageSize;
+      const res = await api.get('/products', {
+        params: { skip, take: pageSize, search: debouncedSearch }
+      });
+      setProducts(res.data.data);
+      setTotalProducts(res.data.total);
+    } catch (err) {
+      console.error('Failed to fetch products', err);
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchData = async () => {
+    await fetchProducts();
+  };
+
   useEffect(() => {
-    fetchData();
+    fetchInitialData();
   }, []);
+
+  useEffect(() => {
+    fetchProducts();
+    setSelectedIds([]);
+  }, [page, debouncedSearch]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
 
   const handleOpenStockModal = (product: Product, type: 'IN' | 'OUT') => {
     setStockForm({
@@ -340,10 +369,7 @@ export default function ProductsPage() {
     log.location.name.toLowerCase().includes(logSearchTerm.toLowerCase())
   );
 
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.sku.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = products;
 
   const getTotalStock = (p: Product) => p.stocks.reduce((sum, s) => sum + s.quantity, 0);
 
@@ -567,6 +593,28 @@ export default function ProductsPage() {
         </table>
       </div>
 
+      <div className="flex items-center justify-between mt-4">
+        <div className="text-xs font-bold text-gray-500">
+          Showing {totalProducts === 0 ? 0 : ((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, totalProducts)} of {totalProducts} entries
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-black uppercase disabled:opacity-50 hover:bg-gray-50 transition-colors shadow-sm"
+          >
+            Previous
+          </button>
+          <button
+            onClick={() => setPage(p => p + 1)}
+            disabled={page * pageSize >= totalProducts}
+            className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-black uppercase disabled:opacity-50 hover:bg-gray-50 transition-colors shadow-sm"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+
       {/* Product Modal */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
@@ -598,7 +646,7 @@ export default function ProductsPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Price:</label>
-                      <input type="number" step="0.01" value={productForm.price} onChange={(e) => setProductForm({...productForm, price: parseFloat(e.target.value)})} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary outline-none" />
+                      <input type="number" step="0.01" value={productForm.price || ''} onChange={(e) => setProductForm({...productForm, price: parseFloat(e.target.value) || 0})} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary outline-none" />
                     </div>
                   </div>
                   <div>
@@ -610,12 +658,12 @@ export default function ProductsPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Threshold (Override):</label>
-                    <input type="number" value={productForm.threshold} onChange={(e) => setProductForm({...productForm, threshold: parseFloat(e.target.value)})} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary outline-none" placeholder="0.00 for Default" />
+                    <input type="number" value={productForm.threshold || ''} onChange={(e) => setProductForm({...productForm, threshold: parseFloat(e.target.value) || 0})} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary outline-none" placeholder="0.00 for Default" />
                     <p className="mt-1 text-[10px] text-gray-400 italic font-medium tracking-tight">Needs Restock when stock ≤ 50% of threshold</p>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Actual Stock:</label>
-                    <input type="number" value={productForm.initialStock} onChange={(e) => setProductForm({...productForm, initialStock: parseInt(e.target.value)})} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary outline-none" />
+                    <input type="number" value={productForm.initialStock || ''} onChange={(e) => setProductForm({...productForm, initialStock: parseInt(e.target.value) || 0})} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary outline-none" />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Location for Stock:</label>
@@ -681,8 +729,8 @@ export default function ProductsPage() {
                   required 
                   type="number" 
                   min="1" 
-                  value={stockForm.quantity} 
-                  onChange={(e) => setStockForm({...stockForm, quantity: parseInt(e.target.value)})} 
+                  value={stockForm.quantity || ''} 
+                  onChange={(e) => setStockForm({...stockForm, quantity: parseInt(e.target.value) || 0})} 
                   className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2"
                 />
               </div>
@@ -864,7 +912,7 @@ export default function ProductsPage() {
             <form onSubmit={handleEditLogSubmit} className="space-y-6">
               <div>
                 <label className="block text-xs font-bold text-gray-400 uppercase mb-1 tracking-widest">Quantity</label>
-                <input required type="number" value={editingLog.quantity} onChange={(e) => setEditingLog({...editingLog, quantity: parseInt(e.target.value)})} className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2" />
+                <input required type="number" value={editingLog?.quantity || ''} onChange={(e) => setEditingLog({...editingLog, quantity: parseInt(e.target.value) || 0})} className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2" />
                 <p className="mt-1 text-[10px] text-blue-500 italic">Changing this will automatically adjust the current on-hand stock.</p>
               </div>
               <div>
@@ -976,7 +1024,7 @@ export default function ProductsPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Price:</label>
-                      <input type="number" step="0.01" value={editingProduct.price} onChange={(e) => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary outline-none" />
+                      <input type="number" step="0.01" value={editingProduct.price || ''} onChange={(e) => setEditingProduct({...editingProduct, price: parseFloat(e.target.value) || 0})} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary outline-none" />
                     </div>
                   </div>
                 </div>
@@ -995,7 +1043,7 @@ export default function ProductsPage() {
                     <div className="flex items-center space-x-2">
                       <input 
                         type="number" 
-                        value={editableStock}
+                        value={editableStock || ''}
                         onChange={(e) => setEditableStock(parseInt(e.target.value) || 0)}
                         className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-black focus:border-primary outline-none" 
                       />

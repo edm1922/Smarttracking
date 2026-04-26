@@ -1,20 +1,23 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, LineChart, Line, Legend
 } from 'recharts';
 import { 
-  Box, Users, TrendingUp, Activity, Filter, Calendar, MapPin, 
+  Box, Users, User, TrendingUp, Activity, Filter, Calendar, MapPin, 
   ChevronRight, ArrowUpRight, ArrowDownRight, Package, ClipboardList, ShoppingCart
 } from 'lucide-react';
 import api from '@/lib/api';
 import { Printer, Eye, X as CloseIcon } from 'lucide-react';
+import { PageHeaderSkeleton, CardSkeleton } from '@/components/ui/LoadingSkeletons';
 
 const COLORS = ['#6366f1', '#f43f5e', '#10b981', '#f59e0b', '#8b5cf6'];
 
-function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: () => void, section: 'product' | 'employee' }) {
+function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: () => void, section: 'product' | 'employee' | 'activity' }) {
   const [reportType, setReportType] = useState('');
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewData, setPreviewData] = useState<any[]>([]);
@@ -34,7 +37,12 @@ function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: (
     { id: 'filter-item', name: 'Filter by Specific Item' },
   ];
 
-  const reports = section === 'product' ? productReports : employeeReports;
+  const activityReports = [
+    { id: 'top-consumed-stock', name: 'Top Consumed Stock' },
+    { id: 'top-requesters', name: 'Top Requesters' }
+  ];
+
+  const reports = section === 'product' ? productReports : section === 'employee' ? employeeReports : activityReports;
 
   const handleGenerate = async () => {
     if (!reportType) return alert('Please select a report type');
@@ -100,6 +108,19 @@ function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: (
           'Total Items Issued': a.totalItems,
           'Breakdown': Object.entries(a.items).map(([k, v]) => `${k}: ${v}`).join(', ')
         }));
+      case 'top-consumed-stock':
+        return data.map((t, idx) => ({
+          Rank: `#${idx + 1}`,
+          'Stock Name': t.name,
+          Description: t.description,
+          'Total Consumed': `${t.count} PCS`
+        }));
+      case 'top-requesters':
+        return data.map((u, idx) => ({
+          Rank: `#${idx + 1}`,
+          'Requester Name': u.name,
+          'Total Requested': `${u.count} ITEMS REQUESTED`
+        }));
       default:
         return data;
     }
@@ -115,7 +136,7 @@ function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: (
             <div>
               <h2 className="text-xl font-black text-gray-900 tracking-tight">Report Generator</h2>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
-                {section === 'product' ? 'Stock & Inventory Intelligence' : 'Organizational Insights'}
+                {section === 'product' ? 'Stock & Inventory Intelligence' : section === 'employee' ? 'Organizational Insights' : 'System Activity & Stock Logs'}
               </p>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
@@ -239,13 +260,21 @@ function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: (
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [data, setData] = useState<any>(null);
   const [locations, setLocations] = useState<any[]>([]);
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [loading, setLoading] = useState(true);
   
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<'product' | 'employee'>('product');
+  const [activeSection, setActiveSection] = useState<'product' | 'employee' | 'activity'>('product');
+
+  useEffect(() => {
+    const role = localStorage.getItem('role');
+    if (role === 'inventory' || role !== 'admin') {
+      router.push('/dashboard/staff/requisition');
+    }
+  }, [router]);
 
   const fetchData = async () => {
     try {
@@ -270,7 +299,21 @@ export default function DashboardPage() {
   }, [selectedLocation]);
 
   if (loading || !data) {
-    return <div className="flex items-center justify-center min-h-[60vh] text-sm text-gray-400 italic">Analyzing system intelligence...</div>;
+    return (
+      <div className="max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-300">
+        <PageHeaderSkeleton />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <CardSkeleton className="h-[120px]" />
+          <CardSkeleton className="h-[120px]" />
+          <CardSkeleton className="h-[120px]" />
+          <CardSkeleton className="h-[120px]" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <CardSkeleton className="h-[400px]" />
+          <div className="lg:col-span-2"><CardSkeleton className="h-[400px]" /></div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -285,6 +328,10 @@ export default function DashboardPage() {
           <div className="px-8 py-2 border-r border-gray-100">
             <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Requests</span>
             <span className="text-3xl font-black text-primary">{data.summary.totalRequests}</span>
+          </div>
+          <div className="px-8 py-2 border-r border-gray-100">
+            <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">New Today</span>
+            <span className="text-3xl font-black text-blue-500">{data.summary.todayRequests || 0}</span>
           </div>
           <div className="px-8 py-2 border-r border-gray-100">
             <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Active Items</span>
@@ -407,54 +454,10 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Unified Activity Log */}
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-          <div className="px-8 py-6 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
-            <h3 className="text-sm font-bold text-gray-800 flex items-center">
-              <Activity className="mr-2 h-4 w-4 text-primary" /> System-Wide Activity Log
-            </h3>
-            <div className="flex items-center space-x-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Live Updates</span>
-            </div>
-          </div>
-          <div className="divide-y divide-gray-50 max-h-[450px] overflow-y-auto">
-            {data.activityLog.length === 0 ? (
-              <div className="px-8 py-20 text-center text-sm text-gray-400 italic">No recent activity detected.</div>
-            ) : (
-              data.activityLog.map((log: any) => (
-                <div key={log.id} className="px-8 py-5 flex items-center justify-between hover:bg-gray-50/80 transition-colors group">
-                  <div className="flex items-center space-x-5">
-                    <div className={`p-2.5 rounded-2xl shadow-sm ${
-                      log.type === 'STOCK' ? 'bg-blue-50 text-blue-600' :
-                      log.type === 'REQUEST' ? 'bg-indigo-50 text-indigo-600' :
-                      'bg-orange-50 text-orange-600'
-                    }`}>
-                      {log.type === 'STOCK' ? <Package className="h-4.5 w-4.5" /> :
-                       log.type === 'REQUEST' ? <ClipboardList className="h-4.5 w-4.5" /> :
-                       <ShoppingCart className="h-4.5 w-4.5" />}
-                    </div>
-                    <div>
-                      <p className="text-xs font-black text-gray-900 group-hover:text-primary transition-colors">{log.title}</p>
-                      <p className="text-[10px] text-gray-500 font-medium mt-0.5">{log.description}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[9px] font-black text-gray-900 uppercase tracking-tighter">{new Date(log.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-                    <p className="text-[9px] font-bold text-gray-400 mt-0.5">{new Date(log.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION 2: EMPLOYEE & DEPT INSIGHTS */}
-      <section className="space-y-6 pt-12 border-t border-gray-100">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Org Insights Controls */}
+        <div className="flex items-center justify-between pt-8 pb-2">
           <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.25em] flex items-center">
-            <Users className="mr-2 h-4 w-4 text-purple-600" /> SECTION 02: ORGANIZATIONAL & EMPLOYEE INSIGHTS
+            <Users className="mr-2 h-4 w-4 text-purple-600" /> ORGANIZATIONAL & EMPLOYEE INSIGHTS
           </h2>
           <div className="flex items-center space-x-3">
             <button 
@@ -547,6 +550,137 @@ export default function DashboardPage() {
                 </PieChart>
               </ResponsiveContainer>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 2: SYSTEM ACTIVITY & STOCK LOGS */}
+      <section className="space-y-6 pt-12 border-t border-gray-100">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.25em] flex items-center">
+            <Activity className="mr-2 h-4 w-4 text-purple-600" /> SECTION 02: SYSTEM ACTIVITY & STOCK LOGS
+          </h2>
+          <button 
+            onClick={() => { setActiveSection('activity'); setIsReportModalOpen(true); }}
+            className="text-[10px] font-black bg-purple-50 text-purple-600 px-3 py-1.5 rounded-lg border border-purple-100 hover:bg-purple-100 transition-colors flex items-center"
+          >
+            <Printer className="w-3 h-3 mr-1.5" />
+            VIEW REPORT
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Most Consumed Admin Stock */}
+          <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-sm font-bold text-gray-800">Top Consumed Stock</h3>
+              <Package className="h-4 w-4 text-blue-600" />
+            </div>
+            <div className="space-y-6">
+              {data.topConsumedStock?.length === 0 ? (
+                <p className="text-center py-10 text-xs text-gray-400 italic">No admin stock out data.</p>
+              ) : (
+                data.topConsumedStock?.map((p: any, idx: number) => (
+                  <div key={idx} className="group">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-3">
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${idx === 0 ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                          #{idx + 1}
+                        </span>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold text-gray-700 group-hover:text-blue-600 transition-colors">{p.name}</span>
+                          {p.description && (
+                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter mt-0.5">{p.description}</span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-black text-gray-900">{p.count} PCS</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-gray-50 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-blue-600 rounded-full transition-all duration-1000" 
+                        style={{ width: `${(p.count / (data.topConsumedStock[0].count || 1)) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Top Issuing Users */}
+          <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-sm font-bold text-gray-800">Top Requesters</h3>
+              <User className="h-4 w-4 text-indigo-600" />
+            </div>
+            <div className="space-y-6">
+              {data.topStockUsers?.length === 0 ? (
+                <p className="text-center py-10 text-xs text-gray-400 italic">No user activity data.</p>
+              ) : (
+                data.topStockUsers?.map((u: any, idx: number) => (
+                  <div key={u.name} className="group">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-3">
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${idx === 0 ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                          #{idx + 1}
+                        </span>
+                        <span className="text-xs font-bold text-gray-700 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{u.name}</span>
+                      </div>
+                      <span className="text-[10px] font-black text-gray-900">{u.count} ITEMS REQUESTED</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-gray-50 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-indigo-600 rounded-full transition-all duration-1000" 
+                        style={{ width: `${(u.count / (data.topStockUsers[0].count || 1)) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Unified Activity Log */}
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+          <div className="px-8 py-6 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
+            <h3 className="text-sm font-bold text-gray-800 flex items-center">
+              <Activity className="mr-2 h-4 w-4 text-primary" /> System-Wide Activity Log
+            </h3>
+            <div className="flex items-center space-x-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Live Updates</span>
+            </div>
+          </div>
+          <div className="divide-y divide-gray-50 max-h-[450px] overflow-y-auto">
+            {data.activityLog.length === 0 ? (
+              <div className="px-8 py-20 text-center text-sm text-gray-400 italic">No recent activity detected.</div>
+            ) : (
+              data.activityLog.map((log: any) => (
+                <div key={log.id} className="px-8 py-5 flex items-center justify-between hover:bg-gray-50/80 transition-colors group">
+                  <div className="flex items-center space-x-5">
+                    <div className={`p-2.5 rounded-2xl shadow-sm ${
+                      log.type === 'STOCK' ? 'bg-blue-50 text-blue-600' :
+                      log.type === 'REQUEST' ? 'bg-indigo-50 text-indigo-600' :
+                      'bg-orange-50 text-orange-600'
+                    }`}>
+                      {log.type === 'STOCK' ? <Package className="h-4.5 w-4.5" /> :
+                       log.type === 'REQUEST' ? <ClipboardList className="h-4.5 w-4.5" /> :
+                       <ShoppingCart className="h-4.5 w-4.5" />}
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-gray-900 group-hover:text-primary transition-colors">{log.title}</p>
+                      <p className="text-[10px] text-gray-500 font-medium mt-0.5">{log.description}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[9px] font-black text-gray-900 uppercase tracking-tighter">{new Date(log.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                    <p className="text-[9px] font-bold text-gray-400 mt-0.5">{new Date(log.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </section>
