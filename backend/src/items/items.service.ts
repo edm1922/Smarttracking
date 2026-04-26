@@ -408,6 +408,37 @@ export class ItemsService {
       return group;
     });
 
+    // Fallback: if nothing found via unitQty path, attempt a lightweight fallback
+    // to ensure the explorer has something to display (safe-guard for missing data).
+    if (result.length === 0) {
+      const allItems = await this.prisma.item.findMany({
+        include: { fieldValues: { include: { field: true } }, batch: true, category: true }
+      });
+      const fallback: Record<string, any> = {};
+      allItems.forEach(it => {
+        const name = it.name || it.slug || 'Unnamed Product';
+        const unitField = it.fieldValues.find((fv: any) => fv.value && typeof fv.value === 'object' && (fv.value as any).unit);
+        const unit = ((unitField?.value as any)?.unit) || 'pcs';
+        const qty = (unitField?.value && (unitField.value as any).qty) || 1;
+
+        if (!fallback[name]) {
+          fallback[name] = { name, totalQty: 0, unit, items: [] };
+        }
+        fallback[name].totalQty += qty;
+        fallback[name].items.push({
+          slug: it.slug,
+          qty,
+          batch: it.batch?.batchCode,
+          fieldValues: it.fieldValues.map((fv: any) => ({
+            fieldId: fv.fieldId,
+            name: fv.field?.name,
+            value: fv.value
+          }))
+        });
+      });
+      return Object.values(fallback);
+    }
+
     return result;
   }
 

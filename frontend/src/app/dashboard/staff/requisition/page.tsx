@@ -82,7 +82,7 @@ export default function StaffRequisitionPage() {
         setForm(f => ({ ...f, locationId: mainOffice ? mainOffice.id : locs[0].id }));
       }
       
-      setProducts(prodsRes.data.data);
+      setProducts(prodsRes.data.data || prodsRes.data || []);
     } catch (err) {
       console.error('Failed to fetch data', err);
     } finally {
@@ -249,7 +249,7 @@ export default function StaffRequisitionPage() {
   const displayProducts = products
     .map(p => {
       // Only sum stocks for the currently selected location source
-      const availableInLocation = p.stocks.find(s => s.locationId === form.locationId)?.quantity || 0;
+      const availableInLocation = p.stocks.find(s => s.location?.id === form.locationId)?.quantity || 0;
       return { ...p, totalStock: availableInLocation };
     })
     .filter(p => p.totalStock! > 0) // Only show items with stock
