@@ -116,17 +116,20 @@ export class InternalRequestsService {
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    const issuanceMap = new Map<string, number>();
-    sortedRequests.forEach((req) => {
+    const issuanceCounts = new Map<string, number[]>();
+    allIssuances.forEach((req) => {
       const key = `${req.productId}-${req.employeeName}`;
-      const prevCount = issuanceMap.get(key) ?? 0;
-      issuanceMap.set(key, prevCount + 1);
+      if (!issuanceCounts.has(key)) {
+        issuanceCounts.set(key, []);
+      }
+      issuanceCounts.get(key)?.push(req.id);
     });
 
     const data = sortedRequests.map((req) => {
       const key = `${req.productId}-${req.employeeName}`;
-      const prevCount = (issuanceMap.get(key) ?? 1) - 1;
-      return { ...req, previousIssuancesCount: prevCount };
+      const ids = issuanceCounts.get(key) || [];
+      const index = ids.indexOf(req.id);
+      return { ...req, previousIssuancesCount: index };
     });
 
     return { data, total };
