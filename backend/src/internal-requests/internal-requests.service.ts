@@ -322,14 +322,17 @@ export class InternalRequestsService {
     remarks?: string,
   ) {
     if (status === 'FULFILLED') {
-      // Bulk fulfillment can be slow in a single transaction.
-      // We'll process them in parallel with individual transactions to prevent pool exhaustion.
-      const results = await Promise.all(
-        ids.map(id => 
-          this.updateStatus(id, status, userId, remarks)
-            .catch(err => ({ error: true, id, message: err.message }))
-        )
-      );
+      // Parallel processing (Promise.all) overwhelmed the connection pool.
+      // We must process these SEQUENTIALLY to prevent P2028 errors.
+      const results = [];
+      for (const id of ids) {
+        try {
+          const res = await this.updateStatus(id, status, userId, remarks);
+          results.push(res);
+        } catch (err) {
+          results.push({ error: true, id, message: err.message });
+        }
+      }
       return results;
     }
 
@@ -356,14 +359,15 @@ export class InternalRequestsService {
   }
 
   async bulkRemove(ids: string[]) {
-    return this.prisma.$transaction(
-      async (tx) => {
-        for (const id of ids) {
-          await this.remove(id, tx);
-        }
-        return { success: true };
-      },
-      { timeout: 60000 },
-    );
+    const results = [];
+    for (const id of ids) {
+      try {
+        await this.remove(id);
+        results.push({ id, success: true });
+      } catch (err) {
+        results.push({ id, error: true, message: err.message });
+      }
+    }
+    return results;
   }
 }
