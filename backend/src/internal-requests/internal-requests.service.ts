@@ -128,7 +128,10 @@ export class InternalRequestsService {
     });
 
     const data = sortedRequests.map((req) => {
-      return { ...req, previousIssuancesCount: 0 };
+      const key = `${req.productId}-${req.employeeName}`;
+      const ids = issuanceCounts.get(key) || [];
+      const index = ids.indexOf(req.id);
+      return { ...req, previousIssuancesCount: index };
     });
 
     return { data, total };

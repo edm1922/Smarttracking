@@ -327,7 +327,7 @@ export default function RequestsPage() {
                   <td>${r.shift}</td>
                   <td>${r.product.name}</td>
                   <td>${r.quantity}</td>
-                  <td>First Issuance</td>
+                  <td>${(r.previousIssuancesCount || 0) + 1 === 1 ? 'First Issuance' : `${getOrdinal((r.previousIssuancesCount || 0) + 1)} Issuance`}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -477,8 +477,10 @@ export default function RequestsPage() {
                         <div className="text-xs font-bold text-gray-900">{req.product.name}</div>
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] text-gray-400 font-mono">{req.product.sku}</span>
-                          <span className="text-[9px] font-black px-1.5 rounded-full bg-purple-100 text-purple-700">
-                            1st Issuance
+                          <span className={`text-[9px] font-black px-1.5 rounded-full ${
+                            (req.previousIssuancesCount || 0) === 0 ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {(req.previousIssuancesCount || 0) + 1 === 1 ? '1st Issuance' : `${getOrdinal((req.previousIssuancesCount || 0) + 1)} Issuance`}
                           </span>
                         </div>
                       </td>
