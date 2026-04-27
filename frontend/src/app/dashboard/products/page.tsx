@@ -54,7 +54,8 @@ export default function ProductsPage() {
   const [previewImageUrl, setPreviewImageUrl] = useState('');
   
   // Selection state
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
+  const selectedIds = selectedProducts.map(p => p.id);
   
   // Form states
   const [productForm, setProductForm] = useState({ 
@@ -145,7 +146,6 @@ export default function ProductsPage() {
 
   useEffect(() => {
     fetchProducts();
-    setSelectedIds([]);
   }, [page, debouncedSearch, stockFilter]);
 
   useEffect(() => {
@@ -391,16 +391,24 @@ export default function ProductsPage() {
   const getTotalStock = (p: Product) => p.stocks.reduce((sum, s) => sum + s.quantity, 0);
 
   const toggleSelectAll = () => {
-    if (selectedIds.length === filteredProducts.length) {
-      setSelectedIds([]);
+    const currentPageIds = filteredProducts.map(p => p.id);
+    const allSelectedOnPage = currentPageIds.every(id => selectedIds.includes(id));
+    
+    if (allSelectedOnPage) {
+      // Deselect all on current page
+      setSelectedProducts(prev => prev.filter(p => !currentPageIds.includes(p.id)));
     } else {
-      setSelectedIds(filteredProducts.map(p => p.id));
+      // Select all on current page, keeping existing selections
+      const toAdd = filteredProducts.filter(p => !selectedIds.includes(p.id));
+      setSelectedProducts(prev => [...prev, ...toAdd]);
     }
   };
 
-  const toggleSelect = (id: string) => {
-    setSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+  const toggleSelect = (product: Product) => {
+    setSelectedProducts(prev => 
+      prev.some(p => p.id === product.id) 
+        ? prev.filter(p => p.id !== product.id) 
+        : [...prev, product]
     );
   };
 
@@ -408,7 +416,7 @@ export default function ProductsPage() {
     if (!confirm(`Are you sure you want to delete ${selectedIds.length} items?`)) return;
     try {
       await Promise.all(selectedIds.map(id => api.delete(`/products/${id}`)));
-      setSelectedIds([]);
+      setSelectedProducts([]);
       fetchData();
     } catch (err) {
       alert('Failed to delete some items');
@@ -416,13 +424,11 @@ export default function ProductsPage() {
   };
 
   const handleBulkTransmittal = () => {
-    const selectedProducts = products.filter(p => selectedIds.includes(p.id));
     localStorage.setItem('pending_transmittal', JSON.stringify(selectedProducts));
     window.location.href = '/dashboard/transmittal';
   };
 
   const handleBulkPR = () => {
-    const selectedProducts = products.filter(p => selectedIds.includes(p.id));
     const prItems = selectedProducts.map(p => {
       const currentStock = getTotalStock(p);
       const neededQty = p.threshold > currentStock ? p.threshold - currentStock : 1;
@@ -499,7 +505,7 @@ export default function ProductsPage() {
               <X className="h-4 w-4 mr-2" /> Delete Selected
             </button>
           </div>
-          <button onClick={() => setSelectedIds([])} className="text-gray-500 hover:text-white"><X className="h-5 w-5" /></button>
+          <button onClick={() => setSelectedProducts([])} className="text-gray-500 hover:text-white"><X className="h-5 w-5" /></button>
         </div>
       )}
 
@@ -536,7 +542,7 @@ export default function ProductsPage() {
                 <input 
                   type="checkbox" 
                   className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
-                  checked={selectedIds.length === filteredProducts.length && filteredProducts.length > 0}
+                  checked={filteredProducts.length > 0 && filteredProducts.every(p => selectedIds.includes(p.id))}
                   onChange={toggleSelectAll}
                 />
               </th>
@@ -564,7 +570,7 @@ export default function ProductsPage() {
                       type="checkbox" 
                       className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
                       checked={selectedIds.includes(product.id)}
-                      onChange={() => toggleSelect(product.id)}
+                      onChange={() => toggleSelect(product)}
                     />
                   </td>
                   <td className="px-6 py-4">
