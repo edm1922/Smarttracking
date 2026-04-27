@@ -348,7 +348,7 @@ export default function StaffRequisitionPage() {
                               key={name}
                               type="button"
                               onClick={() => selectExistingEmployee(name)}
-                              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors"
+                              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors text-gray-900"
                             >
                               {name}
                             </button>

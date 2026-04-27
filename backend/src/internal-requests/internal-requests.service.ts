@@ -386,4 +386,17 @@ export class InternalRequestsService {
     });
     return employees.map(e => e.employeeName);
   }
+
+  async getEmployeeLastDetails(employeeName: string) {
+    const lastRequest = await this.prisma.internalRequest.findFirst({
+      where: { employeeName },
+      orderBy: { date: 'desc' },
+    });
+    if (!lastRequest) return null;
+    return {
+      departmentArea: lastRequest.departmentArea,
+      shift: lastRequest.shift,
+    };
+  }
+  }
 }
