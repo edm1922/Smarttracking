@@ -97,7 +97,16 @@ export default function ProductsPage() {
   const fetchInitialData = async () => {
     try {
       const locsRes = await api.get('/locations');
-      setLocations(locsRes.data);
+      const fetchedLocations = locsRes.data;
+      setLocations(fetchedLocations);
+      
+      // Auto-set default locations for forms
+      if (fetchedLocations.length > 0) {
+        const defaultId = fetchedLocations[0].id;
+        setReleaseForm(prev => ({ ...prev, sourceLocationId: defaultId }));
+        setProductForm(prev => ({ ...prev, initialLocationId: defaultId }));
+        setStockForm(prev => ({ ...prev, locationId: defaultId }));
+      }
     } catch (err) {
       console.error('Failed to fetch locations', err);
     }
@@ -428,7 +437,9 @@ export default function ProductsPage() {
           </button>
           <button
             onClick={() => {
-              setReleaseForm({ ...releaseForm, sourceLocationId: locations[0]?.id || '' });
+              if (locations.length > 0 && !releaseForm.sourceLocationId) {
+                setReleaseForm({ ...releaseForm, sourceLocationId: locations[0].id });
+              }
               setIsReleaseModalOpen(true);
             }}
             className="inline-flex items-center rounded-md bg-[#50C878] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#45b068] transition-colors"
@@ -1253,7 +1264,7 @@ export default function ProductsPage() {
                                 <div className="flex flex-col items-end">
                                   <div className="flex items-center space-x-2">
                                     <span className="text-xs font-black text-primary bg-primary/10 px-3 py-1 rounded-full uppercase">
-                                      {locations.find(l => l.id === releaseForm.sourceLocationId)?.name || 'Available'}: {p.stocks.find(s => s.locationId === releaseForm.sourceLocationId)?.quantity || 0}
+                                      {(locations.find(l => l.id === releaseForm.sourceLocationId)?.name || (locations.length > 0 ? locations[0].name : 'Available'))}: {p.stocks.find(s => s.locationId === releaseForm.sourceLocationId)?.quantity || 0}
                                     </span>
                                   </div>
                                   <span className="text-[10px] text-gray-400 italic mt-1 font-bold uppercase tracking-widest">{p.unit}</span>
