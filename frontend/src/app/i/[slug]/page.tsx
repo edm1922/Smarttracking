@@ -179,9 +179,13 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
         try {
           const logsRes = await api.get(`/logs/item/${itemRes.data.id}`);
           setLogs(logsRes.data);
-        } catch (err) {
-          console.error('Failed to load logs, proceeding without them', err);
-          // If token is invalid, we might want to clear it, but for now just proceed
+        } catch (err: any) {
+          if (err.response?.status === 401) {
+            setIsLoggedIn(false);
+            setUserRole('');
+            setUsername('');
+          }
+          console.warn('Unauthorized to view logs, skipping...');
         }
       }
 
@@ -350,6 +354,12 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       setIsPullingOut(false);
       alert('Item record updated successfully.');
     } catch (err: any) {
+      if (err.response?.status === 401) {
+        setIsLoggedIn(false);
+        setUserRole('');
+        setUsername('');
+        setViewMode('choice');
+      }
       alert(err.response?.data?.message || 'Failed to update item');
     } finally {
       setIsSaving(false);

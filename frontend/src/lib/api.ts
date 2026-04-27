@@ -13,4 +13,20 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Add a response interceptor to handle unauthorized errors
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('role');
+        localStorage.removeItem('username');
+        // Optional: window.location.href = '/login'; or similar
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default api;
