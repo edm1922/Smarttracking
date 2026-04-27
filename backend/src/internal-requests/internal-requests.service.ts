@@ -106,22 +106,26 @@ export class InternalRequestsService {
       this.prisma.internalRequest.count({ where }),
     ]);
 
-    const issuanceCounts = await this.prisma.internalRequest.groupBy({
-      by: ['productId', 'employeeName'],
+    const allIssuances = await this.prisma.internalRequest.findMany({
       where: { status: 'FULFILLED' },
-      _count: { productId: true },
+      select: { id: true, productId: true, employeeName: true, date: true },
+      orderBy: { date: 'asc' },
     });
 
-    const issuanceMap = new Map<string, Map<string, number>>();
-    issuanceCounts.forEach((i) => {
-      if (!issuanceMap.has(i.productId)) {
-        issuanceMap.set(i.productId, new Map());
-      }
-      issuanceMap.get(i.productId)?.set(i.employeeName, i._count.productId);
+    const sortedRequests = [...requests].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    const issuanceMap = new Map<string, number>();
+    sortedRequests.forEach((req) => {
+      const key = `${req.productId}-${req.employeeName}`;
+      const prevCount = issuanceMap.get(key) ?? 0;
+      issuanceMap.set(key, prevCount + 1);
     });
 
-    const data = requests.map((req) => {
-      const prevCount = issuanceMap.get(req.productId)?.get(req.employeeName) ?? 0;
+    const data = sortedRequests.map((req) => {
+      const key = `${req.productId}-${req.employeeName}`;
+      const prevCount = (issuanceMap.get(key) ?? 1) - 1;
       return { ...req, previousIssuancesCount: prevCount };
     });
 

@@ -3,6 +3,59 @@ const XLSX = require('xlsx');
 const path = require('path');
 const prisma = new PrismaClient();
 
+const shiftMap = {
+  'PRODUCTION': '307',
+  'PRODUCTION 307': '307',
+  'PRODUCTION 603': '603',
+  'SANITATION TUNE 3': '603',
+  'SANITATION MP': '603',
+  'SANITATION': '603',
+  'TB-LOINING': '603',
+  'LOINING LOCAL': '603',
+  'CAN LABELLING WAREHOUSE': '307',
+  'CAN LABELLING T3': '603',
+  'MAKAR VAAS': '307',
+  'TUNA 3 PACKING LOCAL': '603',
+  'PACKING LOCAL': '603',
+  'PACKING LOCAL L-G': '603',
+  'PACKING LOCAL L': '603',
+  'PACKING LOCAL/PHILVEST': '603',
+  'PACKING LOCAL LINE-C': 'MK-DS',
+  'PACKING LINE 1 TUNA 3': 'FO-NS',
+  'PACKING LOCAL T-3': 'FO-NS',
+  'PACKING LOCAL TUNE 3 L6': '603',
+  'PK LOCAL TUNE 3 L6': '603',
+  'PK L3 TUNA 3': '603',
+  'TUNA 3': '603',
+  'LINE 6 ALPHA PACKING': '603',
+  '603 PACKING COM': '603',
+  'BIGDOME MACKEREL PACKING': '603',
+  'BIGDOME MACKEREL RECEIVING/CUTTING SECTION': '603',
+  'BIGDOME PETFOOD': '603',
+  'BIGDOME': '603',
+  'MP': '603',
+  'VEGIE PREP': '603',
+  'TUNA 3 VEG PREP': '603',
+  'AWI WHSE': '603',
+  'RECEIVING': '603',
+  'FINANCE': '307',
+  'DEFECTIVES': '603',
+  'EXPORT SKINNING / LOINING': '603',
+  'PROJECT TELESCOPE': '603',
+};
+
+function getShiftFromArea(area) {
+  if (!area) return '603';
+  const upperArea = area.toUpperCase();
+  
+  if (shiftMap[upperArea]) return shiftMap[upperArea];
+  
+  const match = upperArea.match(/\b(\d{3})\b/);
+  if (match) return match[1];
+  
+  return '603';
+}
+
 async function main() {
   const filePath = path.join(__dirname, '../../ISSUANCE_LOG_EXPORT.xlsx');
   const workbook = XLSX.readFile(filePath);
@@ -14,7 +67,6 @@ async function main() {
 
   const MAIN_OFFICE_ID = '8b5aa3c2-bb57-4cfa-936d-ddd1435d159a';
 
-  // Map to store product names to IDs to avoid multiple lookups
   const productMap = {};
 
   let successCount = 0;
@@ -26,7 +78,6 @@ async function main() {
       const itemName = row['Item Name'] || 'Unknown Item';
       const sku = itemName.toUpperCase().replace(/\s+/g, '-').substring(0, 20) + '-' + Math.random().toString(36).substring(2, 5).toUpperCase();
 
-      // Get or create product
       let productId = productMap[itemName];
       if (!productId) {
         let product = await prisma.product.findFirst({
@@ -47,28 +98,29 @@ async function main() {
         productMap[itemName] = productId;
       }
 
-      // Convert Excel Date
       let date = new Date();
       if (row['Date'] && typeof row['Date'] === 'number') {
         date = new Date((row['Date'] - 25569) * 86400 * 1000);
       }
 
-      // Create Request
+      const area = row['Area'] || 'General';
+      const shift = getShiftFromArea(area);
+
       await prisma.internalRequest.create({
         data: {
           requestNo: `HIST-${i + 1}-${Date.now().toString().slice(-4)}`,
           date: date,
           employeeName: row['Employee'] || 'Unknown',
           employeeRole: 'Staff',
-          departmentArea: row['Area'] || 'General',
-          shift: 'SHIFT 1',
+          departmentArea: area,
+          shift: shift,
           supervisor: 'LEGACY IMPORT',
           locationId: MAIN_OFFICE_ID,
           productId: productId,
           quantity: parseInt(row['Qty']) || 1,
           status: row['Status'] || 'FULFILLED',
           remarks: row['Description'] || '',
-          createdAt: date // Set createdAt to match historical date
+          createdAt: date
         }
       });
 
