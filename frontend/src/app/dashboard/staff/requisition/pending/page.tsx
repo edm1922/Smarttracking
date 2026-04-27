@@ -29,7 +29,7 @@ export default function PendingRequestsPage() {
   const fetchRequests = async () => {
     try {
       const res = await api.get('/internal-requests');
-      setRequests(res.data);
+      setRequests(res.data.data || []);
     } catch (err) {
       console.error('Failed to fetch requests', err);
     } finally {
