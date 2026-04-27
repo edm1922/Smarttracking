@@ -102,13 +102,30 @@ export class InternalRequestsService {
             }
           },
         },
+        select: {
+          id: true,
+          requestNo: true,
+          date: true,
+          employeeName: true,
+          employeeRole: true,
+          departmentArea: true,
+          shift: true,
+          supervisor: true,
+          quantity: true,
+          status: true,
+          remarks: true,
+          createdAt: true,
+          product: true,
+          location: true,
+          targetLocation: true,
+        },
       }),
       this.prisma.internalRequest.count({ where }),
     ]);
 
     const allIssuances = await this.prisma.internalRequest.findMany({
       where: { status: 'FULFILLED' },
-      select: { id: true, productId: true, employeeName: true, date: true },
+      select: { id: true, productId: true, employeeName: true, date: true, supervisor: true },
       orderBy: { date: 'asc' },
     });
 
@@ -116,19 +133,31 @@ export class InternalRequestsService {
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    const issuanceCounts = new Map<string, number[]>();
+    const issuanceCounts = new Map<string, { ids: string[]; hasNew: boolean }>();
     allIssuances.forEach((req) => {
       const key = `${req.productId}-${req.employeeName}`;
       if (!issuanceCounts.has(key)) {
-        issuanceCounts.set(key, []);
+        issuanceCounts.set(key, { ids: [], hasNew: false });
       }
-      issuanceCounts.get(key)?.push(req.id);
+      issuanceCounts.get(key)?.ids.push(req.id);
+      if (req.supervisor !== 'LEGACY IMPORT') {
+        issuanceCounts.get(key)!.hasNew = true;
+      }
     });
 
     const data = sortedRequests.map((req) => {
       const key = `${req.productId}-${req.employeeName}`;
-      const ids = issuanceCounts.get(key) || [];
-      const index = ids.indexOf(req.id);
+      const info = issuanceCounts.get(key) || { ids: [], hasNew: false };
+      
+      if (req.supervisor === 'LEGACY IMPORT') {
+        return { ...req, previousIssuancesCount: 0 };
+      }
+      
+      if (!info.hasNew) {
+        return { ...req, previousIssuancesCount: 0 };
+      }
+      
+      const index = info.ids.indexOf(req.id);
       return { ...req, previousIssuancesCount: index };
     });
 
