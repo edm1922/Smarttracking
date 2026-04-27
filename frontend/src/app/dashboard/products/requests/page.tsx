@@ -159,6 +159,35 @@ export default function RequestsPage() {
     setDrafts(drafts.filter(d => d.id !== id));
   };
 
+  const submitAllDrafts = async () => {
+    if (drafts.length === 0) return;
+    if (!form.employeeName) return alert('Please enter employee name');
+    
+    setIsSubmitting(true);
+    try {
+      // Group by draft to match backend expectations or send one by one
+      // The backend has a bulk creation endpoint? No, let's check.
+      // If no bulk endpoint, we can use Promise.all
+      await Promise.all(drafts.map(draft => 
+        api.post('/internal-requests', {
+          ...form,
+          productId: draft.productId,
+          quantity: draft.quantity,
+          remarks: draft.remarks,
+          targetLocationId: (draft as any).targetLocationId
+        })
+      ));
+      
+      setDrafts([]);
+      await fetchData();
+      alert(`Successfully submitted ${drafts.length} requests`);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to submit some requests');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch, activeTab]);
