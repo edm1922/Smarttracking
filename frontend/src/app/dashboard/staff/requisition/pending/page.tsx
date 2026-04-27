@@ -68,11 +68,21 @@ export default function PendingRequestsPage() {
     }
   };
 
-  const filteredRequests = requests.filter(r => 
-    r.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    r.requestNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    r.product.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredRequests = requests
+    .filter(r => 
+      r.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.requestNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.product.name.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      const statusOrder: Record<string, number> = {
+        'PENDING': 1,
+        'APPROVED': 2,
+        'FULFILLED': 3,
+        'REJECTED': 4,
+      };
+      return (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99);
+    });
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
