@@ -155,6 +155,10 @@ export default function RequestsPage() {
     setProductSearch('');
   };
 
+  const removeDraft = (id: string) => {
+    setDrafts(drafts.filter(d => d.id !== id));
+  };
+
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch, activeTab]);
