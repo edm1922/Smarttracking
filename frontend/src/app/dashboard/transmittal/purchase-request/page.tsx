@@ -198,6 +198,15 @@ export default function PRTransmittalPage() {
     })));
   };
 
+  const appendPrItems = (pr: any) => {
+    const newItems = (pr.items || []).map((item: any) => ({
+      ...item,
+      id: Math.random().toString(36).substr(2, 9),
+      name: item.name || item.description || ''
+    }));
+    setPrItems(prev => [...prev, ...newItems]);
+  };
+
   const deletePr = async (id: string) => {
     if (!confirm('Delete this PR from history?')) return;
     try {
@@ -360,19 +369,23 @@ export default function PRTransmittalPage() {
               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">PR History Log</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-2">
                 {prHistory.map(pr => (
-                  <button
+                  <div
                     key={pr.id}
-                    onClick={() => loadPrFromHistory(pr)}
-                    onDoubleClick={() => deletePr(pr.id)}
                     className="flex flex-col p-4 rounded-xl border border-gray-100 bg-gray-50 hover:border-blue-200 transition-all text-left"
                   >
                     <div className="flex justify-between items-center w-full mb-1">
                       <span className="text-sm font-black text-gray-900">{pr.prNo}</span>
-                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 rounded">{pr.items.length} items</span>
+                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{pr.items.length} items</span>
                     </div>
                     <span className="text-[10px] text-gray-500 uppercase font-bold tracking-tighter">{pr.department} • {pr.endUser}</span>
                     <span className="mt-2 text-[9px] text-gray-400">{new Date(pr.date).toLocaleDateString()}</span>
-                  </button>
+                    
+                    <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between space-x-2">
+                      <button onClick={() => loadPrFromHistory(pr)} className="text-[10px] font-bold text-gray-600 hover:text-blue-600 flex-1 text-center bg-white border border-gray-200 hover:border-blue-200 rounded py-1.5 transition-colors">Load / Edit</button>
+                      <button onClick={() => appendPrItems(pr)} className="text-[10px] font-bold text-gray-600 hover:text-green-600 flex-1 text-center bg-white border border-gray-200 hover:border-green-200 rounded py-1.5 transition-colors">Copy Items</button>
+                      <button onClick={() => deletePr(pr.id)} className="text-[10px] font-bold text-red-400 hover:text-red-600 px-2 bg-white border border-gray-200 hover:border-red-200 rounded transition-colors" title="Delete PR"><Trash2 className="h-3 w-3" /></button>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
