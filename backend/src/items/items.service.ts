@@ -149,14 +149,8 @@ export class ItemsService {
   async update(slug: string, data: any, userId: string, userRole: string) {
     const item = await this.findOne(slug);
 
-    if (item.locked && userRole !== 'admin') {
-      // Allow inventory users to pull out (update status/fieldValues) even if locked
-      const { status, statusId, fieldValues, logAction, ...otherData } = data;
-      const isInventoryAction = userRole === 'inventory' && Object.keys(otherData).length === 0;
-      
-      if (!isInventoryAction) {
-        throw new BadRequestException('Item is locked. Only admins can edit core details.');
-      }
+    if (item.locked && userRole !== 'admin' && userRole !== 'inventory' && userRole !== 'staff') {
+      throw new BadRequestException('Item is locked. Only authorized staff can edit details.');
     }
 
     const { fieldValues, tagIds, categoryId, batchId, ...itemData } = data;
