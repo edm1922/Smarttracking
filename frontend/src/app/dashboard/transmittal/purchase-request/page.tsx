@@ -394,10 +394,10 @@ export default function PRTransmittalPage() {
       </div>
 
       {/* Print Layout */}
-      <div className="hidden print:block bg-white p-12 text-gray-900">
-        <div className="flex justify-between items-start border-b-2 border-gray-900 pb-8 mb-12">
+      <div className="hidden print:block bg-white p-8 text-gray-900">
+        <div className="flex justify-between items-start border-b-2 border-gray-900 pb-4 mb-6">
           <div>
-            <h1 className="text-4xl font-black uppercase tracking-tighter text-gray-900 mb-1">Purchase Requisition</h1>
+            <h1 className="text-3xl font-black uppercase tracking-tighter text-gray-900 mb-1">Purchase Requisition</h1>
             <p className="text-sm font-bold text-gray-500">{headerInfo.customSubHeader || headerInfo.subTitle}</p>
           </div>
           <div className="text-right">
@@ -406,59 +406,59 @@ export default function PRTransmittalPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-12 mb-12">
+        <div className="grid grid-cols-2 gap-8 mb-6">
           <div className="space-y-4">
-            <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">Department:</div><div className="text-base font-bold border-b border-gray-200 pb-1">{headerInfo.department || '____________________'}</div></div>
-            <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">End-User:</div><div className="text-base font-bold border-b border-gray-200 pb-1">{headerInfo.endUser || '____________________'}</div></div>
+            <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">Department:</div><div className="text-sm font-bold border-b border-gray-200 pb-1">{headerInfo.department || '____________________'}</div></div>
+            <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">End-User:</div><div className="text-sm font-bold border-b border-gray-200 pb-1">{headerInfo.endUser || '____________________'}</div></div>
           </div>
           <div className="space-y-4">
-            <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">Date:</div><div className="text-base font-bold border-b border-gray-200 pb-1">{new Date(headerInfo.date).toLocaleDateString(undefined, { dateStyle: 'long' })}</div></div>
-            <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">Supplier / Project:</div><div className="text-base font-bold border-b border-gray-200 pb-1">{headerInfo.sourceSupplier || '____________________'}</div></div>
+            <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">Date:</div><div className="text-sm font-bold border-b border-gray-200 pb-1">{new Date(headerInfo.date).toLocaleDateString(undefined, { dateStyle: 'long' })}</div></div>
+            <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">Supplier / Project:</div><div className="text-sm font-bold border-b border-gray-200 pb-1">{headerInfo.sourceSupplier || '____________________'}</div></div>
           </div>
         </div>
 
-        <table className="w-full border-collapse mb-8">
+        <table className="w-full border-collapse mb-4">
           <thead>
             <tr className="border-y-2 border-gray-900 bg-gray-50">
-              <th className="py-2 px-4 text-left text-[10px] font-black uppercase w-12">No.</th>
-              <th className="py-2 px-4 text-left text-[10px] font-black uppercase">Description</th>
-              <th className="py-2 px-4 text-center text-[10px] font-black uppercase w-16">Unit</th>
-              <th className="py-2 px-4 text-center text-[10px] font-black uppercase w-16">Qty</th>
-              <th className="py-2 px-4 text-right text-[10px] font-black uppercase w-28">Est. Cost</th>
-              <th className="py-2 px-4 text-right text-[10px] font-black uppercase w-28">Total</th>
+              <th className="py-1.5 px-4 text-left text-[10px] font-black uppercase w-12">No.</th>
+              <th className="py-1.5 px-4 text-left text-[10px] font-black uppercase">Description</th>
+              <th className="py-1.5 px-4 text-center text-[10px] font-black uppercase w-16">Unit</th>
+              <th className="py-1.5 px-4 text-center text-[10px] font-black uppercase w-16">Qty</th>
+              <th className="py-1.5 px-4 text-right text-[10px] font-black uppercase w-24">Est. Cost</th>
+              <th className="py-1.5 px-4 text-right text-[10px] font-black uppercase w-24">Total</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {prItems.map((item, idx) => (
               <tr key={item.id} className="border-b border-gray-100">
-                <td className="py-2 px-4 text-[10px] font-bold">{idx + 1}</td>
-                <td className="py-2 px-4 text-[10px] font-bold uppercase">{item.name}</td>
-                <td className="py-2 px-4 text-[10px] text-center uppercase">{item.unit}</td>
-                <td className="py-2 px-4 text-[10px] font-black text-center">{item.quantity}</td>
-                <td className="py-2 px-4 text-right text-[10px] font-mono">₱{(item.estimatedCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                <td className="py-2 px-4 text-right text-[10px] font-black">₱{(item.quantity * item.estimatedCost).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                <td className="py-1.5 px-4 text-[10px] font-bold">{idx + 1}</td>
+                <td className="py-1.5 px-4 text-[10px] font-bold uppercase">{item.name}</td>
+                <td className="py-1.5 px-4 text-[10px] text-center uppercase">{item.unit}</td>
+                <td className="py-1.5 px-4 text-[10px] font-black text-center">{item.quantity}</td>
+                <td className="py-1.5 px-4 text-right text-[10px] font-mono">₱{(item.estimatedCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                <td className="py-1.5 px-4 text-right text-[10px] font-black">₱{(item.quantity * item.estimatedCost).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
               </tr>
             ))}
             <tr className="border-t-2 border-gray-900 bg-gray-50">
-              <td colSpan={5} className="py-3 px-4 text-right text-xs font-black uppercase tracking-widest">Total Estimated Amount:</td>
-              <td className="py-3 px-4 text-right text-base font-black text-blue-700">₱{prItems.reduce((acc, i) => acc + (i.quantity * i.estimatedCost), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+              <td colSpan={5} className="py-2 px-4 text-right text-xs font-black uppercase tracking-widest">Total Estimated Amount:</td>
+              <td className="py-2 px-4 text-right text-sm font-black text-blue-700">₱{prItems.reduce((acc, i) => acc + (i.quantity * i.estimatedCost), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
             </tr>
           </tbody>
         </table>
 
         {headerInfo.remarks && (
-          <div className="mb-12">
+          <div className="mb-6 break-inside-avoid">
             <div className="text-[10px] font-black text-gray-400 uppercase mb-1">Remarks:</div>
-            <div className="text-sm font-medium text-gray-700 whitespace-pre-wrap border border-gray-100 p-4 rounded-lg bg-gray-50/50">
+            <div className="text-xs font-medium text-gray-700 whitespace-pre-wrap border border-gray-100 p-3 rounded-lg bg-gray-50/50">
               {headerInfo.remarks}
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-x-12 gap-y-6 pt-8">
+        <div className="grid grid-cols-2 gap-x-12 gap-y-4 pt-4 break-inside-avoid">
           {['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy'].filter(field => (visibleSignatories as any)[field]).map(field => (
-            <div key={field} className="flex flex-col items-start border-t border-gray-100 pt-2">
-              <div className="w-full text-[9px] font-black text-gray-400 uppercase mb-4">{field.replace(/By$/, ' By')}:</div>
+            <div key={field} className="flex flex-col items-start border-t border-gray-100 pt-2 break-inside-avoid">
+              <div className="w-full text-[9px] font-black text-gray-400 uppercase mb-3">{field.replace(/By$/, ' By')}:</div>
               <div className="w-full">
                 <div className="text-[10px] font-black mb-1 uppercase text-center">{(headerInfo as any)[field] || '____________________'}</div>
                 <div className="border-b-2 border-gray-900 w-full mb-1"></div>
