@@ -133,30 +133,18 @@ export class InternalRequestsService {
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    const issuanceCounts = new Map<string, { ids: string[]; hasNew: boolean }>();
+    const issuanceCounts = new Map<string, string[]>();
     allIssuances.forEach((req) => {
       const key = `${req.productId}-${req.employeeName}`;
       if (!issuanceCounts.has(key)) {
-        issuanceCounts.set(key, { ids: [], hasNew: false });
+        issuanceCounts.set(key, []);
       }
-      issuanceCounts.get(key)?.ids.push(req.id);
-      if (req.supervisor !== 'LEGACY IMPORT') {
-        issuanceCounts.get(key)!.hasNew = true;
-      }
+      issuanceCounts.get(key)?.push(req.id);
     });
 
     const data = sortedRequests.map((req) => {
       const key = `${req.productId}-${req.employeeName}`;
-      const info = issuanceCounts.get(key) || { ids: [], hasNew: false };
-      
-      if (req.supervisor === 'LEGACY IMPORT') {
-        return { ...req, previousIssuancesCount: 0 };
-      }
-      
-      if (!info.hasNew) {
-        return { ...req, previousIssuancesCount: 0 };
-      }
-      
+      const info = issuanceCounts.get(key) || { ids: [] };
       const index = info.ids.indexOf(req.id);
       return { ...req, previousIssuancesCount: index };
     });
