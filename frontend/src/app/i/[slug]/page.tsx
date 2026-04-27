@@ -176,8 +176,13 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
 
       const token = localStorage.getItem('token');
       if (token) {
-        const logsRes = await api.get(`/logs/item/${itemRes.data.id}`);
-        setLogs(logsRes.data);
+        try {
+          const logsRes = await api.get(`/logs/item/${itemRes.data.id}`);
+          setLogs(logsRes.data);
+        } catch (err) {
+          console.error('Failed to load logs, proceeding without them', err);
+          // If token is invalid, we might want to clear it, but for now just proceed
+        }
       }
 
       if (!itemRes.data.locked) {
