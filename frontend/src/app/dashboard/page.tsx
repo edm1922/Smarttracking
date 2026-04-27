@@ -266,6 +266,9 @@ export default function DashboardPage() {
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [loading, setLoading] = useState(true);
   
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<'product' | 'employee' | 'activity'>('product');
 
@@ -281,9 +284,12 @@ export default function DashboardPage() {
       const locRes = await api.get('/locations');
       setLocations(locRes.data);
 
-      const url = selectedLocation === 'all' 
-        ? '/reports/analytics' 
-        : `/reports/analytics?locationId=${selectedLocation}`;
+      let url = selectedLocation === 'all' 
+        ? '/reports/analytics?' 
+        : `/reports/analytics?locationId=${selectedLocation}&`;
+      
+      if (startDate) url += `startDate=${startDate}&`;
+      if (endDate) url += `endDate=${endDate}&`;
       
       const res = await api.get(url);
       setData(res.data);
@@ -296,7 +302,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchData();
-  }, [selectedLocation]);
+  }, [selectedLocation, startDate, endDate]);
 
   if (loading || !data) {
     return (
@@ -358,6 +364,33 @@ export default function DashboardPage() {
               <Eye className="h-3.5 w-3.5" />
               View Reports
             </button>
+            <div className="flex items-center space-x-2 bg-white border border-gray-200 px-3 py-1.5 rounded-xl shadow-sm hover:border-primary/50 transition-colors">
+              <Calendar className="h-3.5 w-3.5 text-primary" />
+              <div className="flex items-center gap-2">
+                <input 
+                  type="date" 
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="text-[10px] font-black bg-transparent border-none outline-none cursor-pointer uppercase text-gray-600 focus:text-primary transition-colors"
+                />
+                <span className="text-[10px] font-black text-gray-300">—</span>
+                <input 
+                  type="date" 
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="text-[10px] font-black bg-transparent border-none outline-none cursor-pointer uppercase text-gray-600 focus:text-primary transition-colors"
+                />
+              </div>
+              {(startDate || endDate) && (
+                <button 
+                  onClick={() => { setStartDate(''); setEndDate(''); }}
+                  className="ml-1 p-1 hover:bg-gray-100 rounded-md transition-colors"
+                  title="Clear Filter"
+                >
+                  <CloseIcon className="h-3 w-3 text-gray-400" />
+                </button>
+              )}
+            </div>
             <div className="flex items-center space-x-2 bg-white border border-gray-200 px-3 py-1.5 rounded-xl shadow-sm hover:border-primary/50 transition-colors">
               <MapPin className="h-3.5 w-3.5 text-primary" />
               <select 

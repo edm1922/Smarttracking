@@ -6,9 +6,19 @@ import { Prisma } from '@prisma/client';
 export class ReportsService {
   constructor(private prisma: PrismaService) {}
 
-  async getAnalytics(locationId?: string) {
+  async getAnalytics(locationId?: string, startDate?: string, endDate?: string) {
+    const dateFilter: Prisma.InternalRequestWhereInput = {};
+    if (startDate || endDate) {
+      dateFilter.date = {};
+      if (startDate) dateFilter.date.gte = new Date(startDate);
+      if (endDate) dateFilter.date.lte = new Date(endDate);
+    }
+
     // 1. Summary Stats
-    const summaryWhere = locationId ? { locationId } : {};
+    const summaryWhere = {
+      ...(locationId ? { locationId } : {}),
+      ...dateFilter,
+    };
     const totalRequests = await this.prisma.internalRequest.count({ where: summaryWhere });
     const fulfilledRequests = await this.prisma.internalRequest.count({
       where: { ...summaryWhere, status: 'FULFILLED' },
@@ -21,12 +31,12 @@ export class ReportsService {
     today.setHours(0, 0, 0, 0);
     const todayRequests = await this.prisma.internalRequest.count({
       where: {
-        ...summaryWhere,
+        ...(locationId ? { locationId } : {}),
         createdAt: { gte: today },
       },
     });
 
-    // 2. Stock Distribution (Sufficient vs Need Restock)
+    // 2. Stock Distribution (Sufficient vs Need Restock) - Not affected by date range as it's current snapshot
     const stockFilter = locationId ? Prisma.sql`WHERE ps."locationId" = ${locationId}` : Prisma.empty;
     const stockRaw = await this.prisma.$queryRaw<any[]>`
       SELECT 
@@ -41,27 +51,40 @@ export class ReportsService {
       { name: 'Need Restock', value: Number(stockRaw[0]?.needRestock || 0) },
     ];
 
-    // 3. Monthly Issuance Trends (Last 6 months)
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    // 3. Monthly Issuance Trends
+    let trendStartDate = new Date();
+    trendStartDate.setMonth(trendStartDate.getMonth() - 6);
+    if (startDate) trendStartDate = new Date(startDate);
+
+    let trendEndDate = new Date();
+    if (endDate) trendEndDate = new Date(endDate);
 
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const monthlyDataMap: Record<string, number> = {};
-    for (let i = 0; i < 6; i++) {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      const key = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+    
+    // Generate months between startDate and endDate
+    let current = new Date(trendStartDate);
+    current.setDate(1);
+    const end = new Date(trendEndDate);
+    end.setDate(1);
+
+    while (current <= end) {
+      const key = `${monthNames[current.getMonth()]} ${current.getFullYear()}`;
       monthlyDataMap[key] = 0;
+      current.setMonth(current.setMonth() + 1);
     }
 
     const irFilter = locationId ? Prisma.sql`AND "locationId" = ${locationId}` : Prisma.empty;
+    const dateSqlFilter = Prisma.sql`AND date >= ${trendStartDate} AND date <= ${trendEndDate}`;
+    
     const monthlyCountsRaw = await this.prisma.$queryRaw<any[]>`
       SELECT 
         TO_CHAR(date, 'FMMon YYYY') as month,
         COUNT(*)::int as count
       FROM "InternalRequest"
-      WHERE status = 'FULFILLED' AND date >= ${sixMonthsAgo}
+      WHERE status = 'FULFILLED'
       ${irFilter}
+      ${dateSqlFilter}
       GROUP BY TO_CHAR(date, 'FMMon YYYY')
     `;
 
@@ -72,10 +95,9 @@ export class ReportsService {
     });
 
     const monthlyTrends = Object.entries(monthlyDataMap)
-      .map(([name, count]) => ({ name, count }))
-      .reverse();
+      .map(([name, count]) => ({ name, count }));
 
-    // 4. Activity Log (Combined)
+    // 4. Activity Log (Combined) - Last 15 events (Snapshot)
     const [transactions, internalReqs, purchaseReqs] = await Promise.all([
       this.prisma.productTransaction.findMany({
         take: 10,
@@ -132,7 +154,9 @@ export class ReportsService {
       SELECT p.name, SUM(ir.quantity)::int as count
       FROM "InternalRequest" ir
       JOIN "Product" p ON ir."productId" = p.id
-      WHERE ir.status = 'FULFILLED' ${locationId ? Prisma.sql`AND ir."locationId" = ${locationId}` : Prisma.empty}
+      WHERE ir.status = 'FULFILLED' 
+      ${locationId ? Prisma.sql`AND ir."locationId" = ${locationId}` : Prisma.empty}
+      AND ir.date >= ${trendStartDate} AND ir.date <= ${trendEndDate}
       GROUP BY p.name
       ORDER BY count DESC
       LIMIT 5
@@ -148,7 +172,9 @@ export class ReportsService {
         SUM(pt.quantity)::int as count
       FROM "ProductTransaction" pt
       JOIN "Product" p ON pt."productId" = p.id
-      WHERE pt.type = 'OUT' ${locationId ? Prisma.sql`AND pt."locationId" = ${locationId}` : Prisma.empty}
+      WHERE pt.type = 'OUT' 
+      ${locationId ? Prisma.sql`AND pt."locationId" = ${locationId}` : Prisma.empty}
+      AND pt."createdAt" >= ${trendStartDate} AND pt."createdAt" <= ${trendEndDate}
       GROUP BY p.id, p.name, p.description
       ORDER BY count DESC
       LIMIT 5
@@ -169,7 +195,9 @@ export class ReportsService {
         SUM(pt.quantity)::int as count
       FROM "ProductTransaction" pt
       LEFT JOIN "User" u ON pt."userId" = u.id
-      WHERE pt.type = 'OUT' ${locationId ? Prisma.sql`AND pt."locationId" = ${locationId}` : Prisma.empty}
+      WHERE pt.type = 'OUT' 
+      ${locationId ? Prisma.sql`AND pt."locationId" = ${locationId}` : Prisma.empty}
+      AND pt."createdAt" >= ${trendStartDate} AND pt."createdAt" <= ${trendEndDate}
       GROUP BY name
       ORDER BY count DESC
       LIMIT 5

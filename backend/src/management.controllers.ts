@@ -100,8 +100,12 @@ export class ReportsController {
   @Get('summary') getSummary() {
     return this.service.getSummary();
   }
-  @Get('analytics') getAnalytics(@Query('locationId') locationId?: string) {
-    return this.service.getAnalytics(locationId);
+  @Get('analytics') getAnalytics(
+    @Query('locationId') locationId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.service.getAnalytics(locationId, startDate, endDate);
   }
   @Get('report-data') getReportData(
     @Query('type') type: string,
