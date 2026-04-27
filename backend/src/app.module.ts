@@ -13,6 +13,8 @@ import { PurchaseRequestsModule } from './purchase-requests/purchase-requests.mo
 import { InternalRequestsModule } from './internal-requests/internal-requests.module';
 import { UsersModule } from './users/users.module';
 import { PullOutRequestsModule } from './pull-out-requests/pull-out-requests.module';
+import { StaffInventoryModule } from './staff-inventory/staff-inventory.module';
+import { ChatModule } from './chat/chat.module';
 
 
 @Module({
@@ -29,6 +31,8 @@ import { PullOutRequestsModule } from './pull-out-requests/pull-out-requests.mod
     InternalRequestsModule,
     UsersModule,
     PullOutRequestsModule,
+    StaffInventoryModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],

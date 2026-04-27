@@ -33,4 +33,11 @@ export class UsersController {
     }
     return this.usersService.remove(id);
   }
+
+  @Get('chat-partners')
+  findChatPartners(@Request() req: any) {
+    const userRole = req.user.role;
+    const targetRole = userRole === 'admin' ? 'inventory' : 'admin';
+    return this.usersService.findByRole(targetRole);
+  }
 }

@@ -17,6 +17,9 @@ model User {
   ActivityLog        ActivityLog[]
   ProductTransaction ProductTransaction[]
   PullOutRequest     PullOutRequest[]
+  StaffInventory     StaffInventory[]
+  StaffRelease       StaffRelease[]
+  StaffActivity      StaffActivity[]
 }
 
 model Item {
@@ -43,21 +46,34 @@ model Item {
   fieldValues  ItemFieldValue[]
   tags         ItemTag[]
   pullOutRequests PullOutRequest[]
+
+  @@index([batchId])
+  @@index([categoryId])
+  @@index([statusId])
 }
 
 model PullOutRequest {
-  id        String   @id @default(uuid())
-  itemId    String
-  userId    String
-  qty       Int
-  unit      String
-  status    String   @default("PENDING") // PENDING, APPROVED, REJECTED
-  remarks   String?
-  imageUrl  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id])
+  id               String   @id @default(uuid())
+  itemId           String
+  userId           String
+  qty              Int
+  unit             String
+  status           String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  remarks          String?
+  imageUrl         String?
+  additionalImages Json?
+  department       String?
+  shift            String?
+  supervisor       String?
+  attachmentUrl    String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  item             Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user             User     @relation(fields: [userId], references: [id])
+
+  @@index([itemId, createdAt])
+  @@index([userId])
+  @@index([status])
 }
 
 model Category {
@@ -143,6 +159,9 @@ model ActivityLog {
   createdAt DateTime @default(now())
   item      Item?    @relation(fields: [itemId], references: [id])
   user      User     @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
 }
 
 model Location {
@@ -196,6 +215,9 @@ model ProductTransaction {
   location   Location @relation(fields: [locationId], references: [id])
   product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   user       User     @relation(fields: [userId], references: [id])
+
+  @@index([productId, createdAt])
+  @@index([locationId, createdAt])
 }
 
 model PurchaseRequest {
@@ -234,8 +256,80 @@ model InternalRequest {
   quantity         Int
   status           String   @default("PENDING")
   remarks          String?
+  attachmentUrl    String?
+  additionalImages Json?
   createdAt        DateTime @default(now())
   location         Location @relation("SourceLocation", fields: [locationId], references: [id])
   targetLocation   Location? @relation("TargetLocation", fields: [targetLocationId], references: [id])
   product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, createdAt])
+  @@index([locationId])
+  @@index([status])
 }
+
+model StaffInventory {
+  id          String   @id @default(uuid())
+  userId      String
+  productName String
+  specs       String   @default("")
+  qty         Int      @default(0)
+  threshold   Int      @default(5)
+  unit        String   @default("pcs")
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id])
+  
+  @@unique([userId, productName, specs])
+}
+
+model StaffActivity {
+  id          String   @id @default(uuid())
+  userId      String
+  action      String   // e.g., "BYPASS_RESTOCK", "PULL_REQUEST", "DELETE_ITEM", "MANUAL_ADJUST"
+  description String
+  productName String?
+  specs       String?
+  qty         Int?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model StaffRelease {
+  id           String   @id @default(uuid())
+  staffId      String
+  employeeName String
+  shift        String
+  department   String
+  supervisor   String
+  productName  String
+  specs        String   @default("")
+  itemSlug     String?
+  qty          Int
+  date         DateTime @default(now())
+  staff        User     @relation(fields: [staffId], references: [id])
+}
+
+model ChatConversation {
+  id            String          @id @default(uuid())
+  participant1 String
+  participant2 String
+  lastMessage  String?
+  updatedAt    DateTime        @updatedAt
+  createdAt     DateTime        @default(now())
+  messages     ChatMessage[]
+
+  @@unique([participant1, participant2])
+}
+
+model ChatMessage {
+  id              String            @id @default(uuid())
+  conversationId  String
+  senderId        String
+  content         String
+  read            Boolean           @default(false)
+  createdAt       DateTime          @default(now())
+  conversation    ChatConversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+

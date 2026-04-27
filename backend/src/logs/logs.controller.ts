@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards, Query } from '@nestjs/common';
 import { LogsService } from './logs.service';
 import { AuthGuard } from '../auth/auth.guard';
 
@@ -8,13 +8,30 @@ export class LogsController {
 
   @Get()
   @UseGuards(AuthGuard)
-  findAll() {
-    return this.logsService.findAll();
+  findAll(
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.logsService.findAll({
+      skip: skip ? parseInt(skip, 10) : 0,
+      take: take ? parseInt(take, 10) : 20,
+      search,
+    });
   }
 
   @Get('item/:itemId')
   @UseGuards(AuthGuard)
-  findByItem(@Param('itemId') itemId: string) {
-    return this.logsService.findByItem(itemId);
+  findByItem(
+    @Param('itemId') itemId: string,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.logsService.findByItem(itemId, {
+      skip: skip ? parseInt(skip, 10) : 0,
+      take: take ? parseInt(take, 10) : 20,
+      search,
+    });
   }
 }

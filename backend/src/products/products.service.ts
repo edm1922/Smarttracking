@@ -9,15 +9,41 @@ export class ProductsService {
     private supabaseService: SupabaseService
   ) {}
 
-  findAll() {
-    return this.prisma.product.findMany({
-      include: {
-        stocks: {
-          include: { location: true },
+  async findAll(params: { skip?: number; take?: number; search?: string } = {}) {
+    const { skip = 0, take = 20, search } = params;
+
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { sku: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.product.findMany({
+        where,
+        skip,
+        take,
+        include: {
+          stocks: {
+            select: {
+              quantity: true,
+              location: {
+                select: {
+                  id: true,
+                  name: true,
+                }
+              }
+            },
+          },
         },
-      },
-      orderBy: { name: 'asc' },
-    });
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.product.count({ where }),
+    ]);
+
+    return { data, total };
   }
 
   async create(data: {

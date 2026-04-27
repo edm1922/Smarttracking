@@ -8,7 +8,11 @@ import {
   UseGuards,
   Req,
   Delete,
+  UseInterceptors,
+  UploadedFile,
+  Query,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { InternalRequestsService } from './internal-requests.service';
 
 @Controller('internal-requests')
@@ -27,9 +31,25 @@ export class InternalRequestsController {
     return this.internalRequestsService.bulkCreate(body.requests);
   }
 
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file'))
+  uploadAttachment(@UploadedFile() file: any) {
+    return this.internalRequestsService.uploadAttachment(file);
+  }
+
   @Get()
-  findAll() {
-    return this.internalRequestsService.findAll();
+  findAll(
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.internalRequestsService.findAll({
+      skip: skip ? parseInt(skip, 10) : 0,
+      take: take ? parseInt(take, 10) : 20,
+      search,
+      status,
+    });
   }
 
   @Patch(':id/status')

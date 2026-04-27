@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { UserPlus, Trash2, Shield, User, Key, Copy, Check, Search, AlertCircle } from 'lucide-react';
 import api from '@/lib/api';
+import { TableSkeleton } from '@/components/ui/LoadingSkeletons';
 
 interface UserData {
   id: string;
@@ -114,7 +115,7 @@ export default function UsersPage() {
           </thead>
           <tbody className="divide-y divide-gray-100 bg-white">
             {loading ? (
-              <tr><td colSpan={4} className="px-6 py-10 text-center text-sm text-gray-400">Loading accounts...</td></tr>
+              <TableSkeleton columns={4} rows={4} />
             ) : filteredUsers.length === 0 ? (
               <tr><td colSpan={4} className="px-6 py-10 text-center text-sm text-gray-400">No users found.</td></tr>
             ) : (

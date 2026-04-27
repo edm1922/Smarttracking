@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, UseGuards, Req, Delete, Query } from '@nestjs/common';
 import { PullOutRequestsService } from './pull-out-requests.service';
 import { AuthGuard } from '../auth/auth.guard';
 
@@ -16,13 +16,43 @@ export class PullOutRequestsController {
   }
 
   @Get()
-  async findAll() {
-    return this.pullOutRequestsService.findAll();
+  async findAll(
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.pullOutRequestsService.findAll({
+      skip: skip ? parseInt(skip, 10) : 0,
+      take: take ? parseInt(take, 10) : 20,
+      search,
+    });
+  }
+
+  @Get('mine')
+  async findMine(
+    @Req() req: any,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.pullOutRequestsService.findByUser(req.user.sub, {
+      skip: skip ? parseInt(skip, 10) : 0,
+      take: take ? parseInt(take, 10) : 20,
+      search,
+    });
   }
 
   @Get('pending')
-  async findAllPending() {
-    return this.pullOutRequestsService.findAllPending();
+  async findAllPending(
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.pullOutRequestsService.findAllPending({
+      skip: skip ? parseInt(skip, 10) : 0,
+      take: take ? parseInt(take, 10) : 20,
+      search,
+    });
   }
 
   @Patch(':id/approve')
@@ -33,5 +63,10 @@ export class PullOutRequestsController {
   @Patch(':id/reject')
   async reject(@Param('id') id: string, @Req() req: any) {
     return this.pullOutRequestsService.reject(id, req.user.sub);
+  }
+
+  @Delete(':id')
+  async remove(@Param('id') id: string) {
+    return this.pullOutRequestsService.remove(id);
   }
 }

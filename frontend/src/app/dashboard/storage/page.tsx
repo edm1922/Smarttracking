@@ -7,6 +7,7 @@ import {
   Eye, QrCode, Clock, Printer, X, Trash2
 } from 'lucide-react';
 import api from '@/lib/api';
+import { TableSkeleton, CardSkeleton } from '@/components/ui/LoadingSkeletons';
 
 interface Batch {
   id: string;
@@ -273,7 +274,7 @@ export default function StoragePage() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {loading ? (
-                  <tr><td colSpan={batchFields.length + 4} className="px-6 py-12 text-center text-sm text-gray-400 animate-pulse">Fetching submissions...</td></tr>
+                  <TableSkeleton columns={batchFields.length + 4} rows={5} />
                 ) : items.length === 0 ? (
                   <tr><td colSpan={batchFields.length + 4} className="px-6 py-12 text-center text-sm text-gray-400 italic">No submissions found for this batch yet.</td></tr>
                 ) : (
@@ -360,7 +361,18 @@ export default function StoragePage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {/* Global Storage */}
+        {loading && viewMode === 'grid' && (
+          <>
+            <CardSkeleton className="h-[250px] rounded-[2.5rem]" />
+            <CardSkeleton className="h-[250px] rounded-[2.5rem]" />
+            <CardSkeleton className="h-[250px] rounded-[2.5rem]" />
+            <CardSkeleton className="h-[250px] rounded-[2.5rem]" />
+          </>
+        )}
+
+        {!loading && (
+          <>
+            {/* Global Storage */}
         <div 
           onClick={() => fetchData()} // Just refresh for now
           className="group relative bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-primary/5 transition-all cursor-pointer"
@@ -414,6 +426,8 @@ export default function StoragePage() {
             </div>
             <p className="text-gray-400 font-medium">No storage folders found matching "{searchTerm}"</p>
           </div>
+        )}
+        </>
         )}
       </div>
     </div>
