@@ -255,7 +255,6 @@ export default function StaffRequisitionPage() {
       const availableInLocation = p.stocks.find(s => s.location?.id === form.locationId)?.quantity || 0;
       return { ...p, totalStock: availableInLocation };
     })
-    .filter(p => p.totalStock! > 0) // Only show items with stock
     .filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.sku.toLowerCase().includes(productSearch.toLowerCase()))
     .sort((a, b) => b.totalStock! - a.totalStock!); // Sort highest quantity to lowest
 

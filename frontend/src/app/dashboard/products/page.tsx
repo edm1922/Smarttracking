@@ -32,6 +32,7 @@ interface Location {
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [searchProducts, setSearchProducts] = useState<Product[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -96,9 +97,14 @@ export default function ProductsPage() {
 
   const fetchInitialData = async () => {
     try {
-      const locsRes = await api.get('/locations');
+      const [locsRes, prodsRes] = await Promise.all([
+        api.get('/locations'),
+        api.get('/products', { params: { take: 1000 } })
+      ]);
+      
       const fetchedLocations = locsRes.data;
       setLocations(fetchedLocations);
+      setSearchProducts(prodsRes.data.data || []);
       
       // Auto-set default locations for forms
       if (fetchedLocations.length > 0) {
@@ -108,7 +114,7 @@ export default function ProductsPage() {
         setStockForm(prev => ({ ...prev, locationId: defaultId }));
       }
     } catch (err) {
-      console.error('Failed to fetch locations', err);
+      console.error('Failed to fetch initial data', err);
     }
   };
 
@@ -172,6 +178,7 @@ export default function ProductsPage() {
         threshold: 0, initialStock: 0, initialLocationId: locations[0]?.id || '' 
       });
       fetchData();
+      fetchInitialData(); // Refresh search list to include new product
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to save product');
     }
@@ -1234,7 +1241,7 @@ export default function ProductsPage() {
                       
                       {releaseSearchInput.length > 0 && (
                         <div className="absolute z-[100] left-0 right-0 mt-3 bg-white border border-gray-100 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] max-h-[400px] overflow-y-auto animate-in fade-in slide-in-from-top-4 duration-300">
-                          {products
+                          {searchProducts
                             .filter(p => 
                               (p.name.toLowerCase().includes(releaseSearchInput.toLowerCase()) || 
                                p.sku.toLowerCase().includes(releaseSearchInput.toLowerCase())) &&
@@ -1271,7 +1278,7 @@ export default function ProductsPage() {
                                 </div>
                               </div>
                             ))}
-                          {products.filter(p => 
+                          {searchProducts.filter(p => 
                             (p.name.toLowerCase().includes(releaseSearchInput.toLowerCase()) || 
                              p.sku.toLowerCase().includes(releaseSearchInput.toLowerCase())) &&
                             !releaseForm.items.find(i => i.productId === p.id)
