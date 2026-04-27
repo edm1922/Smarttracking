@@ -189,7 +189,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       }
 
     } catch (err: any) {
-      setError(err.response?.status === 404 ? 'Item not found' : 'Failed to load item details');
+      setError(err.response?.status === 404 ? 'Item not found' : (err.response?.data?.message || 'Failed to load item details'));
     } finally {
       setLoading(false);
     }

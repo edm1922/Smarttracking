@@ -28,6 +28,7 @@ export class ProductsService {
         include: {
           stocks: {
             select: {
+              locationId: true,
               quantity: true,
               location: {
                 select: {

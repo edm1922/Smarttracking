@@ -115,7 +115,7 @@ export class ItemsService {
     // Always include relevant custom fields for this item's batch so they are viewable even if empty
     const relevantFields = await this.prisma.customField.findMany({
       where: {
-        OR: [{ batchId: item.batchId || 'GLOBAL_FIELDS' }, { batchId: null }],
+        OR: [{ batchId: item.batchId }, { batchId: null }],
       },
     });
 
@@ -131,19 +131,19 @@ export class ItemsService {
         field: f,
       }));
 
-    (item as any).fieldValues = [...item.fieldValues, ...newFieldValues].sort(
-      (a, b) => {
-        const aOrder = a.field?.orderIndex || 0;
-        const bOrder = b.field?.orderIndex || 0;
-        if (aOrder === bOrder) {
-          // Fallback to createdAt or id just to ensure stable sort
-          return a.field?.id.localeCompare(b.field?.id) || 0;
-        }
-        return aOrder - bOrder;
-      },
-    );
+    const allFieldValues = [...item.fieldValues, ...newFieldValues].sort((a, b) => {
+      const aOrder = a.field?.orderIndex ?? 0;
+      const bOrder = b.field?.orderIndex ?? 0;
+      if (aOrder === bOrder) {
+        return (a.field?.id || '').localeCompare(b.field?.id || '');
+      }
+      return aOrder - bOrder;
+    });
 
-    return item;
+    return {
+      ...item,
+      fieldValues: allFieldValues,
+    };
   }
 
   async update(slug: string, data: any, userId: string, userRole: string) {
@@ -392,7 +392,7 @@ export class ItemsService {
         status: item.status,
         fieldValues: item.fieldValues.map(fv => ({
           fieldId: fv.fieldId,
-          name: fv.field.name,
+          name: fv.field?.name || 'Unknown Field',
           value: fv.value
         }))
       });
