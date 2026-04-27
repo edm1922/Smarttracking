@@ -162,7 +162,6 @@ export default function RequestsPage() {
 
   const submitAllDrafts = async () => {
     if (drafts.length === 0) return;
-    if (!form.employeeName) return alert('Please enter employee name');
     
     setIsSubmitting(true);
     try {
@@ -172,6 +171,11 @@ export default function RequestsPage() {
       await Promise.all(drafts.map(draft => 
         api.post('/internal-requests', {
           ...form,
+          employeeName: form.employeeName || 'Admin User',
+          departmentArea: form.departmentArea || 'Admin Area',
+          shift: form.shift || 'N/A',
+          supervisor: form.supervisor || 'Admin',
+          employeeRole: form.employeeRole || 'Admin',
           productId: draft.productId,
           quantity: draft.quantity,
           remarks: draft.remarks,
@@ -369,33 +373,7 @@ export default function RequestsPage() {
             </div>
             
             <div className="p-6 space-y-6">
-              {/* Employee Info Section (Sticky Fields) */}
-              <div className="space-y-4">
-                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center">
-                  <User className="mr-2 h-3 w-3" />
-                  Employee Details
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Request Date</label>
-                    <input type="date" value={form.date || ''} onChange={e => setForm({...form, date: e.target.value})} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-1 ring-primary outline-none" />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Employee Name</label>
-                    <input type="text" placeholder="Juan Dela Cruz" value={form.employeeName || ''} onChange={e => setForm({...form, employeeName: e.target.value})} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-1 ring-primary outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Shift</label>
-                    <input type="text" placeholder="SHIFT 1" value={form.shift || ''} onChange={e => setForm({...form, shift: e.target.value.toUpperCase()})} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-1 ring-primary outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Dept/Area</label>
-                    <input type="text" placeholder="Production" value={form.departmentArea || ''} onChange={e => setForm({...form, departmentArea: e.target.value})} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-1 ring-primary outline-none" />
-                  </div>
-                </div>
-              </div>
 
-              <div className="h-px bg-gray-100" />
 
               {/* Product Entry Section */}
               <div className="space-y-4">
