@@ -36,6 +36,7 @@ export default function ProductsPage() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [stockFilter, setStockFilter] = useState('all');
   
   // Modals state
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -123,7 +124,7 @@ export default function ProductsPage() {
     try {
       const skip = (page - 1) * pageSize;
       const res = await api.get('/products', {
-        params: { skip, take: pageSize, search: debouncedSearch }
+        params: { skip, take: pageSize, search: debouncedSearch, stockFilter }
       });
       setProducts(res.data.data);
       setTotalProducts(res.data.total);
@@ -145,11 +146,11 @@ export default function ProductsPage() {
   useEffect(() => {
     fetchProducts();
     setSelectedIds([]);
-  }, [page, debouncedSearch]);
+  }, [page, debouncedSearch, stockFilter]);
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, stockFilter]);
 
   const handleOpenStockModal = (product: Product, type: 'IN' | 'OUT') => {
     setStockForm({
@@ -479,17 +480,29 @@ export default function ProductsPage() {
         </div>
       )}
 
-      <div className="relative">
-        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-          <Search className="h-5 w-5 text-gray-400" />
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+            <Search className="h-5 w-5 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search stocks by SKU or name..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="block w-full rounded-lg border border-gray-300 bg-white py-3 pl-10 pr-3 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary"
+          />
         </div>
-        <input
-          type="text"
-          placeholder="Search stocks by SKU or name..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="block w-full rounded-md border border-gray-300 bg-white py-3 pl-10 pr-3 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary"
-        />
+        <select
+          value={stockFilter}
+          onChange={(e) => setStockFilter(e.target.value)}
+          className="rounded-lg border border-gray-300 bg-white py-3 pl-4 pr-10 text-sm font-semibold text-gray-700 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+        >
+          <option value="all">All Stocks</option>
+          <option value="high">High Stocks</option>
+          <option value="low">Low Stocks</option>
+          <option value="restock">Needs Restock</option>
+        </select>
       </div>
 
       <div className="table-container overflow-hidden rounded-xl border border-gray-200 bg-white">

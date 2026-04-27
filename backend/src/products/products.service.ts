@@ -9,8 +9,8 @@ export class ProductsService {
     private supabaseService: SupabaseService
   ) {}
 
-  async findAll(params: { skip?: number; take?: number; search?: string } = {}) {
-    const { skip = 0, take = 20, search } = params;
+  async findAll(params: { skip?: number; take?: number; search?: string; stockFilter?: string } = {}) {
+    const { skip = 0, take = 20, search, stockFilter } = params;
 
     const where: any = {};
     if (search) {
@@ -18,6 +18,34 @@ export class ProductsService {
         { name: { contains: search, mode: 'insensitive' } },
         { sku: { contains: search, mode: 'insensitive' } },
       ];
+    }
+
+    if (stockFilter && stockFilter !== 'all') {
+      const allProducts = await this.prisma.product.findMany({
+        where,
+        include: {
+          stocks: {
+            select: {
+              locationId: true,
+              quantity: true,
+              location: { select: { id: true, name: true } }
+            },
+          },
+        },
+        orderBy: { name: 'asc' },
+      });
+
+      const filtered = allProducts.filter(p => {
+        const totalStock = p.stocks.reduce((sum, s) => sum + s.quantity, 0);
+        if (stockFilter === 'restock') return totalStock < p.threshold;
+        if (stockFilter === 'low') return totalStock === p.threshold;
+        if (stockFilter === 'high') return totalStock > p.threshold;
+        return true;
+      });
+
+      const total = filtered.length;
+      const data = filtered.slice(skip, skip + take);
+      return { data, total };
     }
 
     const [data, total] = await Promise.all([
