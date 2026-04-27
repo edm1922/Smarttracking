@@ -90,6 +90,11 @@ export class InternalRequestsController {
     return this.internalRequestsService.remove(id);
   }
 
+  @Get('employees')
+  getEmployees() {
+    return this.internalRequestsService.getUniqueEmployees();
+  }
+
   @Post('bulk-delete')
   bulkRemove(@Body() body: { ids: string[] }) {
     return this.internalRequestsService.bulkRemove(body.ids);

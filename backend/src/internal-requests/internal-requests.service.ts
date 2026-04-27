@@ -377,4 +377,13 @@ export class InternalRequestsService {
     }
     return results;
   }
+
+  async getUniqueEmployees() {
+    const employees = await this.prisma.internalRequest.findMany({
+      select: { employeeName: true },
+      distinct: ['employeeName'],
+      orderBy: { employeeName: 'asc' },
+    });
+    return employees.map(e => e.employeeName);
+  }
 }
