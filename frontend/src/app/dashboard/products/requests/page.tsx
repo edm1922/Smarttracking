@@ -8,6 +8,13 @@ import {
 import api from '@/lib/api';
 import { TableSkeleton, Spinner } from '@/components/ui/LoadingSkeletons';
 
+function getOrdinal(n: number): string {
+  if (n === 1) return '1st';
+  if (n === 2) return '2nd';
+  if (n === 3) return '3rd';
+  return `${n}th`;
+}
+
 interface Request {
   id: string;
   requestNo: string;
@@ -320,7 +327,7 @@ export default function RequestsPage() {
                   <td>${r.shift}</td>
                   <td>${r.product.name}</td>
                   <td>${r.quantity}</td>
-                  <td>${(r.previousIssuancesCount || 0) + 1 === 1 ? 'First Issuance' : `${(r.previousIssuancesCount || 0) + 1}th Issuance`}</td>
+                  <td>${(r.previousIssuancesCount || 0) + 1 === 1 ? 'First Issuance' : `${getOrdinal((r.previousIssuancesCount || 0) + 1)} Issuance`}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -473,7 +480,7 @@ export default function RequestsPage() {
                           <span className={`text-[9px] font-black px-1.5 rounded-full ${
                             (req.previousIssuancesCount || 0) === 0 ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'
                           }`}>
-                            {(req.previousIssuancesCount || 0) + 1 === 1 ? '1st Issuance' : `${(req.previousIssuancesCount || 0) + 1}th Issuance`}
+                            {(req.previousIssuancesCount || 0) + 1 === 1 ? '1st Issuance' : `${getOrdinal((req.previousIssuancesCount || 0) + 1)} Issuance`}
                           </span>
                         </div>
                       </td>
