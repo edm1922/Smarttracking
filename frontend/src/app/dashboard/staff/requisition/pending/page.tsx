@@ -25,6 +25,7 @@ export default function PendingRequestsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
+  const [sortFilter, setSortFilter] = useState<string>('status-asc');
 
   const fetchRequests = async () => {
     try {
@@ -75,13 +76,28 @@ export default function PendingRequestsPage() {
       r.product.name.toLowerCase().includes(searchTerm.toLowerCase())
     )
     .sort((a, b) => {
-      const statusOrder: Record<string, number> = {
-        'PENDING': 1,
-        'APPROVED': 2,
-        'FULFILLED': 3,
-        'REJECTED': 4,
-      };
-      return (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99);
+      if (sortFilter === 'status-asc') {
+        const statusOrder: Record<string, number> = {
+          'PENDING': 1,
+          'APPROVED': 2,
+          'FULFILLED': 3,
+          'REJECTED': 4,
+        };
+        return (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99);
+      } else if (sortFilter === 'status-desc') {
+        const statusOrder: Record<string, number> = {
+          'PENDING': 4,
+          'APPROVED': 3,
+          'FULFILLED': 2,
+          'REJECTED': 1,
+        };
+        return (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99);
+      } else if (sortFilter === 'date-asc') {
+        return new Date(a.date).getTime() - new Date(b.date).getTime();
+      } else if (sortFilter === 'date-desc') {
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      }
+      return 0;
     });
 
   return (
@@ -103,6 +119,16 @@ export default function PendingRequestsPage() {
               className="w-full rounded-xl border border-gray-200 pl-11 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all bg-white"
             />
           </div>
+          <select
+            value={sortFilter}
+            onChange={(e) => setSortFilter(e.target.value)}
+            className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all bg-white"
+          >
+            <option value="status-asc">Pending First</option>
+            <option value="status-desc">Pending Last</option>
+            <option value="date-desc">Newest First</option>
+            <option value="date-asc">Oldest First</option>
+          </select>
         </div>
 
         <div className="overflow-x-auto">
