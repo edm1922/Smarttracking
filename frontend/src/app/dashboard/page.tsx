@@ -9,7 +9,8 @@ import {
 } from 'recharts';
 import { 
   Box, Users, User, TrendingUp, Activity, Filter, Calendar, MapPin, 
-  ChevronRight, ArrowUpRight, ArrowDownRight, Package, ClipboardList, ShoppingCart
+  ChevronRight, ArrowUpRight, ArrowDownRight, Package, ClipboardList, ShoppingCart,
+  RefreshCw, Loader2
 } from 'lucide-react';
 import api from '@/lib/api';
 import { Printer, Eye, X as CloseIcon } from 'lucide-react';
@@ -265,6 +266,7 @@ export default function DashboardPage() {
   const [locations, setLocations] = useState<any[]>([]);
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -280,6 +282,7 @@ export default function DashboardPage() {
   }, [router]);
 
   const fetchData = async () => {
+    setIsRefreshing(true);
     try {
       const locRes = await api.get('/locations');
       setLocations(locRes.data);
@@ -297,6 +300,7 @@ export default function DashboardPage() {
       console.error('Failed to fetch analytics', err);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -327,7 +331,10 @@ export default function DashboardPage() {
       {/* Top Header Summary */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-gray-100 pb-10">
         <div>
-          <h1 className="text-4xl font-black text-gray-900 tracking-tight">System Intelligence</h1>
+          <h1 className="text-4xl font-black text-gray-900 tracking-tight flex items-center">
+            System Intelligence
+            {isRefreshing && <RefreshCw className="ml-4 h-6 w-6 text-primary animate-spin" />}
+          </h1>
           <p className="text-sm text-gray-500 font-medium mt-1">Real-time reports and organizational requisition trends</p>
         </div>
         <div className="flex items-center bg-white p-1.5 rounded-2xl border border-gray-200 shadow-sm">
@@ -351,7 +358,15 @@ export default function DashboardPage() {
       </div>
 
       {/* SECTION 1: PRODUCT REPORTS */}
-      <section className="space-y-6">
+      <section className="space-y-6 relative">
+        {isRefreshing && (
+          <div className="absolute inset-0 z-10 bg-white/40 backdrop-blur-[1px] flex items-center justify-center rounded-3xl animate-in fade-in duration-300">
+            <div className="bg-white p-4 rounded-2xl shadow-xl flex items-center gap-3 border border-gray-100">
+              <Loader2 className="h-5 w-5 text-primary animate-spin" />
+              <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Syncing Records...</span>
+            </div>
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.25em] flex items-center">
             <Box className="mr-2 h-4 w-4 text-primary" /> SECTION 01: STOCK & INVENTORY INTELLIGENCE
@@ -588,7 +603,15 @@ export default function DashboardPage() {
       </section>
 
       {/* SECTION 2: SYSTEM ACTIVITY & STOCK LOGS */}
-      <section className="space-y-6 pt-12 border-t border-gray-100">
+      <section className="space-y-6 pt-12 border-t border-gray-100 relative">
+        {isRefreshing && (
+          <div className="absolute inset-0 z-10 bg-white/40 backdrop-blur-[1px] flex items-center justify-center rounded-3xl animate-in fade-in duration-300">
+            <div className="bg-white p-4 rounded-2xl shadow-xl flex items-center gap-3 border border-gray-100">
+              <Loader2 className="h-5 w-5 text-primary animate-spin" />
+              <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Syncing Records...</span>
+            </div>
+          </div>
+        )}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.25em] flex items-center">
             <Activity className="mr-2 h-4 w-4 text-purple-600" /> SECTION 02: SYSTEM ACTIVITY & STOCK LOGS
