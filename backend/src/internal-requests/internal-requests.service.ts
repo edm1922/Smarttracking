@@ -128,6 +128,8 @@ export class InternalRequestsService {
     return { data, total };
   }
 
+  private cachedAdminId: string | null = null;
+
   async updateStatus(
     id: string,
     status: string,
@@ -145,13 +147,17 @@ export class InternalRequestsService {
 
     let validUserId = userId;
     if (userId === 'admin-system' || userId === 'system-delete') {
-      const admin = await p.user.findFirst({ where: { role: 'admin' } });
-      if (admin) {
-        validUserId = admin.id;
+      if (this.cachedAdminId) {
+        validUserId = this.cachedAdminId;
       } else {
-        // Fallback: get any user, or throw error if no users exist
-        const anyUser = await p.user.findFirst();
-        if (anyUser) validUserId = anyUser.id;
+        const admin = await this.prisma.user.findFirst({ where: { role: 'admin' } });
+        if (admin) {
+          validUserId = admin.id;
+          this.cachedAdminId = admin.id;
+        } else {
+          const anyUser = await this.prisma.user.findFirst();
+          if (anyUser) validUserId = anyUser.id;
+        }
       }
     }
 
@@ -169,7 +175,7 @@ export class InternalRequestsService {
 
       if (!stock || stock.quantity < request.quantity) {
         throw new BadRequestException(
-          'Insufficient stock in the selected location',
+          `Insufficient stock for ${request.product.name} in ${request.location.name}`,
         );
       }
 
@@ -219,7 +225,7 @@ export class InternalRequestsService {
               quantity: request.quantity,
               type: 'IN',
               remarks: `Received via Transfer from ${request.location.name} (Req ${request.requestNo})`,
-              userId: userId,
+              userId: validUserId,
             },
           });
         }
@@ -234,7 +240,7 @@ export class InternalRequestsService {
       if (txOverride) {
         return fulfillLogic(txOverride);
       } else {
-        return this.prisma.$transaction(async (tx) => fulfillLogic(tx));
+        return this.prisma.$transaction(async (tx) => fulfillLogic(tx), { timeout: 15000 });
       }
     }
 
@@ -284,7 +290,7 @@ export class InternalRequestsService {
               quantity: request.quantity,
               type: 'OUT',
               remarks: `Transfer REVERSED (Req ${request.requestNo})`,
-              userId: userId,
+              userId: validUserId,
             },
           });
         }
@@ -299,7 +305,7 @@ export class InternalRequestsService {
       if (txOverride) {
         return undoLogic(txOverride);
       } else {
-        return this.prisma.$transaction(async (tx) => undoLogic(tx));
+        return this.prisma.$transaction(async (tx) => undoLogic(tx), { timeout: 15000 });
       }
     }
 
@@ -316,18 +322,15 @@ export class InternalRequestsService {
     remarks?: string,
   ) {
     if (status === 'FULFILLED') {
-      // Bulk fulfillment requires individual stock checks and transaction logging
-      return this.prisma.$transaction(
-        async (tx) => {
-          const results = [];
-          for (const id of ids) {
-            const res = await this.updateStatus(id, status, userId, remarks, tx);
-            results.push(res);
-          }
-          return results;
-        },
-        { timeout: 60000 },
+      // Bulk fulfillment can be slow in a single transaction.
+      // We'll process them in parallel with individual transactions to prevent pool exhaustion.
+      const results = await Promise.all(
+        ids.map(id => 
+          this.updateStatus(id, status, userId, remarks)
+            .catch(err => ({ error: true, id, message: err.message }))
+        )
       );
+      return results;
     }
 
     // For other statuses (APPROVED, REJECTED), we can do a simple updateMany
