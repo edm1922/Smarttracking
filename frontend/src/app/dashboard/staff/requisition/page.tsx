@@ -58,6 +58,8 @@ export default function StaffRequisitionPage() {
   // Multiple Employees state
   const [employeeInput, setEmployeeInput] = useState('');
   const [employees, setEmployees] = useState<string[]>([]);
+  const [existingEmployees, setExistingEmployees] = useState<string[]>([]);
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   
   // Cart state
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
@@ -72,10 +74,13 @@ export default function StaffRequisitionPage() {
 
   const fetchData = async () => {
     try {
-      const [prodsRes, locsRes] = await Promise.all([
+      const [prodsRes, locsRes, empRes] = await Promise.all([
         api.get('/products', { params: { take: 1000 } }),
-        api.get('/locations')
+        api.get('/locations'),
+        api.get('/internal-requests/employees')
       ]);
+      
+      setExistingEmployees(empRes.data || []);
       
       const locs = locsRes.data;
       setLocations(locs);
@@ -101,9 +106,29 @@ export default function StaffRequisitionPage() {
     const trimmed = employeeInput.trim();
     if (trimmed && !employees.includes(trimmed)) {
       setEmployees([...employees, trimmed]);
+      setEmployeeInput('');
+      setShowEmployeeDropdown(false);
+    }
+  };
+
+  const handleEmployeeInputChange = (value: string) => {
+    setEmployeeInput(value);
+    setShowEmployeeDropdown(value.length > 0);
+  };
+
+  const selectExistingEmployee = (name: string) => {
+    if (!employees.includes(name)) {
+      setEmployees([...employees, name]);
     }
     setEmployeeInput('');
+    setShowEmployeeDropdown(false);
   };
+
+  const filteredExistingEmployees = existingEmployees.filter(
+    (name: string) =>
+      name.toLowerCase().includes(employeeInput.toLowerCase()) &&
+      !employees.includes(name)
+  );
 
   const removeEmployee = (nameToRemove: string) => {
     setEmployees(employees.filter(name => name !== nameToRemove));
@@ -306,19 +331,34 @@ export default function StaffRequisitionPage() {
                   {/* MULTIPLE EMPLOYEES TAGGING */}
                   <div className="col-span-2 space-y-2">
                     <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Employee Names (Multiple)</label>
-                    <div className="flex gap-2">
+                    <div className="relative">
                       <input 
                         type="text" 
                         placeholder="Type employee name & press Add..." 
                         value={employeeInput} 
-                        onChange={e => setEmployeeInput(e.target.value)}
+                        onChange={e => handleEmployeeInputChange(e.target.value)}
+                        onFocus={() => employeeInput.length > 0 && setShowEmployeeDropdown(true)}
                         onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addEmployee())}
-                        className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all" 
+                        className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all" 
                       />
-                      <button onClick={addEmployee} type="button" className="px-5 py-2.5 bg-gray-100 text-gray-700 font-bold text-xs rounded-xl hover:bg-gray-200 transition-colors">
-                        Add
-                      </button>
+                      {showEmployeeDropdown && filteredExistingEmployees.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-40 overflow-y-auto">
+                          {filteredExistingEmployees.map((name: string) => (
+                            <button
+                              key={name}
+                              type="button"
+                              onClick={() => selectExistingEmployee(name)}
+                              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors"
+                            >
+                              {name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
+                    <button onClick={addEmployee} type="button" className="px-5 py-2.5 bg-gray-100 text-gray-700 font-bold text-xs rounded-xl hover:bg-gray-200 transition-colors">
+                      Add
+                    </button>
                     
                     {employees.length > 0 && (
                       <div className="flex flex-wrap gap-2 pt-2">
