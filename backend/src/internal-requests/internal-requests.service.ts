@@ -143,16 +143,11 @@ export class InternalRequestsService {
     });
 
     const data = sortedRequests.map((req) => {
-      const key = `${req.productId}-${req.employeeName}`;
-      const info = issuanceCounts.get(key) || { ids: [] };
-      const index = info.ids.indexOf(req.id);
-      return { ...req, previousIssuancesCount: index };
+      return { ...req, previousIssuancesCount: 0 };
     });
 
     return { data, total };
   }
-
-  private cachedAdminId: string | null = null;
 
   async updateStatus(
     id: string,
