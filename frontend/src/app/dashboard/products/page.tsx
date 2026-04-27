@@ -421,6 +421,23 @@ export default function ProductsPage() {
     window.location.href = '/dashboard/transmittal';
   };
 
+  const handleBulkPR = () => {
+    const selectedProducts = products.filter(p => selectedIds.includes(p.id));
+    const prItems = selectedProducts.map(p => {
+      const currentStock = getTotalStock(p);
+      const neededQty = p.threshold > currentStock ? p.threshold - currentStock : 1;
+      return {
+        id: Math.random().toString(36).substr(2, 9),
+        name: `${p.name} [Stock: ${currentStock}]`,
+        unit: p.unit || 'PCS',
+        quantity: neededQty,
+        estimatedCost: p.price || 0
+      };
+    });
+    localStorage.setItem('pending_pr_items', JSON.stringify(prItems));
+    window.location.href = '/dashboard/transmittal/purchase-request';
+  };
+
   return (
     <div className="space-y-8 relative">
       <div className="flex items-center justify-between">
@@ -468,6 +485,12 @@ export default function ProductsPage() {
               className="flex items-center text-sm font-bold hover:text-primary transition-colors"
             >
               <Plus className="h-4 w-4 mr-2" /> Create Transmittal
+            </button>
+            <button 
+              onClick={handleBulkPR}
+              className="flex items-center text-sm font-bold text-green-400 hover:text-green-300 transition-colors"
+            >
+              <Plus className="h-4 w-4 mr-2" /> Create PR
             </button>
             <button 
               onClick={handleBulkDelete}

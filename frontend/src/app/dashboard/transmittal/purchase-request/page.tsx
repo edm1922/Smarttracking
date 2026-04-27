@@ -98,6 +98,12 @@ export default function PRTransmittalPage() {
           date: new Date().toLocaleDateString('en-CA')
         }));
       }
+
+      const pendingPrItems = localStorage.getItem('pending_pr_items');
+      if (pendingPrItems) {
+        setPrItems(JSON.parse(pendingPrItems));
+        localStorage.removeItem('pending_pr_items');
+      }
     };
 
     fetchPrHistory();
