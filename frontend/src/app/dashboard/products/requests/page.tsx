@@ -38,6 +38,7 @@ interface DraftItem {
   sku: string;
   quantity: number;
   remarks: string;
+  targetLocationId?: string;
 }
 
 interface Product {
@@ -174,7 +175,7 @@ export default function RequestsPage() {
           productId: draft.productId,
           quantity: draft.quantity,
           remarks: draft.remarks,
-          targetLocationId: (draft as any).targetLocationId
+          targetLocationId: draft.targetLocationId
         })
       ));
       
