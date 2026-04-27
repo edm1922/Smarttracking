@@ -40,7 +40,7 @@ model Item {
   unit         String?          @default("pcs")
   trackingType String           @default("INDIVIDUAL")
   ActivityLog  ActivityLog[]
-  batch        Batch?           @relation(fields: [batchId], references: [id])
+  batch        Batch?           @relation(fields: [batchId], references: [id], onDelete: Cascade)
   category     Category?        @relation(fields: [categoryId], references: [id])
   statusRef    Status?          @relation(fields: [statusId], references: [id])
   fieldValues  ItemFieldValue[]
@@ -136,7 +136,7 @@ model CustomField {
   createdAt   DateTime         @default(now())
   batchId     String?
   orderIndex  Int              @default(0)
-  batch       Batch?           @relation(fields: [batchId], references: [id])
+  batch       Batch?           @relation(fields: [batchId], references: [id], onDelete: Cascade)
   fieldValues ItemFieldValue[]
 }
 
@@ -157,7 +157,7 @@ model ActivityLog {
   action    String
   changes   Json?
   createdAt DateTime @default(now())
-  item      Item?    @relation(fields: [itemId], references: [id])
+  item      Item?    @relation(fields: [itemId], references: [id], onDelete: SetNull)
   user      User     @relation(fields: [userId], references: [id])
 
   @@index([createdAt])
