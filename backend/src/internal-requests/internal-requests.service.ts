@@ -8,6 +8,8 @@ import { SupabaseService } from '../prisma/supabase.service';
 
 @Injectable()
 export class InternalRequestsService {
+  private cachedAdminId: string | null = null;
+  
   constructor(
     private prisma: PrismaService,
     private supabaseService: SupabaseService,
@@ -101,23 +103,6 @@ export class InternalRequestsService {
               name: true,
             }
           },
-        },
-        select: {
-          id: true,
-          requestNo: true,
-          date: true,
-          employeeName: true,
-          employeeRole: true,
-          departmentArea: true,
-          shift: true,
-          supervisor: true,
-          quantity: true,
-          status: true,
-          remarks: true,
-          createdAt: true,
-          product: true,
-          location: true,
-          targetLocation: true,
         },
       }),
       this.prisma.internalRequest.count({ where }),

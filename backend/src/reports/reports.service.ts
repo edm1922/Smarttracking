@@ -71,7 +71,7 @@ export class ReportsService {
     while (current <= end) {
       const key = `${monthNames[current.getMonth()]} ${current.getFullYear()}`;
       monthlyDataMap[key] = 0;
-      current.setMonth(current.setMonth() + 1);
+      current.setMonth(current.getMonth() + 1);
     }
 
     const irFilter = locationId ? Prisma.sql`AND "locationId" = ${locationId}` : Prisma.empty;
