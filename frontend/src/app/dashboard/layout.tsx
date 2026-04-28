@@ -76,7 +76,6 @@ useEffect(() => {
       ]
     },
     { name: 'My Inventory', href: '/dashboard/staff/inventory', icon: Database },
-    { name: 'Pull Requests', href: '/dashboard/products/requests', icon: ClipboardList },
   ];
 
   const inventoryItems = [
