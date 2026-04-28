@@ -420,16 +420,30 @@ export default function UnitTrackingPage() {
                   <button 
                     onClick={handleBulkReject}
                     disabled={processingId === 'bulk'}
-                    className="px-4 py-2 bg-gray-50 text-gray-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-50 hover:text-red-600 transition-all disabled:opacity-50"
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-50 hover:text-red-600 transition-all disabled:opacity-50"
                   >
-                    Reject Selected
+                    {processingId === 'bulk' ? (
+                      <>
+                        <div className="h-3 w-3 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      'Reject Selected'
+                    )}
                   </button>
                   <button 
                     onClick={handleBulkApprove}
                     disabled={processingId === 'bulk'}
-                    className="px-6 py-2 bg-gray-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                    className="flex items-center gap-2 px-6 py-2 bg-gray-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-all shadow-lg active:scale-95 disabled:opacity-50"
                   >
-                    Approve Selected
+                    {processingId === 'bulk' ? (
+                      <>
+                        <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      'Approve Selected'
+                    )}
                   </button>
                </div>
             </div>
