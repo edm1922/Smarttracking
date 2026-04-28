@@ -133,9 +133,19 @@ function UnitRequisitionContent() {
       setMyRequests(res.data.data);
       setTotalRequests(res.data.total);
     } catch (err) {
-      console.error('Failed to fetch my requests', err);
+      console.error('Failed to fetch pull out requests', err);
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  const handleDeleteRequest = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this pending scan?')) return;
+    try {
+      await api.delete(`/pull-out-requests/${id}`);
+      fetchMyRequests();
+    } catch (err) {
+      alert('Failed to delete request');
     }
   };
 
@@ -543,27 +553,36 @@ function UnitRequisitionContent() {
                             <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{item.qty} {item.unit}</p>
                           </div>
                         </div>
-                        <button 
-                          onClick={() => {
-                            const cartItem: CartItem = {
-                              id: item.id,
-                              slug: item.item?.slug || item.itemId,
-                              productName: item.item?.name,
-                              manualSlug: item.item?.slug || item.itemId,
-                              qty: item.qty,
-                              imagePreview: null,
-                              referencePreview: item.imageUrl,
-                              status: 'success'
-                            };
-                            setCart(prev => [...prev, cartItem]);
-                            if (item.supervisor && !form.supervisorName) {
-                              setForm(prev => ({ ...prev, supervisorName: item.supervisor }));
-                            }
-                          }}
-                          className="px-4 py-2 bg-orange-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-orange-900/20 active:scale-95 transition-all flex items-center gap-2"
-                        >
-                          <Plus className="h-3 w-3" /> Add to Form
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => handleDeleteRequest(item.id)}
+                            className="p-2.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                            title="Delete Request"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                          <button 
+                            onClick={() => {
+                              const cartItem: CartItem = {
+                                id: item.id,
+                                slug: item.item?.slug || item.itemId,
+                                productName: item.item?.name,
+                                manualSlug: item.item?.slug || item.itemId,
+                                qty: item.qty,
+                                imagePreview: null,
+                                referencePreview: item.imageUrl,
+                                status: 'success'
+                              };
+                              setCart(prev => [...prev, cartItem]);
+                              if (item.supervisor && !form.supervisorName) {
+                                setForm(prev => ({ ...prev, supervisorName: item.supervisor }));
+                              }
+                            }}
+                            className="px-4 py-2 bg-orange-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-orange-900/20 active:scale-95 transition-all flex items-center gap-2"
+                          >
+                            <Plus className="h-3 w-3" /> Add to Form
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
