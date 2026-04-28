@@ -164,20 +164,6 @@ const pageSize = 20;
     }
   };
 
-  const fetchInventory = async () => {
-    try {
-      const skip = (invPage - 1) * pageSize;
-      const res = await api.get('/items/unit-inventory', { params: { skip, take: pageSize } });
-      console.log('Unit Inventory Data:', res.data);
-      setInventory(res.data.data || []);
-      setInvTotal(res.data.total || 0);
-    } catch (err) {
-      console.error('Failed to fetch unit inventory', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const totalUnitsAvailable = useMemo(() => 
     inventory.reduce((acc, p) => acc + p.totalQty, 0), 
     [inventory]
