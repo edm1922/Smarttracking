@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { 
   Boxes, Package, Search, Filter, ArrowRight, 
-  ChevronRight, ChevronDown, ChevronUp, History,
+  ChevronRight, ChevronLeft, ChevronDown, ChevronUp, History,
   TrendingDown, TrendingUp, AlertTriangle, Box,
   QrCode, Clock, User, ArrowUpRight, Check, X, Truck, Activity, FileText, Printer, LayoutGrid, Trash2
 } from 'lucide-react';
@@ -49,6 +49,7 @@ export default function UnitTrackingPage() {
   const [invTotal, setInvTotal] = useState(0);
   const pageSize = 100;
   const debouncedLogSearch = useDebounce(logSearch, 300);
+  const debouncedInventorySearch = useDebounce(searchTerm, 300);
 
   const { steps, setStepDone, setStepLabel } = useLoadingSteps([
     'Fetching pull-out requests',
@@ -72,7 +73,7 @@ export default function UnitTrackingPage() {
     if (user) {
       setTransmittalHeader(prev => ({ ...prev, preparedBy: user }));
     }
-  }, [invPage, page, debouncedLogSearch]);
+  }, [invPage, page, debouncedLogSearch, debouncedInventorySearch]);
 
   const fetchRequests = async () => {
     try {
@@ -90,7 +91,7 @@ export default function UnitTrackingPage() {
   const fetchInventory = async () => {
     try {
       const skip = (invPage - 1) * pageSize;
-      const res = await api.get('/items/unit-inventory', { params: { skip, take: pageSize } });
+      const res = await api.get('/items/unit-inventory', { params: { skip, take: pageSize, search: debouncedInventorySearch } });
       console.log('Unit Inventory Data:', res.data);
       setInventory(res.data.data || []);
       setInvTotal(res.data.total || 0);
@@ -103,6 +104,10 @@ export default function UnitTrackingPage() {
   useEffect(() => {
     setPage(1);
   }, [debouncedLogSearch]);
+
+  useEffect(() => {
+    setInvPage(1);
+  }, [debouncedInventorySearch]);
 
   const handleApprove = async (id: string) => {
     if (!confirm('Are you sure you want to approve this pull-out? It will deduct stock immediately.')) return;
@@ -220,9 +225,7 @@ export default function UnitTrackingPage() {
   };
 
 
-  const filteredInventory = inventory.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredInventory = inventory;
 
   const toggleFilter = (productName: string, specKey: string, specValue: string) => {
     setProductFilters(prev => {
@@ -828,6 +831,34 @@ export default function UnitTrackingPage() {
             </div>
           )}
         </div>
+
+        {/* Inventory Pagination */}
+        {invTotal > pageSize && (
+          <div className="flex items-center justify-between bg-white p-6 rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/50 mt-8">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+              Showing <span className="text-gray-900">{inventory.length}</span> of <span className="text-gray-900">{invTotal}</span> products
+            </p>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setInvPage(prev => Math.max(1, prev - 1))}
+                disabled={invPage === 1}
+                className="p-3 bg-gray-50 text-gray-400 rounded-xl hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <div className="px-6 flex items-center justify-center bg-gray-900 text-white rounded-xl text-sm font-black">
+                Page {invPage}
+              </div>
+              <button 
+                onClick={() => setInvPage(prev => prev + 1)}
+                disabled={invPage * pageSize >= invTotal}
+                className="p-3 bg-gray-50 text-gray-400 rounded-xl hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     )}
 
