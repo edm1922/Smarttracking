@@ -37,7 +37,7 @@ interface CartItem {
   manualSlug: string;
   qty: number;
   unit: string;
-  status: 'pending' | 'scanning' | 'success' | 'manual';
+  status: 'pending' | 'scanning' | 'searching' | 'success' | 'manual';
 }
 
 export default function UnitRequisitionPage() {
@@ -152,10 +152,11 @@ function UnitRequisitionContent() {
 
   useEffect(() => {
     const fetchNames = async () => {
-      const itemsToFetch = cart.filter(item => item.manualSlug && !item.productName && item.status !== 'scanning');
+      const itemsToFetch = cart.filter(item => item.manualSlug && item.manualSlug.length > 3 && !item.productName && item.status !== 'scanning' && item.status !== 'searching');
       
       for (const item of itemsToFetch) {
         try {
+          updateCartItem(item.id, { status: 'searching' });
           const res = await api.get(`/items/${item.manualSlug}`);
           if (res.data) {
             updateCartItem(item.id, { 
@@ -163,9 +164,11 @@ function UnitRequisitionContent() {
               unit: res.data.unit || 'pcs',
               status: 'success'
             });
+          } else {
+            updateCartItem(item.id, { status: 'manual' });
           }
         } catch (err) {
-          // If not found, we don't alert to avoid annoying the user while typing
+          updateCartItem(item.id, { status: 'manual' });
           console.error(`Item not found: ${item.manualSlug}`);
         }
       }
@@ -734,7 +737,12 @@ function UnitRequisitionContent() {
                                <div className="col-span-2">
                                   <div className="flex items-center justify-between mb-1.5 ml-1">
                                      <label className="block text-[9px] font-black text-gray-400 uppercase">QR ID (Manual / Auto)</label>
-                                     {item.productName && (
+                                     {item.status === 'searching' && (
+                                        <span className="text-[10px] font-black text-blue-500 uppercase animate-pulse">
+                                          Searching...
+                                        </span>
+                                      )}
+                                      {item.productName && (
                                        <span className="text-[10px] font-black text-primary uppercase animate-in fade-in zoom-in duration-300">
                                          {item.productName}
                                        </span>
