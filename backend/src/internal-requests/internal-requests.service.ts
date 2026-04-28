@@ -85,54 +85,42 @@ export class InternalRequestsService {
         orderBy: { createdAt: 'desc' },
         include: {
           product: {
-            select: {
-              id: true,
-              name: true,
-              sku: true,
-            }
+            select: { id: true, name: true, sku: true },
           },
           location: {
-            select: {
-              id: true,
-              name: true,
-            }
+            select: { id: true, name: true },
           },
           targetLocation: {
-            select: {
-              id: true,
-              name: true,
-            }
+            select: { id: true, name: true },
           },
         },
       }),
       this.prisma.internalRequest.count({ where }),
     ]);
 
-    const allIssuances = await this.prisma.internalRequest.findMany({
+    // OPTIMIZED: Use groupBy for total fulfilled counts instead of loading full history
+    const issuanceCounts = await this.prisma.internalRequest.groupBy({
+      by: ['productId', 'employeeName'],
       where: { status: 'FULFILLED' },
-      select: { id: true, productId: true, employeeName: true, date: true, supervisor: true },
-      orderBy: { date: 'asc' },
+      _count: {
+        productId: true,
+      },
     });
 
-    const sortedRequests = [...requests].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
-
-    const issuanceCounts = new Map<string, string[]>();
-    allIssuances.forEach((req) => {
-      const key = `${req.productId}-${req.employeeName}`;
-      if (!issuanceCounts.has(key)) {
-        issuanceCounts.set(key, []);
+    // Build lookup map for fast association
+    const issuanceMap = new Map<string, Map<string, number>>();
+    issuanceCounts.forEach((i) => {
+      if (!issuanceMap.has(i.productId)) {
+        issuanceMap.set(i.productId, new Map());
       }
-      issuanceCounts.get(key)?.push(req.id);
+      issuanceMap.get(i.productId)?.set(i.employeeName, i._count.productId);
     });
 
-    const data = sortedRequests.map((req) => {
-      const key = `${req.productId}-${req.employeeName}`;
-      const ids = issuanceCounts.get(key) || [];
-      const index = ids.indexOf(req.id);
-      return { ...req, previousIssuancesCount: index };
-    });
+    const data = requests.map((req) => ({
+      ...req,
+      previousIssuancesCount:
+        issuanceMap.get(req.productId)?.get(req.employeeName) ?? 0,
+    }));
 
     return { data, total };
   }
