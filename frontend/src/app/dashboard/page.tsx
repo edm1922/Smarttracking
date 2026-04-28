@@ -15,6 +15,7 @@ import {
 import api from '@/lib/api';
 import { Printer, Eye, X as CloseIcon } from 'lucide-react';
 import { PageHeaderSkeleton, CardSkeleton } from '@/components/ui/LoadingSkeletons';
+import { LoadingProgress, useLoadingSteps } from '@/components/ui/LoadingProgress';
 
 const COLORS = ['#6366f1', '#f43f5e', '#10b981', '#f59e0b', '#8b5cf6'];
 
@@ -274,6 +275,11 @@ export default function DashboardPage() {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<'product' | 'employee' | 'activity'>('product');
 
+  const { steps, setStepDone, setStepLabel } = useLoadingSteps([
+    'Syncing network locations',
+    'Compiling organizational analytics'
+  ]);
+
   useEffect(() => {
     const role = localStorage.getItem('role');
     if (role === 'inventory' || role !== 'admin') {
@@ -287,6 +293,7 @@ export default function DashboardPage() {
     try {
       const locRes = await api.get('/locations');
       setLocations(locRes.data);
+      setStepDone('Syncing network locations');
 
       let url = selectedLocation === 'all' 
         ? '/reports/analytics?' 
@@ -297,12 +304,13 @@ export default function DashboardPage() {
       
       const res = await api.get(url);
       setData(res.data);
+      setStepDone('Compiling organizational analytics');
     } catch (err) {
       console.error('Failed to fetch analytics', err);
     } finally {
       const elapsed = Date.now() - startTime;
-      if (elapsed < 1000) {
-        await new Promise(resolve => setTimeout(resolve, 1000 - elapsed));
+      if (elapsed < 1800) {
+        await new Promise(resolve => setTimeout(resolve, 1800 - elapsed));
       }
       setLoading(false);
       setIsRefreshing(false);
@@ -316,6 +324,7 @@ export default function DashboardPage() {
   if (loading || !data) {
     return (
       <div className="max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-300">
+        <LoadingProgress steps={steps} minDisplayTime={1500} />
         <PageHeaderSkeleton />
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <CardSkeleton className="h-[120px]" />
