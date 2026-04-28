@@ -10,6 +10,7 @@ import {
 import api from '@/lib/api';
 import { useDebounce } from '@/hooks/useDebounce';
 import { TableSkeleton, CardSkeleton, PageHeaderSkeleton } from '@/components/ui/LoadingSkeletons';
+import { LoadingProgress, useLoadingSteps } from '@/components/ui/LoadingProgress';
 
 
 export default function UnitTrackingPage() {
@@ -49,20 +50,22 @@ export default function UnitTrackingPage() {
   const pageSize = 20;
   const debouncedLogSearch = useDebounce(logSearch, 300);
 
-  const fetchAll = async () => {
-    setLoading(true);
-    await Promise.all([fetchRequests(), fetchInventory()]);
-  };
+  const { steps, setStepDone, setStepLabel } = useLoadingSteps([
+    'Fetching pull-out requests',
+    'Loading inventory'
+  ]);
 
   useEffect(() => {
-    fetchAll();
+    setLoading(true);
+    Promise.all([fetchRequests(), fetchInventory()]);
     const user = localStorage.getItem('username');
     if (user) {
       setTransmittalHeader(prev => ({ ...prev, preparedBy: user }));
     }
   }, [invPage, page, debouncedLogSearch]);
 
-  const fetchRequests = async () => {
+const fetchRequests = async () => {
+    setStepDone('Fetching pull-out requests');
     try {
       const skip = (page - 1) * pageSize;
       const res = await api.get('/pull-out-requests', { params: { skip, take: pageSize, search: debouncedLogSearch } });
@@ -74,9 +77,34 @@ export default function UnitTrackingPage() {
     }
   };
 
-  useEffect(() => {
-    fetchRequests();
-  }, [page, debouncedLogSearch]);
+  const fetchInventory = async () => {
+    setStepDone('Loading inventory');
+    try {
+      const skip = (page - 1) * pageSize;
+      const res = await api.get('/pull-out-requests', { params: { skip, take: pageSize, search: debouncedLogSearch } });
+      console.log('Fetched Requests:', res.data.data);
+      setRequests(res.data.data);
+      setTotalRequests(res.data.total);
+      setStepDone('Fetching pull-out requests');
+    } catch (err) {
+      console.error('Failed to fetch pull out requests', err);
+    }
+  };
+
+  const fetchInventory = async () => {
+    try {
+      const skip = (invPage - 1) * pageSize;
+      const res = await api.get('/items/unit-inventory', { params: { skip, take: pageSize } });
+      console.log('Unit Inventory Data:', res.data);
+      setInventory(res.data.data || []);
+      setInvTotal(res.data.total || 0);
+      setStepDone('Loading inventory');
+    } catch (err) {
+      console.error('Failed to fetch unit inventory', err);
+    } finally {
+      if (loading) setLoading(false);
+    }
+  };
 
   useEffect(() => {
     setPage(1);
@@ -320,6 +348,11 @@ export default function UnitTrackingPage() {
           <CardSkeleton />
           <CardSkeleton />
         </div>
+        <LoadingProgress 
+          steps={steps}
+          title="Loading Dashboard"
+          showPercentage={true}
+        />
         <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden mt-8">
            <div className="px-8 py-6 border-b border-gray-100 flex gap-4">
              <div className="h-10 w-32 bg-gray-100 rounded-xl animate-pulse" />

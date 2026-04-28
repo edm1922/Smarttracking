@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api';
 import { CardSkeleton, PageHeaderSkeleton } from '@/components/ui/LoadingSkeletons';
+import { LoadingProgress, useLoadingSteps } from '@/components/ui/LoadingProgress';
 import jsQR from 'jsqr';
 
 interface Product {
