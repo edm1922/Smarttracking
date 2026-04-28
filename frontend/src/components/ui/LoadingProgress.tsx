@@ -13,31 +13,36 @@ interface LoadingProgressProps {
   title?: string;
   showPercentage?: boolean;
   autoHideDelay?: number;
+  minDisplayTime?: number;
 }
 
 export function LoadingProgress({ 
   steps, 
   title = 'Loading...',
   showPercentage = true,
-  autoHideDelay = 1000 
+  autoHideDelay = 5000,
+  minDisplayTime = 3000
 }: LoadingProgressProps) {
   const [visible, setVisible] = useState(true);
   const [justCompleted, setJustCompleted] = useState(false);
+  const [startTime] = useState(Date.now());
 
   const completedCount = steps.filter(s => s.done).length;
   const totalCount = steps.length;
   const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
   const isComplete = completedCount === totalCount && totalCount > 0;
+  const elapsedTime = Date.now() - startTime;
 
   useEffect(() => {
     if (isComplete) {
       setJustCompleted(true);
+      const remainingTime = Math.max(0, minDisplayTime - elapsedTime);
       const timer = setTimeout(() => {
         setVisible(false);
-      }, autoHideDelay);
+      }, remainingTime + autoHideDelay);
       return () => clearTimeout(timer);
     }
-  }, [isComplete, autoHideDelay]);
+  }, [isComplete, autoHideDelay, minDisplayTime, elapsedTime]);
 
   if (!visible) return null;
 
@@ -57,7 +62,12 @@ export function LoadingProgress({
             <span className={`text-lg font-black tracking-tighter ${
               isComplete ? 'text-green-600' : 'text-orange-600'
             }`}>
-              {progress}%
+              {isComplete ? '100%' : `${progress}%`}
+              {!isComplete && elapsedTime > 2000 && (
+                <span className="text-[10px] text-gray-400 ml-1">
+                  ({Math.round(elapsedTime / 1000)}s)
+                </span>
+              )}
             </span>
           )}
         </div>
