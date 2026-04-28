@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CacheModule } from '@nestjs/cache-manager';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ItemsModule } from './items/items.module';
@@ -20,6 +21,10 @@ import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
+    CacheModule.register({
+      isGlobal: true,
+      ttl: 60,
+    }),
     PrismaModule,
     AuthModule,
     ItemsModule,

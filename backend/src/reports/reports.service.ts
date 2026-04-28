@@ -1,10 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 
 @Injectable()
 export class ReportsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+  ) {}
 
   async getAnalytics(locationId?: string, startDate?: string, endDate?: string) {
     const dateFilter: Prisma.InternalRequestWhereInput = {};
@@ -394,6 +399,10 @@ export class ReportsService {
   }
 
   async getMostIssuedProducts(startDate?: string, endDate?: string) {
+    const cacheKey = `reports:most-issued:${startDate || 'all'}:${endDate || 'all'}`;
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) return cached;
+
     const where = this.getWhereClause(startDate, endDate);
     const topProducts = await this.prisma.productTransaction.groupBy({
       by: ['productId'],
@@ -410,14 +419,21 @@ export class ReportsService {
 
     const productMap = new Map(products.map((p) => [p.id, p.name]));
 
-    return topProducts.map((tp) => ({
+    const result = topProducts.map((tp) => ({
       productId: tp.productId,
       name: productMap.get(tp.productId) || 'Unknown',
       totalIssued: tp._sum.quantity ?? 0,
     }));
+
+    await this.cacheManager.set(cacheKey, result, 60000); // 60s
+    return result;
   }
 
   async getDailyStockMovement(startDate?: string, endDate?: string) {
+    const cacheKey = `reports:daily-movement:${startDate || 'all'}:${endDate || 'all'}`;
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) return cached;
+
     const conditions = [];
 
     if (startDate) {
@@ -442,38 +458,61 @@ export class ReportsService {
       LIMIT 50
     `;
 
-    return await this.prisma.$queryRaw(query);
+    const result = await this.prisma.$queryRaw(query);
+    await this.cacheManager.set(cacheKey, result, 60000); // 60s
+    return result;
   }
 
   async getIssuancesByLocation(startDate?: string, endDate?: string) {
+    const cacheKey = `reports:by-location:${startDate || 'all'}:${endDate || 'all'}`;
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) return cached;
+
     const where = this.getWhereClause(startDate, endDate);
-    return await this.prisma.productTransaction.groupBy({
+    const result = await this.prisma.productTransaction.groupBy({
       by: ['locationId'],
       _sum: { quantity: true },
       where,
       orderBy: { _sum: { quantity: 'desc' } },
       take: 50,
     });
+
+    await this.cacheManager.set(cacheKey, result, 60000); // 60s
+    return result;
   }
 
   async getRequestStatusDistribution(startDate?: string, endDate?: string) {
+    const cacheKey = `reports:status-dist:${startDate || 'all'}:${endDate || 'all'}`;
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) return cached;
+
     const where = this.getWhereClause(startDate, endDate);
-    return await this.prisma.internalRequest.groupBy({
+    const result = await this.prisma.internalRequest.groupBy({
       by: ['status'],
       _count: { status: true },
       where,
     });
+
+    await this.cacheManager.set(cacheKey, result, 30000); // 30s
+    return result;
   }
 
   async getTopEmployees(startDate?: string, endDate?: string) {
+    const cacheKey = `reports:top-employees:${startDate || 'all'}:${endDate || 'all'}`;
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) return cached;
+
     const where = this.getWhereClause(startDate, endDate);
-    return await this.prisma.internalRequest.groupBy({
+    const result = await this.prisma.internalRequest.groupBy({
       by: ['employeeName'],
       _count: { employeeName: true },
       where,
       orderBy: { _count: { employeeName: 'desc' } },
       take: 50,
     });
+
+    await this.cacheManager.set(cacheKey, result, 60000); // 60s
+    return result;
   }
 
   async getProductUsageTrend(productId: string, startDate?: string, endDate?: string) {
