@@ -103,6 +103,38 @@ export default function UnitTrackingPage() {
     }
   };
 
+  const handleBulkApprove = async () => {
+    if (selectedRequestIds.length === 0) return;
+    if (!confirm(`Are you sure you want to approve ${selectedRequestIds.length} requests?`)) return;
+    
+    setProcessingId('bulk');
+    try {
+      await api.post('/pull-out-requests/bulk-approve', { ids: selectedRequestIds });
+      setSelectedRequestIds([]);
+      await Promise.all([fetchRequests(), fetchInventory()]);
+    } catch (err: any) {
+      alert('Failed to process bulk approval');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleBulkReject = async () => {
+    if (selectedRequestIds.length === 0) return;
+    if (!confirm(`Are you sure you want to reject ${selectedRequestIds.length} requests?`)) return;
+    
+    setProcessingId('bulk');
+    try {
+      await api.post('/pull-out-requests/bulk-reject', { ids: selectedRequestIds });
+      setSelectedRequestIds([]);
+      await fetchRequests();
+    } catch (err: any) {
+      alert('Failed to process bulk rejection');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const handleDeleteLog = async (id: string) => {
     if (!confirm('Are you sure you want to delete this log entry? This will not revert stock.')) return;
     try {
@@ -368,14 +400,61 @@ export default function UnitTrackingPage() {
             </span>
           </div>
 
+          {selectedRequestIds.length > 0 && (
+            <div className="flex items-center justify-between bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-orange-200 shadow-lg animate-in slide-in-from-bottom-2 duration-300">
+               <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 bg-orange-600 text-white rounded-lg flex items-center justify-center font-black text-xs">
+                    {selectedRequestIds.length}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest leading-none">Items Selected</span>
+                    <button 
+                      onClick={() => setSelectedRequestIds([])}
+                      className="text-[9px] font-bold text-gray-400 hover:text-orange-600 uppercase underline text-left"
+                    >
+                      Clear Selection
+                    </button>
+                  </div>
+               </div>
+               <div className="flex gap-2">
+                  <button 
+                    onClick={handleBulkReject}
+                    disabled={processingId === 'bulk'}
+                    className="px-4 py-2 bg-gray-50 text-gray-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-50 hover:text-red-600 transition-all disabled:opacity-50"
+                  >
+                    Reject Selected
+                  </button>
+                  <button 
+                    onClick={handleBulkApprove}
+                    disabled={processingId === 'bulk'}
+                    className="px-6 py-2 bg-gray-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                  >
+                    Approve Selected
+                  </button>
+               </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {requests.filter(r => r.status === 'SUBMITTED').map((req) => (
               <div 
                 key={req.id} 
-                onDoubleClick={() => setViewingLog(req)}
-                className={`relative bg-white p-6 rounded-3xl border border-orange-100 shadow-sm hover:shadow-md transition-all group cursor-pointer select-none overflow-hidden ${processingId === req.id ? 'opacity-70 pointer-events-none' : ''}`}
-                title="Double-click to view details & evidence"
+                onClick={() => toggleRequestSelection(req.id)}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  setViewingLog(req);
+                }}
+                className={`relative bg-white p-6 rounded-3xl border transition-all group cursor-pointer select-none overflow-hidden ${selectedRequestIds.includes(req.id) ? 'border-orange-500 ring-2 ring-orange-500/20' : 'border-orange-100'} ${processingId === req.id ? 'opacity-70 pointer-events-none' : ''}`}
+                title="Click to select | Double-click for details"
               >
+                {selectedRequestIds.includes(req.id) && (
+                  <div className="absolute top-0 right-0 p-2 z-20">
+                    <div className="h-6 w-6 bg-orange-600 text-white rounded-bl-xl flex items-center justify-center shadow-lg animate-in zoom-in duration-200">
+                      <Check className="h-4 w-4" />
+                    </div>
+                  </div>
+                )}
+
                 {processingId === req.id && (
                   <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center animate-in fade-in duration-300">
                     <div className="h-8 w-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-2" />

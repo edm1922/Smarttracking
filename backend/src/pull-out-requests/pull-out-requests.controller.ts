@@ -59,6 +59,16 @@ export class PullOutRequestsController {
     return this.pullOutRequestsService.findAllPending();
   }
 
+  @Post('bulk-approve')
+  async bulkApprove(@Body() data: { ids: string[] }, @Req() req: any) {
+    return this.pullOutRequestsService.bulkApprove(data.ids, req.user.sub);
+  }
+
+  @Post('bulk-reject')
+  async bulkReject(@Body() data: { ids: string[] }, @Req() req: any) {
+    return this.pullOutRequestsService.bulkReject(data.ids, req.user.sub);
+  }
+
   @Patch(':id/approve')
   async approve(@Param('id') id: string, @Req() req: any) {
     return this.pullOutRequestsService.approve(id, req.user.sub);

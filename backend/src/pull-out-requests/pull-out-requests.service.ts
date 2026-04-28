@@ -349,4 +349,30 @@ export class PullOutRequestsService {
       orderBy: { createdAt: 'desc' }
     });
   }
+
+  async bulkApprove(ids: string[], adminId: string) {
+    const results = [];
+    for (const id of ids) {
+      try {
+        const res = await this.approve(id, adminId);
+        results.push({ id, status: 'success', data: res });
+      } catch (err) {
+        results.push({ id, status: 'error', error: err.message });
+      }
+    }
+    return results;
+  }
+
+  async bulkReject(ids: string[], adminId: string) {
+    const results = [];
+    for (const id of ids) {
+      try {
+        const res = await this.reject(id, adminId);
+        results.push({ id, status: 'success', data: res });
+      } catch (err) {
+        results.push({ id, status: 'error', error: err.message });
+      }
+    }
+    return results;
+  }
 }
