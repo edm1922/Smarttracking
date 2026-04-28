@@ -57,7 +57,7 @@ export default function UnitTrackingLogPage() {
     const fetchRequests = async () => {
       try {
         const res = await api.get('/pull-out-requests');
-        setRequests(res.data);
+        setRequests(res.data.data || []);
       } catch (err) {
         console.error('Failed to fetch requests', err);
       } finally {

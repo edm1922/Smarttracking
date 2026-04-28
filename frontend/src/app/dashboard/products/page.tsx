@@ -335,7 +335,7 @@ export default function ProductsPage() {
   const fetchLogs = async () => {
     try {
       const res = await api.get('/products/logs');
-      setLogs(res.data);
+      setLogs(res.data.data || []);
       setIsLogModalOpen(true);
     } catch (err) {
       alert('Failed to fetch logs');
@@ -357,7 +357,7 @@ export default function ProductsPage() {
       });
       setIsEditLogModalOpen(false);
       const res = await api.get('/products/logs');
-      setLogs(res.data);
+      setLogs(res.data.data || []);
       fetchData(); // Refresh products to see stock updates
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to update log');
@@ -371,7 +371,7 @@ export default function ProductsPage() {
       await api.delete(`/products/logs/${editingLog.id}`);
       setIsEditLogModalOpen(false);
       const res = await api.get('/products/logs');
-      setLogs(res.data);
+      setLogs(res.data.data || []);
       fetchData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to delete log');
