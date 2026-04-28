@@ -92,7 +92,7 @@ export default function ProductTransmittalPage() {
     const fetchLogs = async () => {
       try {
         const res = await api.get('/products/logs');
-        setLogs(res.data);
+        setLogs(res.data.data || []);
       } catch (err) {
         console.error('Failed to fetch logs', err);
       }

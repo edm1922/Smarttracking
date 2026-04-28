@@ -18,13 +18,15 @@ export default function AdminNotifications() {
         api.get('/internal-requests')
       ]);
 
-      const pullOuts = (pullOutRes.data || []).map((r: any) => ({
+      const pullOutData = pullOutRes.data?.data || pullOutRes.data || [];
+      const pullOuts = (Array.isArray(pullOutData) ? pullOutData : []).map((r: any) => ({
         ...r,
         _type: 'pull-out',
         _date: new Date(r.createdAt).getTime()
       }));
 
-      const internals = (internalRes.data.data || [])
+      const internalData = internalRes.data?.data || internalRes.data || [];
+      const internals = (Array.isArray(internalData) ? internalData : [])
         .filter((r: any) => r.status === 'PENDING')
         .map((r: any) => ({
           ...r,
