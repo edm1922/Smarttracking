@@ -292,29 +292,51 @@ export class ItemsService {
     return updatedItem;
   }
 
-  async getUnitInventory() {
-    // Find all items where any field value has useUnitQty: true
-    const items = await this.prisma.item.findMany({
-      where: {
-        fieldValues: {
-          some: {
-            value: {
-              path: ['useUnitQty'],
-              equals: true
-            }
+  async getUnitInventory(params: { skip?: number; take?: number; search?: string } = {}) {
+    const { skip = 0, take = 20, search } = params;
+
+    const where: any = {
+      fieldValues: {
+        some: {
+          value: {
+            path: ['useUnitQty'],
+            equals: true
           }
         }
-      },
-      include: {
-        fieldValues: {
-          include: { field: true }
-        },
-        batch: true,
-        category: true
       }
-    });
+    };
 
-    // Group and aggregate
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { slug: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.item.findMany({
+        where,
+        skip,
+        take,
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          status: true,
+          batch: { select: { batchCode: true } },
+          fieldValues: {
+            select: {
+              fieldId: true,
+              value: true,
+              field: { select: { name: true } }
+            }
+          }
+        },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.item.count({ where })
+    ]);
+
     const inventory: Record<string, any> = {};
     
     items.forEach(item => {
@@ -341,7 +363,6 @@ export class ItemsService {
 
       inventory[name].totalQty += qty;
       
-      // Aggregate unique specs for the group
       if (!inventory[name].specs) inventory[name].specs = {};
       item.fieldValues.forEach(fv => {
         const v = fv.value as any;
@@ -363,18 +384,10 @@ export class ItemsService {
       });
 
       let threshold = 5;
-      let totalCapacity = qty;
-
       item.fieldValues.forEach(fv => {
         const v = fv.value as any;
         if (v && typeof v === 'object' && v.useUnitQty) {
           if (v.threshold !== undefined) threshold = v.threshold;
-          // We can assume the initial qty set during generation was the capacity
-          // or we can look for a capacity field if the user adds one.
-          // For now, let's treat the current qty as capacity if it's the first time, 
-          // but better if we had a dedicated capacity field.
-          // The user said "the apparels/products will be place on large cellophanes... each cellophane will have its own QR code which correspond to quantity"
-          // So the 'qty' is the current count.
         }
       });
 
@@ -392,7 +405,6 @@ export class ItemsService {
       });
     });
 
-    // Convert Sets to Arrays for JSON serialization
     const result = Object.values(inventory).map((group: any) => {
       if (group.specs) {
         Object.keys(group.specs).forEach(key => {
@@ -402,14 +414,26 @@ export class ItemsService {
       return group;
     });
 
-    // Fallback: if nothing found via unitQty path, attempt a lightweight fallback
-    // to ensure the explorer has something to display (safe-guard for missing data).
-    if (result.length === 0) {
-      const allItems = await this.prisma.item.findMany({
-        include: { fieldValues: { include: { field: true } }, batch: true, category: true }
+    if (result.length === 0 && skip === 0) {
+      const fallbackItems = await this.prisma.item.findMany({
+        take: 100,
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          status: true,
+          batch: { select: { batchCode: true } },
+          fieldValues: {
+            select: {
+              fieldId: true,
+              value: true,
+              field: { select: { name: true } }
+            }
+          }
+        }
       });
       const fallback: Record<string, any> = {};
-      allItems.forEach(it => {
+      fallbackItems.forEach(it => {
         const name = it.name || it.slug || 'Unnamed Product';
         const unitField = it.fieldValues.find((fv: any) => fv.value && typeof fv.value === 'object' && (fv.value as any).unit);
         const unit = ((unitField?.value as any)?.unit) || 'pcs';
@@ -430,10 +454,10 @@ export class ItemsService {
           }))
         });
       });
-      return Object.values(fallback);
+      return { data: Object.values(fallback), total: fallbackItems.length };
     }
 
-    return result;
+    return { data: result, total };
   }
 
   async submitForm(slug: string, data: any) {

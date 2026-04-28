@@ -44,6 +44,8 @@ export default function UnitTrackingPage() {
 
   const [page, setPage] = useState(1);
   const [totalRequests, setTotalRequests] = useState(0);
+  const [invPage, setInvPage] = useState(1);
+  const [invTotal, setInvTotal] = useState(0);
   const pageSize = 20;
   const debouncedLogSearch = useDebounce(logSearch, 300);
 
@@ -56,6 +58,10 @@ export default function UnitTrackingPage() {
       setTransmittalHeader(prev => ({ ...prev, preparedBy: user }));
     }
   }, []);
+
+  useEffect(() => {
+    fetchInventory();
+  }, [invPage]);
 
   const fetchRequests = async () => {
     try {
@@ -147,9 +153,11 @@ export default function UnitTrackingPage() {
 
   const fetchInventory = async () => {
     try {
-      const res = await api.get('/items/unit-inventory');
+      const skip = (invPage - 1) * pageSize;
+      const res = await api.get('/items/unit-inventory', { params: { skip, take: pageSize } });
       console.log('Unit Inventory Data:', res.data);
-      setInventory(res.data);
+      setInventory(res.data.data || []);
+      setInvTotal(res.data.total || 0);
     } catch (err) {
       console.error('Failed to fetch unit inventory', err);
     } finally {

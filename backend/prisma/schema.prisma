@@ -50,6 +50,8 @@ model Item {
   @@index([batchId])
   @@index([categoryId])
   @@index([statusId])
+  @@index([name])
+  @@index([createdAt])
 }
 
 model PullOutRequest {

@@ -32,8 +32,16 @@ export class ItemsController {
   }
 
   @Get('unit-inventory')
-  getUnitInventory() {
-    return this.itemsService.getUnitInventory();
+  getUnitInventory(
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.itemsService.getUnitInventory({
+      skip: skip ? parseInt(skip, 10) : 0,
+      take: take ? parseInt(take, 10) : 20,
+      search,
+    });
   }
 
   @Get(':slug')
