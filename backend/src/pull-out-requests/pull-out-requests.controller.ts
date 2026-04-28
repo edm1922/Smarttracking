@@ -34,11 +34,23 @@ export class PullOutRequestsController {
     @Query('skip') skip?: string,
     @Query('take') take?: string,
     @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('allPending') allPending?: string,
   ) {
     return this.pullOutRequestsService.findByUser(req.user.sub, {
       skip: skip ? parseInt(skip, 10) : 0,
       take: take ? parseInt(take, 10) : 20,
       search,
+      status,
+      allPending: allPending === 'true',
+    });
+  }
+
+  @Patch('bulk-submit')
+  async bulkSubmit(@Body() data: { ids: string[]; attachmentUrl?: string; supervisor?: string; remarks?: string }) {
+    return this.pullOutRequestsService.bulkUpdateStatus(data.ids, {
+      ...data,
+      status: 'SUBMITTED',
     });
   }
 

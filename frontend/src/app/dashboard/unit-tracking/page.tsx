@@ -225,9 +225,9 @@ export default function UnitTrackingPage() {
     // Filter by sub-tab (Pending vs History)
     if (activeTab === 'requisition') {
       if (requisitionSubTab === 'pending') {
-        filtered = filtered.filter(r => r.status === 'PENDING');
+        filtered = filtered.filter(r => r.status === 'SUBMITTED');
       } else {
-        filtered = filtered.filter(r => r.status !== 'PENDING');
+        filtered = filtered.filter(r => r.status !== 'SUBMITTED');
       }
     }
 
@@ -324,7 +324,7 @@ export default function UnitTrackingPage() {
                  onClick={() => setRequisitionSubTab('pending')}
                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${requisitionSubTab === 'pending' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
                >
-                 <Clock className="h-3 w-3" /> Pending ({requests.filter(r => r.status === 'PENDING').length})
+                 <Clock className="h-3 w-3" /> Pending ({requests.filter(r => r.status === 'SUBMITTED').length})
                </button>
                <button 
                  onClick={() => setRequisitionSubTab('history')}
@@ -350,7 +350,7 @@ export default function UnitTrackingPage() {
       </div>
       
       {/* Pending Approvals Section */}
-      {requests.filter(r => r.status === 'PENDING').length > 0 && (
+      {requests.filter(r => r.status === 'SUBMITTED').length > 0 && (
         <div className="bg-orange-50 border border-orange-100 rounded-[2.5rem] p-8 space-y-6 animate-in slide-in-from-top-4 duration-500">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -359,16 +359,16 @@ export default function UnitTrackingPage() {
               </div>
               <div>
                 <h2 className="text-xl font-black text-gray-900 tracking-tight">Pending Approvals</h2>
-                <p className="text-xs font-bold text-orange-600/60 uppercase tracking-widest">New pull-out requests waiting for review</p>
+                <p className="text-xs font-bold text-orange-600/60 uppercase tracking-widest">New bulk requisitions waiting for final sign-off</p>
               </div>
             </div>
             <span className="px-4 py-1.5 bg-orange-600 text-white text-[10px] font-black rounded-full uppercase tracking-widest animate-pulse">
-              {requests.filter(r => r.status === 'PENDING').length} Action Required
+              {requests.filter(r => r.status === 'SUBMITTED').length} Action Required
             </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {requests.filter(r => r.status === 'PENDING').map((req) => (
+            {requests.filter(r => r.status === 'SUBMITTED').map((req) => (
               <div 
                 key={req.id} 
                 onDoubleClick={() => setViewingLog(req)}

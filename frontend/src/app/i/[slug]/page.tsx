@@ -309,7 +309,9 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       return;
     }
 
+    setIsSaving(true);
     try {
+      console.log('Submitting pull-out request...', { slug, qty: pullOutQty });
       const payload = {
         itemSlug: slug,
         qty: pullOutQty,

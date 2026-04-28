@@ -35,6 +35,7 @@ export class PullOutRequestsService {
     supervisor?: string;
     attachmentUrl?: string;
     additionalImages?: string[];
+    status?: string;
   }) {
     let itemId = data.itemId;
     let unit = data.unit;
@@ -63,6 +64,8 @@ export class PullOutRequestsService {
 
     if (!itemId) throw new BadRequestException('Either itemId or itemSlug must be provided');
 
+    console.log(`[PullOutRequestsService] Creating request for Item ID: ${itemId}, User ID: ${data.userId}, Qty: ${data.qty}`);
+
     const result = await this.prisma.pullOutRequest.create({
       data: {
         itemId: itemId,
@@ -76,6 +79,7 @@ export class PullOutRequestsService {
         supervisor: data.supervisor,
         attachmentUrl: data.attachmentUrl,
         additionalImages: data.additionalImages || [],
+        status: data.status || 'PENDING',
       },
       include: { item: true, user: true },
     });
@@ -92,14 +96,25 @@ export class PullOutRequestsService {
     return result;
   }
 
-  async findByUser(userId: string, params: { skip?: number; take?: number; search?: string } = {}) {
-    const { skip = 0, take = 20, search } = params;
+  async findByUser(userId: string, params: { skip?: number; take?: number; search?: string; status?: string; allPending?: boolean } = {}) {
+    const { skip = 0, take = 20, search, status, allPending } = params;
 
-    const where: any = { userId };
+    const where: any = {};
+    
+    if (allPending) {
+      where.status = 'PENDING';
+    } else {
+      where.userId = userId;
+      if (status) {
+        where.status = status;
+      }
+    }
+
     if (search) {
       where.OR = [
-        { purpose: { contains: search, mode: 'insensitive' } },
+        { remarks: { contains: search, mode: 'insensitive' } },
         { item: { name: { contains: search, mode: 'insensitive' } } },
+        { item: { slug: { contains: search, mode: 'insensitive' } } },
       ];
     }
 
@@ -320,6 +335,18 @@ export class PullOutRequestsService {
     );
 
     return result;
+  }
+
+  async bulkUpdateStatus(ids: string[], data: { status: string; attachmentUrl?: string; supervisor?: string; remarks?: string }) {
+    return this.prisma.pullOutRequest.updateMany({
+      where: { id: { in: ids } },
+      data: {
+        status: data.status,
+        attachmentUrl: data.attachmentUrl,
+        supervisor: data.supervisor,
+        remarks: data.remarks,
+      },
+    });
   }
 
   async remove(id: string) {

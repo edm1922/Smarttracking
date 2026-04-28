@@ -129,7 +129,7 @@ function UnitRequisitionContent() {
     try {
       setIsRefreshing(true);
       const skip = (page - 1) * pageSize;
-      const res = await api.get('/pull-out-requests/mine', { params: { skip, take: pageSize } });
+      const res = await api.get('/pull-out-requests/mine', { params: { skip, take: pageSize, allPending: true } });
       setMyRequests(res.data.data);
       setTotalRequests(res.data.total);
     } catch (err) {
@@ -278,8 +278,24 @@ function UnitRequisitionContent() {
       const attachmentRes = await api.post('/internal-requests/upload', attachmentFormData);
       const attachmentUrl = attachmentRes.data.url;
 
-      // 2. Submit each item in the cart
-      for (const item of cart) {
+      // 2. Partition cart into existing scans and manual items
+      const scanIds = cart.filter(item => myRequests.some(r => r.id === item.id)).map(item => item.id);
+      const manualItems = cart.filter(item => !myRequests.some(r => r.id === item.id));
+
+      console.log('Submitting bulk requisition:', { scans: scanIds.length, manual: manualItems.length });
+
+      // 3. Update existing scans to SUBMITTED
+      if (scanIds.length > 0) {
+        await api.patch('/pull-out-requests/bulk-submit', {
+          ids: scanIds,
+          attachmentUrl,
+          supervisor: form.supervisorName,
+          remarks: form.remarks || 'Bulk Unit Requisition'
+        });
+      }
+
+      // 4. Create new SUBMITTED requests for manual items
+      for (const item of manualItems) {
         let qrImageUrl = '';
         if (item.imageFile) {
           const formData = new FormData();
@@ -315,7 +331,8 @@ function UnitRequisitionContent() {
           imageUrl: qrImageUrl || undefined,
           attachmentUrl: attachmentUrl,
           additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
-          supervisor: form.supervisorName
+          supervisor: form.supervisorName,
+          status: 'SUBMITTED' // Mark as submitted immediately
         });
       }
       
