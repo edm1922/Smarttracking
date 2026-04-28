@@ -150,6 +150,30 @@ function UnitRequisitionContent() {
   };
 
   useEffect(() => {
+    const fetchNames = async () => {
+      const itemsToFetch = cart.filter(item => item.manualSlug && !item.productName && item.status !== 'scanning');
+      
+      for (const item of itemsToFetch) {
+        try {
+          const res = await api.get(`/items/${item.manualSlug}`);
+          if (res.data) {
+            updateCartItem(item.id, { 
+              productName: res.data.name,
+              status: 'success'
+            });
+          }
+        } catch (err) {
+          // If not found, we don't alert to avoid annoying the user while typing
+          console.error(`Item not found: ${item.manualSlug}`);
+        }
+      }
+    };
+
+    const timer = setTimeout(fetchNames, 1000); // Debounce
+    return () => clearTimeout(timer);
+  }, [cart]);
+
+  useEffect(() => {
     fetchMyRequests();
   }, [page]);
 
@@ -266,7 +290,18 @@ function UnitRequisitionContent() {
   };
 
   const updateCartItem = (id: string, updates: Partial<CartItem>) => {
-    setCart(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
+    setCart(prev => prev.map(item => {
+      if (item.id === id) {
+        const newItem = { ...item, ...updates };
+        // If manualSlug is changing and it's different from the original, clear productName
+        if (updates.manualSlug !== undefined && updates.manualSlug !== item.manualSlug) {
+          newItem.productName = '';
+          newItem.status = 'manual';
+        }
+        return newItem;
+      }
+      return item;
+    }));
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -689,7 +724,14 @@ function UnitRequisitionContent() {
                           <div className="md:col-span-8 flex flex-col justify-center space-y-4">
                              <div className="grid grid-cols-2 gap-4">
                                <div className="col-span-2">
-                                  <label className="block text-[9px] font-black text-gray-400 uppercase mb-1.5 ml-1">QR ID (Manual / Auto)</label>
+                                  <div className="flex items-center justify-between mb-1.5 ml-1">
+                                     <label className="block text-[9px] font-black text-gray-400 uppercase">QR ID (Manual / Auto)</label>
+                                     {item.productName && (
+                                       <span className="text-[10px] font-black text-primary uppercase animate-in fade-in zoom-in duration-300">
+                                         {item.productName}
+                                       </span>
+                                     )}
+                                  </div>
                                   <div className="relative">
                                     <input 
                                       type="text"
