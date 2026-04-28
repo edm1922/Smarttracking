@@ -15,7 +15,7 @@ import {
 import api from '@/lib/api';
 import { Printer, Eye, X as CloseIcon } from 'lucide-react';
 import { PageHeaderSkeleton, CardSkeleton } from '@/components/ui/LoadingSkeletons';
-import { LoadingProgress, useLoadingSteps } from '@/components/ui/LoadingProgress';
+import { CircularLoading, useLoadingSteps } from '@/components/ui/LoadingProgress';
 
 const COLORS = ['#6366f1', '#f43f5e', '#10b981', '#f59e0b', '#8b5cf6'];
 
@@ -324,7 +324,7 @@ export default function DashboardPage() {
   if (loading || !data) {
     return (
       <div className="max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-300">
-        <LoadingProgress steps={steps} minDisplayTime={1500} />
+        <CircularLoading steps={steps} minDisplayTime={1500} title="Intelligence Sync" />
         <PageHeaderSkeleton />
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <CardSkeleton className="h-[120px]" />

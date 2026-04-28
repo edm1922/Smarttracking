@@ -145,3 +145,104 @@ export function useLoadingSteps(initialSteps: string[]) {
 
   return { steps, setStepDone, setStepError, setStepLabel, reset };
 }
+
+interface CircularLoadingProps extends LoadingProgressProps {
+  size?: number;
+  strokeWidth?: number;
+}
+
+export function CircularLoading({ 
+  steps, 
+  title = 'Processing',
+  size = 120,
+  strokeWidth = 10,
+  minDisplayTime = 1500
+}: CircularLoadingProps) {
+  const [visible, setVisible] = useState(true);
+  const [startTime] = useState(Date.now());
+
+  const completedCount = steps.filter(s => s.done).length;
+  const totalCount = steps.length;
+  const progress = totalCount > 0 ? (completedCount / totalCount) : 0;
+  const isComplete = completedCount === totalCount && totalCount > 0;
+  const currentStep = steps.find(s => !s.done) || steps[steps.length - 1];
+
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const offset = circumference - (progress * circumference);
+
+  useEffect(() => {
+    if (isComplete) {
+      const elapsed = Date.now() - startTime;
+      const timer = setTimeout(() => {
+        setVisible(false);
+      }, Math.max(0, minDisplayTime - elapsed));
+      return () => clearTimeout(timer);
+    }
+  }, [isComplete, minDisplayTime, startTime]);
+
+  if (!visible) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gray-50/80 backdrop-blur-md animate-in fade-in duration-500">
+      <div className="relative flex items-center justify-center">
+        {/* Track */}
+        <svg width={size} height={size} className="transform -rotate-90">
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke="currentColor"
+            strokeWidth={strokeWidth}
+            fill="transparent"
+            className="text-gray-200"
+          />
+          {/* Progress */}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke="currentColor"
+            strokeWidth={strokeWidth}
+            fill="transparent"
+            strokeDasharray={circumference}
+            style={{ 
+              strokeDashoffset: offset,
+              transition: 'stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)' 
+            }}
+            strokeLinecap="round"
+            className="text-primary"
+          />
+        </svg>
+        
+        {/* Center Content */}
+        <div className="absolute flex flex-col items-center justify-center">
+          <span className="text-2xl font-black text-gray-900 leading-none">
+            {Math.round(progress * 100)}%
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-8 text-center space-y-2 max-w-xs px-4">
+        <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest animate-pulse">
+          {title}
+        </h3>
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tight h-4">
+          {currentStep?.label}
+        </p>
+      </div>
+
+      {/* Decorative dots for extra flair */}
+      <div className="absolute bottom-12 flex gap-2">
+        {steps.map((s, i) => (
+          <div 
+            key={i}
+            className={`h-1.5 w-1.5 rounded-full transition-all duration-300 ${
+              s.done ? 'bg-primary scale-125' : 'bg-gray-200'
+            }`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
