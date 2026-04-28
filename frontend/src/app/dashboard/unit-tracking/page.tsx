@@ -47,7 +47,7 @@ export default function UnitTrackingPage() {
   const [totalRequests, setTotalRequests] = useState(0);
   const [invPage, setInvPage] = useState(1);
   const [invTotal, setInvTotal] = useState(0);
-  const pageSize = 20;
+const pageSize = 20;
   const debouncedLogSearch = useDebounce(logSearch, 300);
 
   const { steps, setStepDone, setStepLabel } = useLoadingSteps([
@@ -64,7 +64,7 @@ export default function UnitTrackingPage() {
     }
   }, [invPage, page, debouncedLogSearch]);
 
-const fetchRequests = async () => {
+  const fetchRequests = async () => {
     setStepDone('Fetching pull-out requests');
     try {
       const skip = (page - 1) * pageSize;
@@ -80,25 +80,11 @@ const fetchRequests = async () => {
   const fetchInventory = async () => {
     setStepDone('Loading inventory');
     try {
-      const skip = (page - 1) * pageSize;
-      const res = await api.get('/pull-out-requests', { params: { skip, take: pageSize, search: debouncedLogSearch } });
-      console.log('Fetched Requests:', res.data.data);
-      setRequests(res.data.data);
-      setTotalRequests(res.data.total);
-      setStepDone('Fetching pull-out requests');
-    } catch (err) {
-      console.error('Failed to fetch pull out requests', err);
-    }
-  };
-
-  const fetchInventory = async () => {
-    try {
       const skip = (invPage - 1) * pageSize;
       const res = await api.get('/items/unit-inventory', { params: { skip, take: pageSize } });
       console.log('Unit Inventory Data:', res.data);
       setInventory(res.data.data || []);
       setInvTotal(res.data.total || 0);
-      setStepDone('Loading inventory');
     } catch (err) {
       console.error('Failed to fetch unit inventory', err);
     } finally {
