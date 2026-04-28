@@ -871,7 +871,7 @@ function UnitRequisitionContent() {
                                   <span className="text-[10px] font-black text-gray-400 uppercase">Batch: {item.batch || 'N/A'}</span>
                                 </div>
                                 <button 
-                                  onClick={() => setCart([...cart, { id: Math.random().toString(36).substr(2, 9), slug: item.slug, productName: product.name, manualSlug: item.slug, qty: 1, status: 'success' }])}
+                                  onClick={() => setCart([...cart, { id: Math.random().toString(36).substr(2, 9), slug: item.slug, productName: product.name, manualSlug: item.slug, qty: 1, unit: product.unit || 'pcs', status: 'success' }])}
                                   className="h-10 w-10 bg-white border border-gray-100 text-gray-400 hover:text-primary rounded-xl transition-all shadow-sm flex items-center justify-center"
                                 >
                                   <Plus className="h-5 w-5" />
