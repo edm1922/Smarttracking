@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { 
   Boxes, Package, Search, Filter, ArrowRight, 
   ChevronRight, ChevronDown, ChevronUp, History,
@@ -49,19 +49,18 @@ export default function UnitTrackingPage() {
   const pageSize = 20;
   const debouncedLogSearch = useDebounce(logSearch, 300);
 
+  const fetchAll = async () => {
+    setLoading(true);
+    await Promise.all([fetchRequests(), fetchInventory()]);
+  };
+
   useEffect(() => {
-    fetchInventory();
-    
-    // Set preparedBy on client-side
+    fetchAll();
     const user = localStorage.getItem('username');
     if (user) {
       setTransmittalHeader(prev => ({ ...prev, preparedBy: user }));
     }
-  }, []);
-
-  useEffect(() => {
-    fetchInventory();
-  }, [invPage]);
+  }, [invPage, page, debouncedLogSearch]);
 
   const fetchRequests = async () => {
     try {
@@ -165,9 +164,13 @@ export default function UnitTrackingPage() {
     }
   };
 
-  const totalUnitsAvailable = inventory.reduce((acc, p) => acc + p.totalQty, 0);
-  const lowStockItems = inventory.flatMap(p => 
-    p.items.filter((item: any) => item.qty <= (item.threshold || 0))
+  const totalUnitsAvailable = useMemo(() => 
+    inventory.reduce((acc, p) => acc + p.totalQty, 0), 
+    [inventory]
+  );
+  const lowStockItems = useMemo(() => 
+    inventory.flatMap(p => p.items.filter((item: any) => item.qty <= (item.threshold || 0))),
+    [inventory]
   );
 
   const handleRefill = async (item: any) => {
