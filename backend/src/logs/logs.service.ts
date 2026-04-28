@@ -21,7 +21,13 @@ export class LogsService {
         where,
         skip,
         take,
-        include: {
+        select: {
+          id: true,
+          action: true,
+          changes: true,
+          createdAt: true,
+          userId: true,
+          itemId: true,
           user: {
             select: { username: true, role: true },
           },
@@ -51,7 +57,13 @@ export class LogsService {
         where,
         skip,
         take,
-        include: {
+        select: {
+          id: true,
+          action: true,
+          changes: true,
+          createdAt: true,
+          userId: true,
+          itemId: true,
           user: {
             select: { username: true, role: true },
           },

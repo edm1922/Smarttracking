@@ -100,7 +100,6 @@ export class PullOutRequestsService {
     const { skip = 0, take = 20, search, status, allPending } = params;
 
     const where: any = {};
-    
     if (allPending) {
       where.status = 'PENDING';
     } else {
@@ -123,12 +122,29 @@ export class PullOutRequestsService {
         where,
         skip,
         take,
-        include: { 
+        select: {
+          id: true,
+          qty: true,
+          unit: true,
+          status: true,
+          remarks: true,
+          imageUrl: true,
+          createdAt: true,
+          supervisor: true,
           item: {
-            include: {
-              fieldValues: { include: { field: true } }
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              fieldValues: {
+                select: {
+                  fieldId: true,
+                  value: true,
+                  field: { select: { id: true, name: true } }
+                }
+              }
             }
-          }, 
+          },
           user: {
             select: { id: true, username: true }
           }
@@ -158,13 +174,20 @@ export class PullOutRequestsService {
         where,
         skip,
         take,
-        include: { 
+        select: {
+          id: true,
+          qty: true,
+          unit: true,
+          status: true,
+          remarks: true,
+          createdAt: true,
+          supervisor: true,
           item: {
             select: { id: true, name: true, slug: true }
-          }, 
+          },
           user: {
             select: { id: true, username: true }
-          } 
+          }
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -326,28 +349,47 @@ export class PullOutRequestsService {
     return this.prisma.pullOutRequest.delete({ where: { id } });
   }
 
-  async findAllPending() {
-    console.log('[PullOutRequestsService] Fetching all SUBMITTED requests for admin review');
-    return this.prisma.pullOutRequest.findMany({
-      where: { status: 'SUBMITTED' },
-      include: {
-        item: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            unit: true
+  async findAllPending(params: { skip?: number; take?: number; search?: string } = {}) {
+    const { skip = 0, take = 20, search } = params;
+    console.log('[PullOutRequestsService] Fetching SUBMITTED requests for admin review');
+    
+    const where: any = { status: 'SUBMITTED' };
+    if (search) {
+      where.OR = [
+        { remarks: { contains: search, mode: 'insensitive' } },
+        { user: { username: { contains: search, mode: 'insensitive' } } },
+        { item: { name: { contains: search, mode: 'insensitive' } } },
+        { item: { slug: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.pullOutRequest.findMany({
+        where,
+        skip,
+        take,
+        select: {
+          id: true,
+          qty: true,
+          unit: true,
+          status: true,
+          remarks: true,
+          imageUrl: true,
+          createdAt: true,
+          supervisor: true,
+          item: {
+            select: { id: true, name: true, slug: true, unit: true }
+          },
+          user: {
+            select: { id: true, username: true }
           }
         },
-        user: {
-          select: {
-            id: true,
-            username: true
-          }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+        orderBy: { createdAt: 'desc' }
+      }),
+      this.prisma.pullOutRequest.count({ where })
+    ]);
+
+    return { data, total };
   }
 
   async bulkApprove(ids: string[], adminId: string) {

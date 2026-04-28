@@ -20,18 +20,31 @@ export class ProductsService {
       ];
     }
 
+    const select = {
+      id: true,
+      sku: true,
+      name: true,
+      description: true,
+      unit: true,
+      price: true,
+      threshold: true,
+      imageUrl: true,
+      createdAt: true,
+      stocks: {
+        select: {
+          locationId: true,
+          quantity: true,
+          location: { select: { id: true, name: true } }
+        },
+      },
+    };
+
     if (stockFilter && stockFilter !== 'all') {
+      // For stock level filtering, we currently need to load related stocks to calculate totals
+      // We still limit the fields via select to keep the payload small
       const allProducts = await this.prisma.product.findMany({
         where,
-        include: {
-          stocks: {
-            select: {
-              locationId: true,
-              quantity: true,
-              location: { select: { id: true, name: true } }
-            },
-          },
-        },
+        select,
         orderBy: { name: 'asc' },
       });
 
@@ -43,9 +56,10 @@ export class ProductsService {
         return true;
       });
 
-      const total = filtered.length;
-      const data = filtered.slice(skip, skip + take);
-      return { data, total };
+      return { 
+        data: filtered.slice(skip, skip + take), 
+        total: filtered.length 
+      };
     }
 
     const [data, total] = await Promise.all([
@@ -53,20 +67,7 @@ export class ProductsService {
         where,
         skip,
         take,
-        include: {
-          stocks: {
-            select: {
-              locationId: true,
-              quantity: true,
-              location: {
-                select: {
-                  id: true,
-                  name: true,
-                }
-              }
-            },
-          },
-        },
+        select,
         orderBy: { name: 'asc' },
       }),
       this.prisma.product.count({ where }),
@@ -231,15 +232,42 @@ export class ProductsService {
     });
   }
 
-  getTransactionLogs() {
-    return this.prisma.productTransaction.findMany({
-      include: {
-        product: true,
-        location: true,
-        user: { select: { username: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAllTransactions(params: { skip?: number; take?: number; search?: string } = {}) {
+    const { skip = 0, take = 20, search } = params;
+
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { remarks: { contains: search, mode: 'insensitive' } },
+        { product: { name: { contains: search, mode: 'insensitive' } } },
+        { product: { sku: { contains: search, mode: 'insensitive' } } },
+        { location: { name: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.productTransaction.findMany({
+        where,
+        skip,
+        take,
+        select: {
+          id: true,
+          type: true,
+          quantity: true,
+          remarks: true,
+          createdAt: true,
+          productId: true,
+          locationId: true,
+          product: { select: { id: true, name: true, sku: true } },
+          location: { select: { id: true, name: true } },
+          user: { select: { id: true, username: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.productTransaction.count({ where }),
+    ]);
+
+    return { data, total };
   }
 
   async manualStockAdjustment(

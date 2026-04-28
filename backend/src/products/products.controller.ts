@@ -85,8 +85,16 @@ export class ProductsController {
   }
 
   @Get('logs')
-  getLogs() {
-    return this.productsService.getTransactionLogs();
+  getLogs(
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.productsService.findAllTransactions({
+      skip: skip ? parseInt(skip, 10) : 0,
+      take: take ? parseInt(take, 10) : 20,
+      search,
+    });
   }
 
   @Patch('logs/:id')

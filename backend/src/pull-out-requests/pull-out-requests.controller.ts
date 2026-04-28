@@ -55,8 +55,16 @@ export class PullOutRequestsController {
   }
 
   @Get('pending')
-  async findAllPending() {
-    return this.pullOutRequestsService.findAllPending();
+  async findAllPending(
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.pullOutRequestsService.findAllPending({
+      skip: skip ? parseInt(skip, 10) : 0,
+      take: take ? parseInt(take, 10) : 20,
+      search,
+    });
   }
 
   @Post('bulk-approve')
