@@ -337,16 +337,19 @@ export class PullOutRequestsService {
     return result;
   }
 
-  async bulkUpdateStatus(ids: string[], data: { status: string; attachmentUrl?: string; supervisor?: string; remarks?: string }) {
-    return this.prisma.pullOutRequest.updateMany({
+  async bulkUpdateStatus(ids: string[], data: { status: string; supervisor?: string; remarks?: string; attachmentUrl?: string }) {
+    console.log(`[PullOutRequestsService] Bulk updating ${ids.length} requests to status: ${data.status}`);
+    const result = await this.prisma.pullOutRequest.updateMany({
       where: { id: { in: ids } },
       data: {
         status: data.status,
-        attachmentUrl: data.attachmentUrl,
         supervisor: data.supervisor,
         remarks: data.remarks,
+        attachmentUrl: data.attachmentUrl,
       },
     });
+    console.log(`[PullOutRequestsService] Successfully updated ${result.count} requests`);
+    return result;
   }
 
   async remove(id: string) {
@@ -354,5 +357,29 @@ export class PullOutRequestsService {
     if (!request) throw new NotFoundException('Request not found');
     
     return this.prisma.pullOutRequest.delete({ where: { id } });
+  }
+
+  async findAllPending() {
+    console.log('[PullOutRequestsService] Fetching all SUBMITTED requests for admin review');
+    return this.prisma.pullOutRequest.findMany({
+      where: { status: 'SUBMITTED' },
+      include: {
+        item: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            unit: true
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            username: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
   }
 }

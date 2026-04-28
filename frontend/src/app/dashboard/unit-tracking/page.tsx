@@ -61,6 +61,7 @@ export default function UnitTrackingPage() {
     try {
       const skip = (page - 1) * pageSize;
       const res = await api.get('/pull-out-requests', { params: { skip, take: pageSize, search: debouncedLogSearch } });
+      console.log('Fetched Requests:', res.data.data);
       setRequests(res.data.data);
       setTotalRequests(res.data.total);
     } catch (err) {
