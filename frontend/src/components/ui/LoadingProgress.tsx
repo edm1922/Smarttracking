@@ -149,6 +149,7 @@ export function useLoadingSteps(initialSteps: string[]) {
 interface CircularLoadingProps extends LoadingProgressProps {
   size?: number;
   strokeWidth?: number;
+  fullPage?: boolean;
 }
 
 export function CircularLoading({ 
@@ -156,7 +157,8 @@ export function CircularLoading({
   title = 'Processing',
   size = 120,
   strokeWidth = 10,
-  minDisplayTime = 1500
+  minDisplayTime = 1500,
+  fullPage = false
 }: CircularLoadingProps) {
   const [visible, setVisible] = useState(true);
   const [startTime] = useState(Date.now());
@@ -184,8 +186,10 @@ export function CircularLoading({
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gray-50/80 backdrop-blur-md animate-in fade-in duration-500">
-      <div className="relative flex items-center justify-center">
+    <div className={`z-[100] flex flex-col items-center justify-center bg-gray-50/40 backdrop-blur-sm animate-in fade-in duration-500 ${
+      fullPage ? 'fixed inset-0' : 'absolute inset-0 rounded-[2.5rem]'
+    }`}>
+      <div className="relative flex items-center justify-center scale-75 md:scale-100">
         {/* Track */}
         <svg width={size} height={size} className="transform -rotate-90">
           <circle

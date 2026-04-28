@@ -323,8 +323,8 @@ export default function DashboardPage() {
 
   if (loading || !data) {
     return (
-      <div className="max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-300">
-        <CircularLoading steps={steps} minDisplayTime={1500} title="Intelligence Sync" />
+      <div className="max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-300 relative min-h-[600px]">
+        <CircularLoading steps={steps} minDisplayTime={1500} title="Intelligence Sync" fullPage={false} />
         <PageHeaderSkeleton />
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <CardSkeleton className="h-[120px]" />
