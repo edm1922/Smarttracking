@@ -16,11 +16,14 @@ export class LogsService {
       ];
     }
 
+    const safeTake = Math.min(take ?? 20, 100);
+    const start = Date.now();
+
     const [data, total] = await Promise.all([
       this.prisma.activityLog.findMany({
         where,
         skip,
-        take,
+        take: safeTake,
         select: {
           id: true,
           action: true,
@@ -37,6 +40,11 @@ export class LogsService {
       this.prisma.activityLog.count({ where })
     ]);
 
+    const duration = Date.now() - start;
+    if (duration > 300) {
+      console.warn(`[LogsService] Slow findByItem query: ${duration}ms`);
+    }
+
     return { data, total };
   }
 
@@ -52,11 +60,14 @@ export class LogsService {
       ];
     }
 
+    const safeTake = Math.min(take ?? 20, 100);
+    const start = Date.now();
+
     const [data, total] = await Promise.all([
       this.prisma.activityLog.findMany({
         where,
         skip,
-        take,
+        take: safeTake,
         select: {
           id: true,
           action: true,
@@ -75,6 +86,11 @@ export class LogsService {
       }),
       this.prisma.activityLog.count({ where })
     ]);
+
+    const duration = Date.now() - start;
+    if (duration > 300) {
+      console.warn(`[LogsService] Slow findAll query: ${duration}ms`);
+    }
 
     return { data, total };
   }

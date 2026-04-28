@@ -77,11 +77,14 @@ export class InternalRequestsService {
       ];
     }
 
+    const safeTake = Math.min(take ?? 20, 100);
+    const start = Date.now();
+
     const [requests, total] = await Promise.all([
       this.prisma.internalRequest.findMany({
         where,
         skip,
-        take,
+        take: safeTake,
         orderBy: { createdAt: 'desc' },
         include: {
           product: {
@@ -97,6 +100,11 @@ export class InternalRequestsService {
       }),
       this.prisma.internalRequest.count({ where }),
     ]);
+
+    const duration = Date.now() - start;
+    if (duration > 300) {
+      console.warn(`[InternalRequestsService] Slow findAll query: ${duration}ms`);
+    }
 
     // OPTIMIZED: Use groupBy for total fulfilled counts instead of loading full history
     const issuanceCounts = await this.prisma.internalRequest.groupBy({

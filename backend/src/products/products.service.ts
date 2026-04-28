@@ -39,6 +39,9 @@ export class ProductsService {
       },
     };
 
+    const safeTake = Math.min(take ?? 20, 100);
+    const start = Date.now();
+
     if (stockFilter && stockFilter !== 'all') {
       // For stock level filtering, we currently need to load related stocks to calculate totals
       // We still limit the fields via select to keep the payload small
@@ -56,8 +59,13 @@ export class ProductsService {
         return true;
       });
 
+      const duration = Date.now() - start;
+      if (duration > 300) {
+        console.warn(`[ProductsService] Slow findAll (StockFilter) query: ${duration}ms`);
+      }
+
       return { 
-        data: filtered.slice(skip, skip + take), 
+        data: filtered.slice(skip, skip + safeTake), 
         total: filtered.length 
       };
     }
@@ -66,12 +74,17 @@ export class ProductsService {
       this.prisma.product.findMany({
         where,
         skip,
-        take,
+        take: safeTake,
         select,
         orderBy: { name: 'asc' },
       }),
       this.prisma.product.count({ where }),
     ]);
+
+    const duration = Date.now() - start;
+    if (duration > 300) {
+      console.warn(`[ProductsService] Slow findAll query: ${duration}ms`);
+    }
 
     return { data, total };
   }
@@ -245,11 +258,14 @@ export class ProductsService {
       ];
     }
 
+    const safeTake = Math.min(take ?? 20, 100);
+    const start = Date.now();
+
     const [data, total] = await Promise.all([
       this.prisma.productTransaction.findMany({
         where,
         skip,
-        take,
+        take: safeTake,
         select: {
           id: true,
           type: true,
@@ -266,6 +282,11 @@ export class ProductsService {
       }),
       this.prisma.productTransaction.count({ where }),
     ]);
+
+    const duration = Date.now() - start;
+    if (duration > 300) {
+      console.warn(`[ProductsService] Slow findAllTransactions query: ${duration}ms`);
+    }
 
     return { data, total };
   }

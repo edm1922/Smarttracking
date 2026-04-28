@@ -380,4 +380,152 @@ export class ReportsService {
       recentUpdates,
     };
   }
+
+  // --- New Analytics Endpoints ---
+
+  private getWhereClause(startDate?: string, endDate?: string, dateField: string = 'createdAt') {
+    if (!startDate && !endDate) return {};
+    return {
+      [dateField]: {
+        ...(startDate && { gte: new Date(startDate + 'T00:00:00.000Z') }),
+        ...(endDate && { lte: new Date(endDate + 'T00:00:00.000Z') }),
+      },
+    };
+  }
+
+  async getMostIssuedProducts(startDate?: string, endDate?: string) {
+    const where = this.getWhereClause(startDate, endDate);
+    const topProducts = await this.prisma.productTransaction.groupBy({
+      by: ['productId'],
+      _sum: { quantity: true },
+      where,
+      orderBy: { _sum: { quantity: 'desc' } },
+      take: 50,
+    });
+
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: topProducts.map((p) => p.productId) } },
+      select: { id: true, name: true },
+    });
+
+    const productMap = new Map(products.map((p) => [p.id, p.name]));
+
+    return topProducts.map((tp) => ({
+      productId: tp.productId,
+      name: productMap.get(tp.productId) || 'Unknown',
+      totalIssued: tp._sum.quantity ?? 0,
+    }));
+  }
+
+  async getDailyStockMovement(startDate?: string, endDate?: string) {
+    const conditions = [];
+
+    if (startDate) {
+      conditions.push(Prisma.sql`"createdAt" >= ${new Date(startDate + 'T00:00:00.000Z')}`);
+    }
+    if (endDate) {
+      conditions.push(Prisma.sql`"createdAt" <= ${new Date(endDate + 'T00:00:00.000Z')}`);
+    }
+
+    const whereClause =
+      conditions.length > 0
+        ? Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`
+        : Prisma.empty;
+
+    const query = Prisma.sql`
+      SELECT DATE_TRUNC('day', "createdAt") as date,
+             SUM(quantity)::int as total
+      FROM "ProductTransaction"
+      ${whereClause}
+      GROUP BY DATE_TRUNC('day', "createdAt")
+      ORDER BY date DESC
+      LIMIT 50
+    `;
+
+    return await this.prisma.$queryRaw(query);
+  }
+
+  async getIssuancesByLocation(startDate?: string, endDate?: string) {
+    const where = this.getWhereClause(startDate, endDate);
+    return await this.prisma.productTransaction.groupBy({
+      by: ['locationId'],
+      _sum: { quantity: true },
+      where,
+      orderBy: { _sum: { quantity: 'desc' } },
+      take: 50,
+    });
+  }
+
+  async getRequestStatusDistribution(startDate?: string, endDate?: string) {
+    const where = this.getWhereClause(startDate, endDate);
+    return await this.prisma.internalRequest.groupBy({
+      by: ['status'],
+      _count: { status: true },
+      where,
+    });
+  }
+
+  async getTopEmployees(startDate?: string, endDate?: string) {
+    const where = this.getWhereClause(startDate, endDate);
+    return await this.prisma.internalRequest.groupBy({
+      by: ['employeeName'],
+      _count: { employeeName: true },
+      where,
+      orderBy: { _count: { employeeName: 'desc' } },
+      take: 50,
+    });
+  }
+
+  async getProductUsageTrend(productId: string, startDate?: string, endDate?: string) {
+    const conditions = [Prisma.sql`"productId" = ${productId}`];
+
+    if (startDate) {
+      conditions.push(Prisma.sql`"createdAt" >= ${new Date(startDate + 'T00:00:00.000Z')}`);
+    }
+    if (endDate) {
+      conditions.push(Prisma.sql`"createdAt" <= ${new Date(endDate + 'T00:00:00.000Z')}`);
+    }
+
+    const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
+
+    const query = Prisma.sql`
+      SELECT DATE_TRUNC('day', "createdAt") as date,
+             SUM(quantity)::int as total
+      FROM "ProductTransaction"
+      ${whereClause}
+      GROUP BY DATE_TRUNC('day', "createdAt")
+      ORDER BY date ASC
+      LIMIT 50
+    `;
+
+    return await this.prisma.$queryRaw(query);
+  }
+
+  async getLowStockAlertReport() {
+    const stock = await this.prisma.productStock.findMany({
+      select: {
+        productId: true,
+        quantity: true,
+        product: {
+          select: {
+            name: true,
+            threshold: true,
+          },
+        },
+      },
+    });
+
+    return stock
+      .filter((item) => item.quantity < (item.product?.threshold || 0))
+      .slice(0, 50);
+  }
+
+  async getBatchLevelAnalytics() {
+    return await this.prisma.item.groupBy({
+      by: ['batchId'],
+      _count: { batchId: true },
+      orderBy: { _count: { batchId: 'desc' } },
+      take: 50,
+    });
+  }
 }

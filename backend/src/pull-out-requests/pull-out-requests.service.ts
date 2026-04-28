@@ -117,11 +117,14 @@ export class PullOutRequestsService {
       ];
     }
 
+    const safeTake = Math.min(take ?? 20, 100);
+    const start = Date.now();
+
     const [data, total] = await Promise.all([
       this.prisma.pullOutRequest.findMany({
         where,
         skip,
-        take,
+        take: safeTake,
         select: {
           id: true,
           qty: true,
@@ -154,6 +157,11 @@ export class PullOutRequestsService {
       this.prisma.pullOutRequest.count({ where })
     ]);
 
+    const duration = Date.now() - start;
+    if (duration > 300) {
+      console.warn(`[PullOutRequestsService] Slow findByUser query: ${duration}ms`);
+    }
+
     return { data, total };
   }
 
@@ -169,11 +177,14 @@ export class PullOutRequestsService {
       ];
     }
 
+    const safeTake = Math.min(take ?? 20, 100);
+    const start = Date.now();
+
     const [data, total] = await Promise.all([
       this.prisma.pullOutRequest.findMany({
         where,
         skip,
-        take,
+        take: safeTake,
         select: {
           id: true,
           qty: true,
@@ -193,6 +204,11 @@ export class PullOutRequestsService {
       }),
       this.prisma.pullOutRequest.count({ where })
     ]);
+
+    const duration = Date.now() - start;
+    if (duration > 300) {
+      console.warn(`[PullOutRequestsService] Slow findAll query: ${duration}ms`);
+    }
 
     return { data, total };
   }
@@ -363,11 +379,14 @@ export class PullOutRequestsService {
       ];
     }
 
+    const safeTake = Math.min(take ?? 20, 100);
+    const start = Date.now();
+
     const [data, total] = await Promise.all([
       this.prisma.pullOutRequest.findMany({
         where,
         skip,
-        take,
+        take: safeTake,
         select: {
           id: true,
           qty: true,
@@ -388,6 +407,11 @@ export class PullOutRequestsService {
       }),
       this.prisma.pullOutRequest.count({ where })
     ]);
+
+    const duration = Date.now() - start;
+    if (duration > 300) {
+      console.warn(`[PullOutRequestsService] Slow findAllPending query: ${duration}ms`);
+    }
 
     return { data, total };
   }

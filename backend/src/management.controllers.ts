@@ -13,7 +13,6 @@ import { CategoriesService } from './categories/categories.service';
 import { TagsService } from './tags/tags.service';
 import { BatchesService } from './batches/batches.service';
 import { WorkflowService } from './workflow/workflow.service';
-import { ReportsService } from './reports/reports.service';
 import { AuthGuard } from './auth/auth.guard';
 
 @Controller('categories')
@@ -88,29 +87,5 @@ export class WorkflowController {
   }
   @Delete('transitions/:id') removeTransition(@Param('id') id: string) {
     return this.service.removeTransition(id);
-  }
-}
-
-@Controller('reports')
-@UseGuards(AuthGuard)
-export class ReportsController {
-  constructor(
-    private readonly service: ReportsService,
-  ) {}
-  @Get('summary') getSummary() {
-    return this.service.getSummary();
-  }
-  @Get('analytics') getAnalytics(
-    @Query('locationId') locationId?: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    return this.service.getAnalytics(locationId, startDate, endDate);
-  }
-  @Get('report-data') getReportData(
-    @Query('type') type: string,
-    @Query('productId') productId?: string,
-  ) {
-    return this.service.getReportData(type, { productId });
   }
 }
