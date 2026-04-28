@@ -114,14 +114,15 @@ function UnitRequisitionContent() {
 
   const fetchInventory = async () => {
     try {
-      const res = await api.get('/items/unit-inventory');
-      setInventory(res.data);
+      const res = await api.get('/items/unit-inventory', { params: { take: 1000 } });
+      setInventory(res.data.data || []);
     } catch (err) {
       console.error('Failed to fetch unit inventory', err);
     } finally {
       setLoading(false);
     }
   };
+
 
   const [page, setPage] = useState(1);
   const [totalRequests, setTotalRequests] = useState(0);

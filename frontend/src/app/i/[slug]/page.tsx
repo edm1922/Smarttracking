@@ -68,8 +68,8 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       ]);
       
       // Defer loading of suggestions to speed up initial form render
-      api.get('/items/unit-inventory').then(res => {
-        setNameTemplates(res.data);
+      api.get('/items/unit-inventory', { params: { take: 1000 } }).then(res => {
+        setNameTemplates(res.data.data || []);
       }).catch(err => console.error('Failed to load suggestions', err));
       
       const itemData = itemRes.data;
