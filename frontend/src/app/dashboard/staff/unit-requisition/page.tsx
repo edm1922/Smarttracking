@@ -73,9 +73,6 @@ function UnitRequisitionContent() {
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
 
-  // Local Inbox (from QR Scans)
-  const [inbox, setInbox] = useState<any[]>([]);
-
   // Tab State
   const [activeTab, setActiveTab] = useState<'create' | 'history' | 'inventory' | 'releasing'>('create');
 
@@ -169,41 +166,8 @@ function UnitRequisitionContent() {
     fetchStaffInventory();
     fetchStaffInventory();
     fetchStaffReleases();
-    
-    // Load inbox from localStorage
-    const savedInbox = JSON.parse(localStorage.getItem('unit_requisition_inbox') || '[]');
-    setInbox(savedInbox);
+    fetchMyRequests();
   }, []);
-
-  const addToCartFromInbox = (inboxItem: any) => {
-    const newItem: CartItem = {
-      id: Math.random().toString(36).substr(2, 9),
-      slug: inboxItem.slug,
-      productName: inboxItem.productName,
-      manualSlug: inboxItem.slug,
-      qty: inboxItem.qty,
-      imagePreview: null, // Reset QR scan preview
-      referencePreview: inboxItem.imagePreview, // Move inbox image to Reference slot
-      status: 'success'
-    };
-
-    // If supervisor is set in inbox item and not in form, suggest it
-    if (inboxItem.supervisor && !form.supervisorName) {
-      setForm(prev => ({ ...prev, supervisorName: inboxItem.supervisor }));
-    }
-
-    setCart([...cart, newItem]);
-    
-    // Remove from inbox
-    const newInbox = inbox.filter(item => item.id !== inboxItem.id);
-    setInbox(newInbox);
-    localStorage.setItem('unit_requisition_inbox', JSON.stringify(newInbox));
-  };
-
-  const clearInbox = () => {
-    setInbox([]);
-    localStorage.removeItem('unit_requisition_inbox');
-  };
 
   const toggleFilter = (productName: string, specKey: string, specValue: string) => {
     setProductFilters(prev => {
@@ -535,8 +499,8 @@ function UnitRequisitionContent() {
             </div>
 
             <div className="p-8 space-y-8 flex-1 overflow-y-auto max-h-[70vh]">
-              {/* Temporary Inbox Section */}
-              {inbox.length > 0 && (
+              {/* Pending Scans from QR - loaded from API */}
+              {myRequests.filter(r => r.status === 'PENDING').length > 0 && (
                 <div className="bg-orange-50/50 rounded-[2rem] border border-orange-100 p-6 space-y-4 animate-in slide-in-from-top-4 mb-4">
                   <div className="flex items-center justify-between px-2">
                     <div className="flex items-center gap-2">
@@ -544,27 +508,41 @@ function UnitRequisitionContent() {
                         <History className="h-4 w-4 text-orange-600" />
                       </div>
                       <div>
-                        <h3 className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Pending Scans (Inbox)</h3>
-                        <p className="text-[8px] font-bold text-orange-600/60 uppercase tracking-tighter">Drafted from QR scans</p>
+                        <h3 className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Pending from QR Scans</h3>
+                        <p className="text-[8px] font-bold text-orange-600/60 uppercase tracking-tighter">Scan QR, review here, then submit</p>
                       </div>
                     </div>
-                    <button onClick={clearInbox} className="text-[8px] font-black text-red-500 uppercase hover:underline">Clear Inbox</button>
                   </div>
 
                   <div className="grid grid-cols-1 gap-2">
-                    {inbox.map((item) => (
+                    {myRequests.filter(r => r.status === 'PENDING').map((item) => (
                       <div key={item.id} className="bg-white p-4 rounded-2xl border border-orange-100/50 flex items-center justify-between hover:border-orange-500/30 transition-all group shadow-sm">
                         <div className="flex items-center gap-3">
                           <div className="h-10 w-10 bg-gray-50 rounded-xl overflow-hidden flex items-center justify-center border border-gray-100">
-                             {item.imagePreview ? <img src={item.imagePreview} className="w-full h-full object-cover" alt="QR" /> : <QrCode className="h-4 w-4 text-gray-300" />}
+                             {item.imageUrl ? <img src={item.imageUrl} className="w-full h-full object-cover" alt="QR" /> : <QrCode className="h-4 w-4 text-gray-300" />}
                           </div>
                           <div>
-                            <p className="text-xs font-mono font-bold text-gray-900 leading-none mb-1">{item.slug}</p>
+                            <p className="text-xs font-mono font-bold text-gray-900 leading-none mb-1">{item.item?.slug || item.itemId}</p>
                             <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{item.qty} {item.unit}</p>
                           </div>
                         </div>
                         <button 
-                          onClick={() => addToCartFromInbox(item)}
+                          onClick={() => {
+                            const cartItem: CartItem = {
+                              id: item.id,
+                              slug: item.item?.slug || item.itemId,
+                              productName: item.item?.name,
+                              manualSlug: item.item?.slug || item.itemId,
+                              qty: item.qty,
+                              imagePreview: null,
+                              referencePreview: item.imageUrl,
+                              status: 'success'
+                            };
+                            setCart(prev => [...prev, cartItem]);
+                            if (item.supervisor && !form.supervisorName) {
+                              setForm(prev => ({ ...prev, supervisorName: item.supervisor }));
+                            }
+                          }}
                           className="px-4 py-2 bg-orange-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-orange-900/20 active:scale-95 transition-all flex items-center gap-2"
                         >
                           <Plus className="h-3 w-3" /> Add to Form

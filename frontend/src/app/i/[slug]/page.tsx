@@ -309,24 +309,19 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       return;
     }
 
-    // Instead of sending to backend, save to local "Inbox"
     try {
-      const inboxData = {
-        id: Math.random().toString(36).substr(2, 9),
-        slug: slug,
-        productName: item.name || 'Unknown Asset',
+      const payload = {
+        itemSlug: slug,
         qty: pullOutQty,
         unit: unitTracking.unit,
         remarks: pullOutRemarks,
-        imagePreview: pullOutImage,
+        imageUrl: pullOutImage,
         supervisor: pullOutSupervisor,
-        timestamp: new Date().toISOString()
       };
 
-      const existingInbox = JSON.parse(localStorage.getItem('unit_requisition_inbox') || '[]');
-      localStorage.setItem('unit_requisition_inbox', JSON.stringify([...existingInbox, inboxData]));
+      await api.post('/pull-out-requests', payload);
       
-      alert(`Added ${slug} to your Requisition Inbox. You can now go to the Unit Requisition Portal to print and submit the form.`);
+      alert(`Pull-out request for ${slug} has been submitted. Please go to the Unit Requisition Portal to review and finalize.`);
       
       // Reset state
       setPullOutRemarks('');
