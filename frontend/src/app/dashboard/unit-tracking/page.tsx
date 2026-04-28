@@ -47,7 +47,7 @@ export default function UnitTrackingPage() {
   const [totalRequests, setTotalRequests] = useState(0);
   const [invPage, setInvPage] = useState(1);
   const [invTotal, setInvTotal] = useState(0);
-const pageSize = 20;
+  const pageSize = 100;
   const debouncedLogSearch = useDebounce(logSearch, 300);
 
   const { steps, setStepDone, setStepLabel } = useLoadingSteps([

@@ -293,7 +293,7 @@ export class ItemsService {
   }
 
   async getUnitInventory(params: { skip?: number; take?: number; search?: string } = {}) {
-    const { skip = 0, take = 20, search } = params;
+    const { skip = 0, take = 100, search } = params;
 
     const where: any = {
       fieldValues: {
@@ -472,7 +472,7 @@ export class ItemsService {
       WHERE fv.value::text LIKE '%useUnitQty%'
       GROUP BY i."name"
       ORDER BY i."name"
-      LIMIT 50
+      LIMIT 100
     `;
     return stats;
   }
