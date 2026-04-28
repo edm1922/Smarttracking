@@ -266,7 +266,11 @@ function UnitRequisitionContent() {
           const code = jsQR(imageData.data, imageData.width, imageData.height);
           
           if (code) {
-            updateCartItem(id, { manualSlug: code.data, status: 'success' });
+            let extractedSlug = code.data;
+            if (extractedSlug.includes('/i/')) {
+              extractedSlug = extractedSlug.split('/i/').pop()?.split('?')[0] || extractedSlug;
+            }
+            updateCartItem(id, { manualSlug: extractedSlug, status: 'success' });
           } else {
             updateCartItem(id, { status: 'manual' });
             alert('Could not detect QR code in this image. You can still use it as a reference, but please type the Slug manually.');
