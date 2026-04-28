@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { 
   Boxes, Package, Search, Filter, ArrowRight, 
   ChevronRight, ChevronLeft, ChevronDown, ChevronUp, History,
@@ -16,6 +16,7 @@ import { LoadingProgress, useLoadingSteps } from '@/components/ui/LoadingProgres
 export default function UnitTrackingPage() {
   const [inventory, setInventory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const isFirstLoad = useRef(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'inventory' | 'summary' | 'requisition'>('inventory');
@@ -57,15 +58,19 @@ export default function UnitTrackingPage() {
   ]);
 
   useEffect(() => {
-    setLoading(true);
     const loadAll = async () => {
+      if (isFirstLoad.current) setLoading(true);
       const startTime = Date.now();
       await Promise.all([fetchRequests(), fetchInventory()]);
       const elapsed = Date.now() - startTime;
-      if (elapsed < 1800) {
-        await new Promise(resolve => setTimeout(resolve, 1800 - elapsed));
+      
+      if (isFirstLoad.current) {
+        if (elapsed < 1800) {
+          await new Promise(resolve => setTimeout(resolve, 1800 - elapsed));
+        }
+        setLoading(false);
+        isFirstLoad.current = false;
       }
-      setLoading(false);
     };
     loadAll();
 
