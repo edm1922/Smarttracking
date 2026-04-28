@@ -283,6 +283,7 @@ export default function DashboardPage() {
 
   const fetchData = async () => {
     setIsRefreshing(true);
+    const startTime = Date.now();
     try {
       const locRes = await api.get('/locations');
       setLocations(locRes.data);
@@ -299,6 +300,10 @@ export default function DashboardPage() {
     } catch (err) {
       console.error('Failed to fetch analytics', err);
     } finally {
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 1000) {
+        await new Promise(resolve => setTimeout(resolve, 1000 - elapsed));
+      }
       setLoading(false);
       setIsRefreshing(false);
     }

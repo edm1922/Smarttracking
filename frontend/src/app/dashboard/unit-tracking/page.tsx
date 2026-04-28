@@ -57,7 +57,17 @@ const pageSize = 20;
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([fetchRequests(), fetchInventory()]);
+    const loadAll = async () => {
+      const startTime = Date.now();
+      await Promise.all([fetchRequests(), fetchInventory()]);
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 1800) {
+        await new Promise(resolve => setTimeout(resolve, 1800 - elapsed));
+      }
+      setLoading(false);
+    };
+    loadAll();
+
     const user = localStorage.getItem('username');
     if (user) {
       setTransmittalHeader(prev => ({ ...prev, preparedBy: user }));
@@ -65,30 +75,28 @@ const pageSize = 20;
   }, [invPage, page, debouncedLogSearch]);
 
   const fetchRequests = async () => {
-    setStepDone('Fetching pull-out requests');
     try {
       const skip = (page - 1) * pageSize;
       const res = await api.get('/pull-out-requests', { params: { skip, take: pageSize, search: debouncedLogSearch } });
       console.log('Fetched Requests:', res.data.data);
       setRequests(res.data.data);
       setTotalRequests(res.data.total);
+      setStepDone('Fetching pull-out requests');
     } catch (err) {
       console.error('Failed to fetch pull out requests', err);
     }
   };
 
   const fetchInventory = async () => {
-    setStepDone('Loading inventory');
     try {
       const skip = (invPage - 1) * pageSize;
       const res = await api.get('/items/unit-inventory', { params: { skip, take: pageSize } });
       console.log('Unit Inventory Data:', res.data);
       setInventory(res.data.data || []);
       setInvTotal(res.data.total || 0);
+      setStepDone('Loading inventory');
     } catch (err) {
       console.error('Failed to fetch unit inventory', err);
-    } finally {
-      if (loading) setLoading(false);
     }
   };
 

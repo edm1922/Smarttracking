@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Box, Calendar, ChevronRight, Search } from 'lucide-react';
 import api from '@/lib/api';
+import { CardSkeleton, PageHeaderSkeleton } from '@/components/ui/LoadingSkeletons';
 
 export default function BatchesPage() {
   const [batches, setBatches] = useState<any[]>([]);
@@ -11,10 +12,15 @@ export default function BatchesPage() {
   const [formData, setFormData] = useState({ batchCode: '', description: '' });
 
   const fetchBatches = async () => {
+    const startTime = Date.now();
     try {
       const response = await api.get('/batches');
       setBatches(response.data);
     } finally {
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 800) {
+        await new Promise(resolve => setTimeout(resolve, 800 - elapsed));
+      }
       setLoading(false);
     }
   };
@@ -30,6 +36,19 @@ export default function BatchesPage() {
       fetchBatches();
     } catch (err) { alert('Failed to create batch'); }
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-300">
+        <PageHeaderSkeleton />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
