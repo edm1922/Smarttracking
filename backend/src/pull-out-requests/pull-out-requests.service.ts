@@ -147,7 +147,7 @@ export class PullOutRequestsService {
     const where: any = {};
     if (search) {
       where.OR = [
-        { purpose: { contains: search, mode: 'insensitive' } },
+        { remarks: { contains: search, mode: 'insensitive' } },
         { user: { username: { contains: search, mode: 'insensitive' } } },
         { item: { name: { contains: search, mode: 'insensitive' } } },
       ];
@@ -174,39 +174,6 @@ export class PullOutRequestsService {
     return { data, total };
   }
 
-  async findAllPending(params: { skip?: number; take?: number; search?: string } = {}) {
-    const { skip = 0, take = 20, search } = params;
-
-    const where: any = { status: 'PENDING' };
-    if (search) {
-      where.OR = [
-        { purpose: { contains: search, mode: 'insensitive' } },
-        { user: { username: { contains: search, mode: 'insensitive' } } },
-        { item: { name: { contains: search, mode: 'insensitive' } } },
-      ];
-    }
-
-    const [data, total] = await Promise.all([
-      this.prisma.pullOutRequest.findMany({
-        where,
-        skip,
-        take,
-        include: { 
-          item: {
-            include: { fieldValues: { include: { field: true } } }
-          }, 
-          user: {
-            select: { id: true, username: true }
-          } 
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.pullOutRequest.count({ where })
-    ]);
-
-    return { data, total };
-  }
-
   async approve(id: string, adminId: string) {
     const request = await this.prisma.pullOutRequest.findUnique({
       where: { id },
@@ -214,7 +181,7 @@ export class PullOutRequestsService {
     });
 
     if (!request) throw new NotFoundException('Request not found');
-    if (request.status !== 'PENDING') throw new BadRequestException('Request is already processed');
+    if (request.status !== 'PENDING' && request.status !== 'SUBMITTED') throw new BadRequestException('Request is already processed');
 
     const item = request.item;
     const qty = request.qty;
@@ -318,7 +285,7 @@ export class PullOutRequestsService {
   async reject(id: string, adminId: string) {
     const request = await this.prisma.pullOutRequest.findUnique({ where: { id } });
     if (!request) throw new NotFoundException('Request not found');
-    if (request.status !== 'PENDING') throw new BadRequestException('Request is already processed');
+    if (request.status !== 'PENDING' && request.status !== 'SUBMITTED') throw new BadRequestException('Request is already processed');
 
     const result = await this.prisma.pullOutRequest.update({
       where: { id },
