@@ -36,6 +36,7 @@ interface CartItem {
   referencePreview?: string | null;
   manualSlug: string;
   qty: number;
+  unit: string;
   status: 'pending' | 'scanning' | 'success' | 'manual';
 }
 
@@ -159,6 +160,7 @@ function UnitRequisitionContent() {
           if (res.data) {
             updateCartItem(item.id, { 
               productName: res.data.name,
+              unit: res.data.unit || 'pcs',
               status: 'success'
             });
           }
@@ -235,6 +237,7 @@ function UnitRequisitionContent() {
       productName: '',
       manualSlug: '',
       qty: 1,
+      unit: 'pcs',
       status: 'manual'
     };
     setCart([...cart, newItem]);
@@ -604,6 +607,7 @@ function UnitRequisitionContent() {
                                 productName: item.item?.name,
                                 manualSlug: item.item?.slug || item.itemId,
                                 qty: item.qty,
+                                unit: item.unit || 'pcs',
                                 imagePreview: null,
                                 referencePreview: item.imageUrl,
                                 status: 'success'
@@ -758,7 +762,7 @@ function UnitRequisitionContent() {
                                </div>
 
                                <div className="flex flex-col justify-end">
-                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Unit: Pair</p>
+                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Unit: {item.unit || 'pcs'}</p>
                                </div>
                              </div>
                           </div>
