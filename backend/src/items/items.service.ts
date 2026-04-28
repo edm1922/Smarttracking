@@ -460,6 +460,23 @@ export class ItemsService {
     return { data: result, total };
   }
 
+  async getUnitInventorySummary() {
+    const stats = await this.prisma.$queryRaw`
+      SELECT 
+        i."name",
+        COUNT(*) as item_count,
+        SUM((fv.value->>'qty')::int) as total_qty,
+        MAX(fv.value->>'unit') as unit
+      FROM "Item" i
+      JOIN "ItemFieldValue" fv ON fv."itemId" = i.id
+      WHERE fv.value::text LIKE '%useUnitQty%'
+      GROUP BY i."name"
+      ORDER BY i."name"
+      LIMIT 50
+    `;
+    return stats;
+  }
+
   async submitForm(slug: string, data: any) {
     const item = await this.findOne(slug);
     if (item.locked)

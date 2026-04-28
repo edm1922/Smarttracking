@@ -44,6 +44,11 @@ export class ItemsController {
     });
   }
 
+  @Get('unit-inventory-summary')
+  getUnitInventorySummary() {
+    return this.itemsService.getUnitInventorySummary();
+  }
+
   @Get(':slug')
   findOne(@Param('slug') slug: string) {
     return this.itemsService.findOne(slug);
