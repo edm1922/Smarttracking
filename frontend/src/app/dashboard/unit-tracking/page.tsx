@@ -778,7 +778,7 @@ export default function UnitTrackingPage() {
                               let displayValue = '';
                               
                               if (v && typeof v === 'object' && v.useUnitQty) {
-                                displayValue = v.main || `${v.qty ?? 0} ${v.unit ?? ''}`;
+                                displayValue = String(v.qty ?? 0);
                               } else {
                                 displayValue = typeof fv.value === 'object' ? JSON.stringify(fv.value) : String(fv.value);
                               }

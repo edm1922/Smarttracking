@@ -93,8 +93,7 @@ export default function StoragePage() {
     const value = fv.value;
     if (value && typeof value === 'object' && !Array.isArray(value)) {
       if (value.useUnitQty) {
-        const qtyStr = `${value.qty ?? 0} ${value.unit ?? ''}`.trim();
-        return value.main ? `${qtyStr} (${value.main})` : qtyStr;
+        return value.qty ?? 0;
       }
       return String(value.main || JSON.stringify(value));
     }

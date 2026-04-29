@@ -808,7 +808,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                       
                      if (typeof val === 'object' && val !== null) {
                         if (val.useUnitQty) {
-                          displayValue = val.main || `${val.qty ?? 0} ${val.unit ?? ''}`;
+                          displayValue = String(val.qty ?? 0);
                         } else {
                           displayValue = val.main || '—';
                         }
@@ -837,7 +837,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                          </div>
                          <div>
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Current Stock</p>
-                            <p className="text-sm font-black text-gray-900">{unitTracking.qty} {unitTracking.unit}</p>
+                            <p className="text-sm font-black text-gray-900">{unitTracking.qty}</p>
                          </div>
                          <div>
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Alert Threshold</p>
