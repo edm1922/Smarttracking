@@ -230,7 +230,11 @@ export default function UnitTrackingPage() {
   };
 
 
-  const filteredInventory = inventory;
+   const filteredInventory = searchTerm 
+    ? inventory.filter(p => 
+        p.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : inventory;
 
   const toggleFilter = (productName: string, specKey: string, specValue: string) => {
     setProductFilters(prev => {
