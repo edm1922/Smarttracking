@@ -808,7 +808,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                       
                      if (typeof val === 'object' && val !== null) {
                         if (val.useUnitQty) {
-                          displayValue = String(val.qty ?? 0);
+                          displayValue = String(val.main ?? val.qty ?? 0);
                         } else {
                           displayValue = val.main || '—';
                         }
