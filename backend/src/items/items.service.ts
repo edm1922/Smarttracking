@@ -295,6 +295,8 @@ export class ItemsService {
   async getUnitInventory(params: { skip?: number; take?: number; search?: string } = {}) {
     const { skip = 0, take = 100, search } = params;
 
+    // Fetch ALL items that match the unit tracking criteria
+    // We do this because we need to group them by name first before we can reliably paginate or search by group name
     const where: any = {
       fieldValues: {
         some: {
@@ -306,36 +308,26 @@ export class ItemsService {
       }
     };
 
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { slug: { contains: search, mode: 'insensitive' } },
-      ];
-    }
-
-    const [items, total] = await Promise.all([
-      this.prisma.item.findMany({
-        where,
-        skip,
-        take,
-        select: {
-          id: true,
-          slug: true,
-          name: true,
-          status: true,
-          batch: { select: { batchCode: true } },
-          fieldValues: {
-            select: {
-              fieldId: true,
-              value: true,
-              field: { select: { name: true } }
-            }
+    // If there is a search term, we'll apply it to items first
+    // but the actual filtering of the groups will happen in JS to be more robust
+    const items = await this.prisma.item.findMany({
+      where,
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        status: true,
+        batch: { select: { batchCode: true } },
+        fieldValues: {
+          select: {
+            fieldId: true,
+            value: true,
+            field: { select: { name: true } }
           }
-        },
-        orderBy: { name: 'asc' },
-      }),
-      this.prisma.item.count({ where })
-    ]);
+        }
+      },
+      orderBy: { name: 'asc' },
+    });
 
     const inventory: Record<string, any> = {};
     
@@ -405,7 +397,8 @@ export class ItemsService {
       });
     });
 
-    const result = Object.values(inventory).map((group: any) => {
+    // Convert Set to Array and prepare final list
+    let result = Object.values(inventory).map((group: any) => {
       if (group.specs) {
         Object.keys(group.specs).forEach(key => {
           group.specs[key] = Array.from(group.specs[key]);
@@ -414,7 +407,24 @@ export class ItemsService {
       return group;
     });
 
-    if (result.length === 0 && skip === 0) {
+    // Apply search filtering in JS for better matching across products and item slugs
+    if (search) {
+      const searchLower = search.toLowerCase();
+      result = result.filter(group => {
+        // Match group name
+        if (group.name.toLowerCase().includes(searchLower)) return true;
+        // Match any item slug in the group
+        if (group.items.some((it: any) => it.slug.toLowerCase().includes(searchLower))) return true;
+        return false;
+      });
+    }
+
+    const total = result.length;
+    // Apply pagination to the GROUPED products
+    result = result.slice(skip, skip + take);
+
+    if (result.length === 0 && skip === 0 && !search) {
+      // Fallback only if no search and no grouped items found at all
       const fallbackItems = await this.prisma.item.findMany({
         take: 100,
         select: {
@@ -454,7 +464,8 @@ export class ItemsService {
           }))
         });
       });
-      return { data: Object.values(fallback), total: fallbackItems.length };
+      const fallbackResult = Object.values(fallback);
+      return { data: fallbackResult.slice(skip, skip + take), total: fallbackResult.length };
     }
 
     return { data: result, total };

@@ -800,7 +800,7 @@ export default function UnitTrackingPage() {
                         </div>
                         <div className="flex items-center gap-4">
                            <div className="text-right mr-2">
-                             <span className={`text-sm font-black ${isLowStock ? 'text-red-600' : 'text-gray-900'}`}>{item.qty} <span className="text-[10px] text-gray-400 uppercase">{product.unit}</span></span>
+                              <span className={`text-sm font-black ${isLowStock ? 'text-red-600' : 'text-gray-900'}`}>{item.qty}</span>
                              {isLowStock && <p className="text-[8px] font-bold text-red-400 uppercase tracking-tighter">Limit: {item.threshold}</p>}
                            </div>
                            <button 
@@ -986,7 +986,7 @@ export default function UnitTrackingPage() {
                     <p className="text-sm font-bold text-gray-900">{req.user.username}</p>
                   </td>
                   <td className="px-8 py-5 text-center">
-                    <p className="text-sm font-black text-gray-900">{req.isGrouped ? req.totalQty : req.qty} <span className="text-[10px] text-gray-400 uppercase">{req.unit}</span></p>
+                    <p className="text-sm font-black text-gray-900">{req.isGrouped ? req.totalQty : req.qty}</p>
                     {req.isGrouped && <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Aggregated</p>}
                   </td>
                   <td className="px-8 py-5">
@@ -1166,7 +1166,7 @@ export default function UnitTrackingPage() {
                         <tr key={req.id}>
                           <td className="px-6 py-4 text-xs font-bold text-gray-400">{idx + 1}</td>
                           <td className="px-6 py-4 text-xs font-mono font-bold text-gray-900">{req.item.slug}</td>
-                          <td className="px-6 py-4 text-xs font-black text-gray-900">{req.qty} {req.unit}</td>
+                          <td className="px-6 py-4 text-xs font-black text-gray-900">{req.qty}</td>
                           <td className="px-6 py-4">
                             <span className="text-[9px] font-black uppercase text-gray-400">{req.status}</span>
                           </td>
@@ -1234,7 +1234,7 @@ export default function UnitTrackingPage() {
               <tr key={req.id}>
                 <td className="py-4 px-4 text-xs font-bold text-gray-400">{idx + 1}</td>
                 <td className="py-4 px-4 text-xs font-bold uppercase">{req.item.slug}</td>
-                <td className="py-4 px-4 text-xs font-black">{req.qty} {req.unit}</td>
+                <td className="py-4 px-4 text-xs font-black">{req.qty}</td>
                 <td className="py-4 px-4 text-xs italic text-gray-400">Authorized Release</td>
               </tr>
             ))}
@@ -1323,7 +1323,7 @@ export default function UnitTrackingPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[10px] font-black text-gray-400 uppercase">Release Qty:</span>
-                    <span className="text-sm font-black text-gray-900">{viewingLog.qty} {viewingLog.unit}</span>
+                    <span className="text-sm font-black text-gray-900">{viewingLog.qty}</span>
                   </div>
                 </div>
               </div>
