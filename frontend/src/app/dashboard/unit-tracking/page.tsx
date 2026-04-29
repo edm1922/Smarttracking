@@ -656,7 +656,7 @@ export default function UnitTrackingPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {filteredInventory.map((product, idx) => (
+         {filteredInventory.filter(product => product.name && product.name !== 'Unnamed Product').map((product, idx) => (
           <div 
             key={product.name}
             className="group relative bg-white rounded-[2.5rem] border border-gray-100 shadow-xl shadow-gray-200/50 overflow-hidden transition-all hover:shadow-2xl hover:shadow-primary/5"

@@ -332,6 +332,9 @@ export class ItemsService {
     const inventory: Record<string, any> = {};
     
     items.forEach(item => {
+      // Skip items with no name (they are part of TELA batch but not individual products)
+      if (!item.name) return;
+      
       const unitField = item.fieldValues.find(fv => {
         const val = fv.value as any;
         return val && typeof val === 'object' && val.useUnitQty === true;
@@ -339,11 +342,11 @@ export class ItemsService {
       
       if (!unitField) return;
       const val = unitField.value as any;
-
-      const name = item.name || 'Unnamed Product';
+      
+      const name = item.name;
       const qty = val.qty || 0;
       const unit = val.unit || 'Units';
-
+      
       if (!inventory[name]) {
         inventory[name] = {
           name,
@@ -352,7 +355,7 @@ export class ItemsService {
           items: []
         };
       }
-
+      
       inventory[name].totalQty += qty;
       
       if (!inventory[name].specs) inventory[name].specs = {};
@@ -442,9 +445,12 @@ export class ItemsService {
           }
         }
       });
-      const fallback: Record<string, any> = {};
+       const fallback: Record<string, any> = {};
       fallbackItems.forEach(it => {
-        const name = it.name || it.slug || 'Unnamed Product';
+        // Skip items with no name - they should not create "Unnamed Product" groups
+        if (!it.name) return;
+        
+        const name = it.name;
         const unitField = it.fieldValues.find((fv: any) => fv.value && typeof fv.value === 'object' && (fv.value as any).unit);
         const unit = ((unitField?.value as any)?.unit) || 'pcs';
         const qty = (unitField?.value && (unitField.value as any).qty) || 1;
