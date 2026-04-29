@@ -50,6 +50,7 @@ export default function ProductsPage() {
   const [logSearchTerm, setLogSearchTerm] = useState('');
   const [editableStock, setEditableStock] = useState(0);
   const [releaseSearchInput, setReleaseSearchInput] = useState('');
+  const [releaseSearchResults, setReleaseSearchResults] = useState<Product[]>([]);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState('');
   
@@ -119,6 +120,26 @@ export default function ProductsPage() {
       console.error('Failed to fetch initial data', err);
     }
   };
+
+  const debouncedReleaseSearch = useDebounce(releaseSearchInput, 300);
+
+  useEffect(() => {
+    if (debouncedReleaseSearch.length < 2) {
+      setReleaseSearchResults([]);
+      return;
+    }
+    const searchReleaseProducts = async () => {
+      try {
+        const res = await api.get('/products', { 
+          params: { search: debouncedReleaseSearch, take: 20 } 
+        });
+        setReleaseSearchResults(res.data.data || []);
+      } catch (err) {
+        console.error('Failed to search products for release', err);
+      }
+    };
+    searchReleaseProducts();
+  }, [debouncedReleaseSearch]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -1283,7 +1304,7 @@ export default function ProductsPage() {
                       
                       {releaseSearchInput.length > 0 && (
                         <div className="absolute z-[100] left-0 right-0 mt-3 bg-white border border-gray-100 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] max-h-[400px] overflow-y-auto animate-in fade-in slide-in-from-top-4 duration-300">
-                          {searchProducts
+                          {(releaseSearchResults.length > 0 ? releaseSearchResults : searchProducts)
                             .filter(p => 
                               (p.name.toLowerCase().includes(releaseSearchInput.toLowerCase()) || 
                                p.sku.toLowerCase().includes(releaseSearchInput.toLowerCase())) &&
@@ -1313,14 +1334,14 @@ export default function ProductsPage() {
                                 <div className="flex flex-col items-end">
                                   <div className="flex items-center space-x-2">
                                     <span className="text-xs font-black text-primary bg-primary/10 px-3 py-1 rounded-full uppercase">
-                                      {(locations.find(l => l.id === releaseForm.sourceLocationId)?.name || (locations.length > 0 ? locations[0].name : 'Available'))}: {p.stocks.find(s => s.locationId === releaseForm.sourceLocationId)?.quantity || 0}
+                                      {(locations.find(l => l.id === releaseForm.sourceLocationId)?.name || (locations.length > 0 ? locations[0].name : 'Available'))}: {p.stocks?.find(s => s.locationId === releaseForm.sourceLocationId)?.quantity || 0}
                                     </span>
                                   </div>
                                   <span className="text-[10px] text-gray-400 italic mt-1 font-bold uppercase tracking-widest">{p.unit}</span>
                                 </div>
                               </div>
                             ))}
-                          {searchProducts.filter(p => 
+                          {(releaseSearchResults.length > 0 ? releaseSearchResults : searchProducts).filter(p => 
                             (p.name.toLowerCase().includes(releaseSearchInput.toLowerCase()) || 
                              p.sku.toLowerCase().includes(releaseSearchInput.toLowerCase())) &&
                             !releaseForm.items.find(i => i.productId === p.id)
