@@ -51,6 +51,7 @@ export default function ProductsPage() {
   const [editableStock, setEditableStock] = useState(0);
   const [releaseSearchInput, setReleaseSearchInput] = useState('');
   const [releaseSearchResults, setReleaseSearchResults] = useState<Product[]>([]);
+  const [releaseSearchLoading, setReleaseSearchLoading] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState('');
   
@@ -126,9 +127,11 @@ export default function ProductsPage() {
   useEffect(() => {
     if (debouncedReleaseSearch.length < 2) {
       setReleaseSearchResults([]);
+      setReleaseSearchLoading(false);
       return;
     }
     const searchReleaseProducts = async () => {
+      setReleaseSearchLoading(true);
       try {
         const res = await api.get('/products', { 
           params: { search: debouncedReleaseSearch, take: 20 } 
@@ -136,6 +139,8 @@ export default function ProductsPage() {
         setReleaseSearchResults(res.data.data || []);
       } catch (err) {
         console.error('Failed to search products for release', err);
+      } finally {
+        setReleaseSearchLoading(false);
       }
     };
     searchReleaseProducts();
@@ -1304,12 +1309,14 @@ export default function ProductsPage() {
                       
                       {releaseSearchInput.length > 0 && (
                         <div className="absolute z-[100] left-0 right-0 mt-3 bg-white border border-gray-100 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] max-h-[400px] overflow-y-auto animate-in fade-in slide-in-from-top-4 duration-300">
-                          {(releaseSearchResults.length > 0 ? releaseSearchResults : searchProducts)
-                            .filter(p => 
-                              (p.name.toLowerCase().includes(releaseSearchInput.toLowerCase()) || 
-                               p.sku.toLowerCase().includes(releaseSearchInput.toLowerCase())) &&
-                              !releaseForm.items.find(i => i.productId === p.id)
-                            )
+                          {releaseSearchLoading ? (
+                            <div className="px-8 py-16 text-center">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                              <p className="text-sm text-gray-400 font-bold italic">Searching...</p>
+                            </div>
+                          ) : releaseSearchResults.length > 0 ? (
+                            releaseSearchResults
+                            .filter(p => !releaseForm.items.find(i => i.productId === p.id))
                             .map(p => (
                               <div 
                                 key={p.id}
@@ -1340,12 +1347,8 @@ export default function ProductsPage() {
                                   <span className="text-[10px] text-gray-400 italic mt-1 font-bold uppercase tracking-widest">{p.unit}</span>
                                 </div>
                               </div>
-                            ))}
-                          {(releaseSearchResults.length > 0 ? releaseSearchResults : searchProducts).filter(p => 
-                            (p.name.toLowerCase().includes(releaseSearchInput.toLowerCase()) || 
-                             p.sku.toLowerCase().includes(releaseSearchInput.toLowerCase())) &&
-                            !releaseForm.items.find(i => i.productId === p.id)
-                          ).length === 0 && (
+                            ))
+                          ) : (
                             <div className="px-8 py-16 text-center">
                               <Search className="h-12 w-12 text-gray-100 mx-auto mb-4" />
                               <p className="text-sm text-gray-400 font-bold italic">No matching items found for "{releaseSearchInput}"</p>
