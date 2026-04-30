@@ -544,8 +544,9 @@ export default function StaffRequisitionPage() {
                         </span>
                       </div>
                     </div>
-                    
-                    <button 
+                  </div>
+                  
+                  <button 
                       onClick={() => isSelected ? removeCartItem(product.id) : addItemToCart(product, product.totalStock!)}
                       className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center ${
                         isSelected 

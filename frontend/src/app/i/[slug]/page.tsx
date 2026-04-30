@@ -824,6 +824,8 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                 
 
 
+                {(canAdmin || canInventory) && (
+                  <div className="pt-4 border-t border-gray-100 space-y-4">
                     <div className="px-6 pb-2">
                       <label className="flex items-center gap-3 cursor-pointer group">
                         <div className="relative">
