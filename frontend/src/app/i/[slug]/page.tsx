@@ -85,7 +85,6 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
         status: itemData.status || '',
         categoryId: itemData.categoryId || '',
         batchId: itemData.batchId || '',
-        batchId: itemData.batchId || '',
       });
       
       // Filter fields relevant to this item (Global or matching Batch)
