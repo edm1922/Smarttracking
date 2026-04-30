@@ -37,6 +37,7 @@ export default function ProductsPage() {
   const [searchProducts, setSearchProducts] = useState<Product[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [stockFilter, setStockFilter] = useState('all');
   
@@ -154,15 +155,18 @@ export default function ProductsPage() {
 
   const fetchProducts = async () => {
     setLoading(true);
+    setError(null);
     try {
       const skip = (page - 1) * pageSize;
       const res = await api.get('/products', {
         params: { skip, take: pageSize, search: debouncedSearch, stockFilter }
       });
-      setProducts(res.data.data);
-      setTotalProducts(res.data.total);
-    } catch (err) {
+      console.log('API Response:', res.data);
+      setProducts(res.data.data || []);
+      setTotalProducts(res.data.total || 0);
+    } catch (err: any) {
       console.error('Failed to fetch products', err);
+      setError(err.response?.data?.message || err.message || 'Failed to load products');
     } finally {
       setLoading(false);
     }
@@ -597,9 +601,13 @@ export default function ProductsPage() {
           </thead>
           <tbody className="divide-y divide-gray-100 bg-white">
             {loading ? (
-              <tr><td colSpan={4} className="px-6 py-10 text-center text-sm text-gray-500">Loading stocks...</td></tr>
+              <tr><td colSpan={6} className="px-6 py-10 text-center text-sm text-gray-500">Loading stocks...</td></tr>
+            ) : error ? (
+              <tr><td colSpan={6} className="px-6 py-10 text-center text-sm text-red-500">Error: {error}</td></tr>
             ) : filteredProducts.length === 0 ? (
-              <tr><td colSpan={4} className="px-6 py-10 text-center text-sm text-gray-500">No stocks found.</td></tr>
+              <tr><td colSpan={6} className="px-6 py-10 text-center text-sm text-gray-500">
+                {debouncedSearch || stockFilter !== 'all' ? 'No stocks match your filters.' : 'No stocks found. Add your first stock item above.'}
+              </td></tr>
             ) : (
               filteredProducts.map((product) => (
                 <tr 
