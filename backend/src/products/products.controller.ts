@@ -23,11 +23,11 @@ export class ProductsController {
 
   @Get()
   findAll(
+    @Request() req: any,
     @Query('skip') skip?: string,
     @Query('take') take?: string,
     @Query('search') search?: string,
     @Query('stockFilter') stockFilter?: string,
-    @Request() req: any,
   ) {
     return this.productsService.findAll({
       skip: skip ? parseInt(skip, 10) : 0,
