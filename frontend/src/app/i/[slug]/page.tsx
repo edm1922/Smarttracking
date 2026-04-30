@@ -36,6 +36,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     status: '',
     categoryId: '',
     batchId: '',
+    showInInventory: true,
   });
   const [dynamicValues, setDynamicValues] = useState<Record<string, any>>({});
   const [availableFields, setAvailableFields] = useState<any[]>([]);
@@ -60,6 +61,8 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
   const [pullOutImage, setPullOutImage] = useState<string | null>(null);
   const [pullOutSupervisor, setPullOutSupervisor] = useState('');
   const [bypassLogs, setBypassLogs] = useState(true);
+  const [isUploading1, setIsUploading1] = useState(false);
+  const [isUploading2, setIsUploading2] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -83,6 +86,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
         status: itemData.status || '',
         categoryId: itemData.categoryId || '',
         batchId: itemData.batchId || '',
+        showInInventory: itemData.showInInventory !== false,
       });
       
       // Filter fields relevant to this item (Global or matching Batch)
@@ -270,6 +274,23 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       }
       return { fieldId, value };
     }).filter(Boolean);
+  };
+
+  const uploadItemImage = async (file: File, slot: number) => {
+    const setter = slot === 1 ? setIsUploading1 : setIsUploading2;
+    setter(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      await api.post(`/items/${slug}/image?slot=${slot}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      await fetchData();
+    } catch (err) {
+      alert('Failed to upload image');
+    } finally {
+      setter(false);
+    }
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -543,11 +564,22 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
         )}
 
         <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-gray-100">
-          <div className="relative h-64 group">
-            {item.imageUrl ? (
-              <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+          <div className="relative h-64 group flex overflow-hidden bg-gray-100">
+            {item.imageUrl || item.imageUrl2 ? (
+              <>
+                {item.imageUrl && (
+                  <div className={`h-full ${item.imageUrl2 ? 'w-1/2' : 'w-full'} transition-all duration-500`}>
+                    <img src={item.imageUrl} alt={`${item.name} primary`} className="w-full h-full object-cover border-r border-white/10" />
+                  </div>
+                )}
+                {item.imageUrl2 && (
+                  <div className={`h-full ${item.imageUrl ? 'w-1/2' : 'w-full'} transition-all duration-500`}>
+                    <img src={item.imageUrl2} alt={`${item.name} secondary`} className="w-full h-full object-cover" />
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100 text-gray-300">
+              <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
                 <ImageIcon className="h-12 w-12 mb-2 opacity-20" />
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-30">Scan Success</p>
               </div>
@@ -650,6 +682,69 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                       <option value="Defective">Defective</option>
                       <option value="Released">Released</option>
                     </select>
+                  </div>
+                )}
+
+                {isEditing && (
+                  <div className="space-y-4 pt-4 border-t border-gray-100">
+                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Item Documentation Photos</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Slot 1 */}
+                      <div className="space-y-3">
+                        <label className="block text-[9px] font-black text-gray-500 uppercase">Primary Image</label>
+                        <div className="relative group aspect-video rounded-2xl overflow-hidden bg-gray-50 border-2 border-dashed border-gray-200 hover:border-primary/30 transition-all">
+                          {item.imageUrl ? (
+                            <>
+                              <img src={item.imageUrl} alt="Slot 1" className="w-full h-full object-cover" />
+                              <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+                                <Upload className="h-6 w-6 text-white" />
+                                <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadItemImage(e.target.files[0], 1)} />
+                              </label>
+                            </>
+                          ) : (
+                            <label className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer">
+                              {isUploading1 ? (
+                                <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <>
+                                  <Camera className="h-6 w-6 text-gray-300 mb-1" />
+                                  <span className="text-[8px] font-black text-gray-400 uppercase">Add Photo 1</span>
+                                </>
+                              )}
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadItemImage(e.target.files[0], 1)} />
+                            </label>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Slot 2 */}
+                      <div className="space-y-3">
+                        <label className="block text-[9px] font-black text-gray-500 uppercase">Secondary Image</label>
+                        <div className="relative group aspect-video rounded-2xl overflow-hidden bg-gray-50 border-2 border-dashed border-gray-200 hover:border-primary/30 transition-all">
+                          {item.imageUrl2 ? (
+                            <>
+                              <img src={item.imageUrl2} alt="Slot 2" className="w-full h-full object-cover" />
+                              <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+                                <Upload className="h-6 w-6 text-white" />
+                                <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadItemImage(e.target.files[0], 2)} />
+                              </label>
+                            </>
+                          ) : (
+                            <label className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer">
+                              {isUploading2 ? (
+                                <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <>
+                                  <Camera className="h-6 w-6 text-gray-300 mb-1" />
+                                  <span className="text-[8px] font-black text-gray-400 uppercase">Add Photo 2</span>
+                                </>
+                              )}
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadItemImage(e.target.files[0], 2)} />
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -773,23 +868,44 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                 )}
                 
                 {(canAdmin || canInventory) && (
-                  <div className="pt-4 px-6 pb-2">
-                    <label className="flex items-center gap-3 cursor-pointer group">
-                      <div className="relative">
-                        <input 
-                          type="checkbox" 
-                          checked={bypassLogs}
-                          onChange={(e) => setBypassLogs(e.target.checked)}
-                          className="peer sr-only"
-                        />
-                        <div className="w-10 h-6 bg-gray-200 rounded-full peer peer-checked:bg-primary transition-all duration-300"></div>
-                        <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 peer-checked:translate-x-4"></div>
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest group-hover:text-primary transition-colors">Bypass Stock Logs</span>
-                        <span className="text-[9px] text-gray-400 font-bold italic">Admin: Update silently without audit trail</span>
-                      </div>
-                    </label>
+                  <div className="pt-4 border-t border-gray-100 space-y-4">
+                    <div className="px-6 pb-2">
+                      <label className="flex items-center gap-3 cursor-pointer group">
+                        <div className="relative">
+                          <input 
+                            type="checkbox" 
+                            checked={formData.showInInventory}
+                            onChange={(e) => setFormData({ ...formData, showInInventory: e.target.checked })}
+                            className="peer sr-only"
+                          />
+                          <div className="w-10 h-6 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 transition-all duration-300"></div>
+                          <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 peer-checked:translate-x-4"></div>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest group-hover:text-blue-600 transition-colors">Show in Inventory Explorer</span>
+                          <span className="text-[9px] text-gray-400 font-bold italic">Staff Portal: Visibility in aggregated inventory views</span>
+                        </div>
+                      </label>
+                    </div>
+
+                    <div className="px-6 pb-2">
+                      <label className="flex items-center gap-3 cursor-pointer group">
+                        <div className="relative">
+                          <input 
+                            type="checkbox" 
+                            checked={bypassLogs}
+                            onChange={(e) => setBypassLogs(e.target.checked)}
+                            className="peer sr-only"
+                          />
+                          <div className="w-10 h-6 bg-gray-200 rounded-full peer peer-checked:bg-primary transition-all duration-300"></div>
+                          <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 peer-checked:translate-x-4"></div>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest group-hover:text-primary transition-colors">Bypass Stock Logs</span>
+                          <span className="text-[9px] text-gray-400 font-bold italic">Admin: Update silently without audit trail</span>
+                        </div>
+                      </label>
+                    </div>
                   </div>
                 )}
 

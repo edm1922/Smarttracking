@@ -790,7 +790,13 @@ export default function UnitTrackingPage() {
                         >
                           <div className="flex-1 cursor-pointer" onClick={() => window.open(`/i/${item.slug}`, '_blank')}>
                             <div className="flex items-center gap-3 mb-1.5">
-                              <div className={`w-2 h-2 rounded-full ${isLowStock ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]'}`} />
+                              <div className="flex -space-x-2 mr-1">
+                                {item.imageUrl && <img src={item.imageUrl} className="w-6 h-6 rounded-lg object-cover border-2 border-white shadow-sm" />}
+                                {item.imageUrl2 && <img src={item.imageUrl2} className="w-6 h-6 rounded-lg object-cover border-2 border-white shadow-sm" />}
+                                {!item.imageUrl && !item.imageUrl2 && (
+                                  <div className={`w-2 h-2 rounded-full ${isLowStock ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]'}`} />
+                                )}
+                              </div>
                               <span className="text-sm font-mono font-bold text-gray-700">{item.slug}</span>
                               {item.batch && <span className="px-2 py-0.5 bg-gray-200 text-[9px] font-black rounded-md">{item.batch}</span>}
                               {isLowStock && (

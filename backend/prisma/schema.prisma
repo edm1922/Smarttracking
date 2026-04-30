@@ -32,14 +32,16 @@ model Item {
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   imageUrl     String?
+  imageUrl2    String?
   batchId      String?
   categoryId   String?
   statusId     String?
   isLegacy     Boolean          @default(false)
   supplierId   String?
-  unit         String?          @default("pcs")
-  trackingType String           @default("INDIVIDUAL")
-  ActivityLog  ActivityLog[]
+  unit             String?          @default("pcs")
+  trackingType     String           @default("INDIVIDUAL")
+  showInInventory  Boolean          @default(true)
+  ActivityLog      ActivityLog[]
   batch        Batch?           @relation(fields: [batchId], references: [id], onDelete: Cascade)
   category     Category?        @relation(fields: [categoryId], references: [id])
   statusRef    Status?          @relation(fields: [statusId], references: [id])

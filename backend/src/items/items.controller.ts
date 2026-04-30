@@ -78,8 +78,9 @@ export class ItemsController {
     @Param('slug') slug: string,
     @UploadedFile() file: any,
     @Request() req: any,
+    @Query('slot') slot: string,
   ) {
-    return this.itemsService.uploadImage(slug, file, req.user.sub);
+    return this.itemsService.uploadImage(slug, file, req.user.sub, parseInt(slot, 10) || 1);
   }
 
   @UseGuards(AuthGuard)
