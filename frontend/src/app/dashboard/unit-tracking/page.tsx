@@ -43,6 +43,12 @@ export default function UnitTrackingPage() {
   const [viewingLog, setViewingLog] = useState<any>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [productFilters, setProductFilters] = useState<Record<string, Record<string, string>>>({});
+  
+  const [isRefillModalOpen, setIsRefillModalOpen] = useState(false);
+  const [refillItem, setRefillItem] = useState<any>(null);
+  const [refillQty, setRefillQty] = useState<number>(0);
+  const [bypassLogs, setBypassLogs] = useState(true);
+  const [isStockIn, setIsStockIn] = useState(false);
 
   const [page, setPage] = useState(1);
   const [totalRequests, setTotalRequests] = useState(0);
@@ -191,28 +197,45 @@ export default function UnitTrackingPage() {
     [inventory]
   );
 
-  const handleRefill = async (item: any) => {
-    const newQtyStr = prompt(`Refill Cellophane ${item.slug}\nEnter new quantity:`, item.qty);
-    if (newQtyStr === null) return;
+  const handleRefill = (item: any) => {
+    setRefillItem(item);
+    setRefillQty(item.qty);
     
-    const qtyNum = parseInt(newQtyStr);
-    if (isNaN(qtyNum)) {
-      alert('Invalid quantity');
-      return;
-    }
+    setBypassLogs(true);
+    setIsStockIn(false);
+    setIsRefillModalOpen(true);
+  };
 
+
+  const submitRefill = async () => {
+    if (!refillItem) return;
     try {
-      const fieldValues = item.fieldValues.map((fv: any) => {
+      const fieldValues = refillItem.fieldValues.map((fv: any) => {
         if (fv.value && typeof fv.value === 'object' && fv.value.useUnitQty) {
           return {
             fieldId: fv.fieldId,
-            value: { ...fv.value, qty: qtyNum }
+            value: { ...fv.value, qty: refillQty }
           };
         }
         return { fieldId: fv.fieldId, value: fv.value };
       });
 
-      await api.patch(`/items/${item.slug}`, { fieldValues });
+      const payload: any = { fieldValues };
+      
+      if (bypassLogs) {
+        payload.skipLogs = true;
+      }
+
+      if (isStockIn) {
+        const qtyDiff = refillQty - refillItem.qty;
+        if (qtyDiff > 0) {
+          const unit = refillItem.fieldValues.find((fv: any) => fv.value?.useUnitQty)?.value?.unit || 'pcs';
+          payload.logAction = `STOCK_IN_${qtyDiff}_${unit.toUpperCase()}`;
+        }
+      }
+
+      await api.patch(`/items/${refillItem.slug}`, payload);
+      setIsRefillModalOpen(false);
       fetchInventory();
     } catch (err) {
       alert('Failed to refill item');
@@ -1410,6 +1433,94 @@ export default function UnitTrackingPage() {
 
 
 
+      {/* Refill Modal */}
+      {isRefillModalOpen && refillItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-6 overflow-y-auto">
+          <div className="w-full max-w-md rounded-[2.5rem] bg-white p-0 shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+            <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-8 py-6 flex items-center justify-between text-white">
+              <div className="flex items-center gap-4">
+                <div className="p-2 bg-white/10 rounded-xl">
+                  <Activity className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black tracking-tight uppercase italic">Refill Stock</h2>
+                  <p className="text-[10px] text-gray-400 font-bold tracking-widest uppercase">Manual Adjustment</p>
+                </div>
+              </div>
+              <button onClick={() => setIsRefillModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-all"><X className="h-5 w-5" /></button>
+            </div>
+            
+            <div className="p-8 space-y-6">
+              <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-2">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Target Item</p>
+                <p className="text-sm font-bold text-gray-900">{refillItem.name}</p>
+                <p className="text-xs font-mono font-bold text-primary">{refillItem.slug}</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">New Quantity</label>
+                  <input 
+                    type="number" 
+                    value={refillQty}
+                    onChange={(e) => setRefillQty(parseInt(e.target.value) || 0)}
+                    className="w-full px-6 py-4 bg-white border-2 border-gray-100 rounded-2xl text-xl font-black text-gray-900 outline-none focus:border-primary transition-all shadow-inner"
+                  />
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <label className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100 cursor-pointer hover:bg-gray-100 transition-all group">
+                    <input 
+                      type="checkbox" 
+                      checked={bypassLogs}
+                      onChange={(e) => {
+                        setBypassLogs(e.target.checked);
+                        if (e.target.checked) setIsStockIn(false);
+                      }}
+                      className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                    <div>
+                      <p className="text-xs font-black text-gray-900 uppercase">Bypass Stock Logs</p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">This will not record an audit trail for this update</p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100 cursor-pointer hover:bg-gray-100 transition-all group">
+                    <input 
+                      type="checkbox" 
+                      checked={isStockIn}
+                      onChange={(e) => {
+                        setIsStockIn(e.target.checked);
+                        if (e.target.checked) setBypassLogs(false);
+                      }}
+                      className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                    <div>
+                      <p className="text-xs font-black text-gray-900 uppercase">Record as "STOCK IN"</p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Adds a transaction record to the history logs</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button 
+                  onClick={() => setIsRefillModalOpen(false)}
+                  className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-gray-900 transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={submitRefill}
+                  className="flex-[2] py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-gray-900/10 hover:bg-primary transition-all active:scale-95"
+                >
+                  Update Inventory
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

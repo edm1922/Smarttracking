@@ -237,7 +237,7 @@ export class ItemsService {
       include: { fieldValues: true, tags: true },
     });
 
-    if (Object.keys(changes).length > 0) {
+    if (Object.keys(changes).length > 0 && !data.skipLogs) {
       await this.logsService.create({
         userId,
         itemId: item.id,
@@ -247,7 +247,7 @@ export class ItemsService {
     }
 
     // Automated Stock Log Integration for Unit Tracking
-    if (data.logAction && data.logAction.startsWith('PULL_OUT_')) {
+    if (data.logAction && (data.logAction.startsWith('PULL_OUT_') || data.logAction.startsWith('STOCK_IN_'))) {
       try {
         // 1. Check if item has unit tracking (check payload first, then existing)
         const fieldValuesPayload = data.fieldValues || [];
@@ -256,7 +256,11 @@ export class ItemsService {
 
         if (unitData?.useUnitQty) {
           // 2. Extract qty from logAction (e.g., PULL_OUT_5_PAIR)
-          const match = data.logAction.match(/PULL_OUT_(\d+)_/);
+          const isOut = data.logAction.startsWith('PULL_OUT_');
+          const type = isOut ? 'OUT' : 'IN';
+          const prefix = isOut ? 'PULL_OUT_' : 'STOCK_IN_';
+          
+          const match = data.logAction.match(new RegExp(`${prefix}(\\d+)_`));
           if (match) {
             const qty = parseInt(match[1]);
             const productName = item.name;
@@ -273,9 +277,9 @@ export class ItemsService {
                   product.id,
                   '906271f9-c80c-449c-81f5-60156c83e1d1',
                   userId,
-                  'OUT',
+                  type,
                   qty,
-                  `QR Pull Out: ${item.slug} | User: ${userId}`
+                  `QR ${isOut ? 'Pull Out' : 'Stock In'}: ${item.slug} | User: ${userId}`
                 ).catch(err => {
                   console.error('Stock processing failed:', err.message);
                   // We don't rethrow here to prevent 500, but the audit log will still exist
