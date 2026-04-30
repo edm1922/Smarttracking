@@ -246,8 +246,9 @@ export class ItemsService {
       });
     }
 
-    // Automated Stock Log Integration for Unit Tracking
-    if (data.logAction && (data.logAction.startsWith('PULL_OUT_') || data.logAction.startsWith('STOCK_IN_'))) {
+    // Automated Stock Log Integration for Unit Tracking (respect skipLogs flag)
+    const shouldSkipStockLog = data.skipLogs === true || String(data.skipLogs) === 'true';
+    if (!shouldSkipStockLog && data.logAction && (data.logAction.startsWith('PULL_OUT_') || data.logAction.startsWith('STOCK_IN_'))) {
       try {
         // 1. Check if item has unit tracking (check payload first, then existing)
         const fieldValuesPayload = data.fieldValues || [];

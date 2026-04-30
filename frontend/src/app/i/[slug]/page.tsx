@@ -59,6 +59,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
   const [pullOutRemarks, setPullOutRemarks] = useState('');
   const [pullOutImage, setPullOutImage] = useState<string | null>(null);
   const [pullOutSupervisor, setPullOutSupervisor] = useState('');
+  const [bypassLogs, setBypassLogs] = useState(true);
 
   const fetchData = async () => {
     try {
@@ -341,10 +342,12 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     e.preventDefault();
     setIsSaving(true);
     try {
-      const payload = {
+      const payload: any = {
         ...formData,
         fieldValues: prepareFieldValues(dynamicValues),
+        skipLogs: bypassLogs
       };
+
       await api.patch(`/items/${slug}`, payload);
       await fetchData();
       setIsEditing(false);
@@ -766,6 +769,27 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                         </div>
                       </div>
                     )}
+                  </div>
+                )}
+                
+                {(canAdmin || canInventory) && (
+                  <div className="pt-4 px-6 pb-2">
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <div className="relative">
+                        <input 
+                          type="checkbox" 
+                          checked={bypassLogs}
+                          onChange={(e) => setBypassLogs(e.target.checked)}
+                          className="peer sr-only"
+                        />
+                        <div className="w-10 h-6 bg-gray-200 rounded-full peer peer-checked:bg-primary transition-all duration-300"></div>
+                        <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 peer-checked:translate-x-4"></div>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest group-hover:text-primary transition-colors">Bypass Stock Logs</span>
+                        <span className="text-[9px] text-gray-400 font-bold italic">Admin: Update silently without audit trail</span>
+                      </div>
+                    </label>
                   </div>
                 )}
 
