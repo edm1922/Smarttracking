@@ -18,6 +18,8 @@ interface Product {
   price: number;
   threshold: number;
   imageUrl?: string | null;
+  imageUrl2?: string | null;
+  showInInventory: boolean;
   stocks: {
     locationId: string;
     quantity: number;
@@ -55,6 +57,8 @@ export default function ProductsPage() {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState('');
   const [bypassLogs, setBypassLogs] = useState(true);
+  const [isUploading1, setIsUploading1] = useState(false);
+  const [isUploading2, setIsUploading2] = useState(false);
   
   // Selection state
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
@@ -69,7 +73,8 @@ export default function ProductsPage() {
     price: 0,
     threshold: 0,
     initialStock: 0,
-    initialLocationId: ''
+    initialLocationId: '',
+    showInInventory: true,
   });
   const [stockForm, setStockForm] = useState({ 
     productId: '', 
@@ -197,13 +202,15 @@ export default function ProductsPage() {
       // Auto-gen SKU if empty
       const payload = { 
         ...productForm, 
-        sku: productForm.sku || `ITM-${Math.random().toString(36).substring(2, 9).toUpperCase()}` 
+        sku: productForm.sku || `ITM-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+        showInInventory: productForm.showInInventory
       };
       await api.post('/products', payload);
       setIsProductModalOpen(false);
       setProductForm({ 
         sku: '', name: '', description: '', unit: 'PCS', price: 0, 
-        threshold: 0, initialStock: 0, initialLocationId: locations[0]?.id || '' 
+        threshold: 0, initialStock: 0, initialLocationId: locations[0]?.id || '',
+        showInInventory: true,
       });
       fetchData();
       fetchInitialData(); // Refresh search list to include new product
@@ -240,6 +247,8 @@ export default function ProductsPage() {
         price: editingProduct.price,
         threshold: editingProduct.threshold,
         imageUrl: editingProduct.imageUrl,
+        imageUrl2: editingProduct.imageUrl2,
+        showInInventory: editingProduct.showInInventory,
       });
       
       // Handle stock adjustment if value changed
@@ -331,30 +340,34 @@ export default function ProductsPage() {
     });
   };
 
-  const handleImageUpload = async (productId: string, file: File) => {
+  const handleImageUpload = async (productId: string, file: File, slot: number = 1) => {
     const formData = new FormData();
     formData.append('image', file);
+    if (slot === 1) setIsUploading1(true); else setIsUploading2(true);
     try {
-      await api.post(`/products/${productId}/image`, formData);
+      await api.post(`/products/${productId}/image?slot=${slot}`, formData);
       fetchData();
       if (editingProduct && editingProduct.id === productId) {
         // Refresh editing product to see the new image
         const res = await api.get('/products');
-        const updated = res.data.find((p: any) => p.id === productId);
+        const updated = res.data.data.find((p: any) => p.id === productId);
         if (updated) setEditingProduct(updated);
       }
     } catch (err) {
       alert('Failed to upload image');
+    } finally {
+      if (slot === 1) setIsUploading1(false); else setIsUploading2(false);
     }
   };
 
-  const handleRemoveImage = async (productId: string) => {
-    if (!confirm('Are you sure you want to remove this product image?')) return;
+  const handleRemoveImage = async (productId: string, slot: number = 1) => {
+    if (!confirm(`Are you sure you want to remove product image ${slot}?`)) return;
     try {
-      await api.patch(`/products/${productId}`, { imageUrl: null });
+      const payload = slot === 2 ? { imageUrl2: null } : { imageUrl: null };
+      await api.patch(`/products/${productId}`, payload);
       fetchData();
       if (editingProduct && editingProduct.id === productId) {
-        setEditingProduct({ ...editingProduct, imageUrl: null });
+        setEditingProduct({ ...editingProduct, ...payload });
       }
     } catch (err) {
       alert('Failed to remove image');
@@ -578,6 +591,7 @@ export default function ProductsPage() {
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Stock Info</th>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Stock Breakdown</th>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actual Stock</th>
+              <th className="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Visibility</th>
               <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
@@ -645,6 +659,19 @@ export default function ProductsPage() {
                       )}
                       {getTotalStock(product) === product.threshold && (
                         <span className="text-[10px] font-bold text-orange-500 mt-1 uppercase tracking-tighter">Low Stock</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <div className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${product.showInInventory ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-gray-50 text-gray-400 border border-gray-100'}`}>
+                      {product.showInInventory ? (
+                        <>
+                          <Eye className="h-3 w-3 mr-1" /> Visible
+                        </>
+                      ) : (
+                        <>
+                          <X className="h-3 w-3 mr-1" /> Hidden
+                        </>
                       )}
                     </div>
                   </td>
@@ -773,6 +800,24 @@ export default function ProductsPage() {
                       value={Math.max(0, productForm.threshold - productForm.initialStock) || 0}
                       className="w-full rounded-md border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-400 font-bold cursor-not-allowed" 
                     />
+                  </div>
+                  <div className="pt-4 border-t border-gray-100">
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <div className="relative">
+                        <input 
+                          type="checkbox" 
+                          checked={productForm.showInInventory}
+                          onChange={(e) => setProductForm({ ...productForm, showInInventory: e.target.checked })}
+                          className="peer sr-only"
+                        />
+                        <div className="w-10 h-6 bg-gray-200 rounded-full peer peer-checked:bg-primary transition-all duration-300"></div>
+                        <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 peer-checked:translate-x-4"></div>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest group-hover:text-primary transition-colors">Show in Staff Portal</span>
+                        <span className="text-[9px] text-gray-400 font-bold italic">Visibility in restricted staff-facing portal</span>
+                      </div>
+                    </label>
                   </div>
                 </div>
               </div>
@@ -1039,57 +1084,83 @@ export default function ProductsPage() {
                 <div className="space-y-6">
                   {/* Image Upload Section */}
                   <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
-                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Product Media</label>
-                    <div className="flex flex-col items-center">
-                      {editingProduct.imageUrl ? (
-                        <div className="relative group w-full aspect-video rounded-xl overflow-hidden mb-4 border border-gray-200">
-                          <img src={editingProduct.imageUrl} alt={editingProduct.name} className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <button 
-                              type="button"
-                              onClick={() => {
-                                setPreviewImageUrl(editingProduct.imageUrl!);
-                                setIsPreviewOpen(true);
-                              }}
-                              className="p-2 bg-white rounded-full text-gray-900 shadow-xl"
-                            >
-                              <Eye className="h-5 w-5" />
-                            </button>
-                          </div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Product Documentation Media</label>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Slot 1 */}
+                      <div className="space-y-3">
+                        <label className="block text-[9px] font-black text-gray-500 uppercase">Primary Image</label>
+                        <div className="relative group aspect-square rounded-xl overflow-hidden bg-white border border-gray-200">
+                          {editingProduct.imageUrl ? (
+                            <>
+                              <img src={editingProduct.imageUrl} alt="Slot 1" className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2">
+                                <button type="button" onClick={() => { setPreviewImageUrl(editingProduct.imageUrl!); setIsPreviewOpen(true); }} className="p-2 bg-white rounded-lg text-gray-900 shadow-xl"><Eye className="h-4 w-4" /></button>
+                                <button type="button" onClick={() => handleRemoveImage(editingProduct.id, 1)} className="p-2 bg-red-500 rounded-lg text-white shadow-xl"><Trash2 className="h-4 w-4" /></button>
+                              </div>
+                            </>
+                          ) : (
+                            <label className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors">
+                              {isUploading1 ? (
+                                <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <>
+                                  <ImageIcon className="h-6 w-6 text-gray-300 mb-1" />
+                                  <span className="text-[8px] font-black text-gray-400 uppercase">Upload 1</span>
+                                </>
+                              )}
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(editingProduct.id, e.target.files[0], 1)} />
+                            </label>
+                          )}
                         </div>
-                      ) : (
-                        <div className="w-full aspect-video rounded-xl bg-gray-100 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 mb-4">
-                          <ImageIcon className="h-10 w-10 mb-2 opacity-20" />
-                          <p className="text-[10px] font-bold uppercase tracking-tighter">No Media Attached</p>
-                        </div>
-                      )}
-                      <input 
-                        type="file" 
-                        id="product-image-upload" 
-                        className="hidden" 
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleImageUpload(editingProduct.id, file);
-                        }}
-                      />
-                      <div className="flex w-full gap-2 mt-4">
-                        <label 
-                          htmlFor="product-image-upload"
-                          className="flex-1 py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all text-center cursor-pointer shadow-sm"
-                        >
-                          {editingProduct.imageUrl ? 'Replace Image' : 'Upload Product Media'}
-                        </label>
-                        {editingProduct.imageUrl && (
-                          <button 
-                            type="button"
-                            onClick={() => handleRemoveImage(editingProduct.id)}
-                            className="px-4 py-3 bg-red-50 text-red-600 border border-red-100 rounded-xl text-xs font-bold hover:bg-red-100 transition-all shadow-sm"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
                       </div>
+
+                      {/* Slot 2 */}
+                      <div className="space-y-3">
+                        <label className="block text-[9px] font-black text-gray-500 uppercase">Secondary Image</label>
+                        <div className="relative group aspect-square rounded-xl overflow-hidden bg-white border border-gray-200">
+                          {editingProduct.imageUrl2 ? (
+                            <>
+                              <img src={editingProduct.imageUrl2} alt="Slot 2" className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2">
+                                <button type="button" onClick={() => { setPreviewImageUrl(editingProduct.imageUrl2!); setIsPreviewOpen(true); }} className="p-2 bg-white rounded-lg text-gray-900 shadow-xl"><Eye className="h-4 w-4" /></button>
+                                <button type="button" onClick={() => handleRemoveImage(editingProduct.id, 2)} className="p-2 bg-red-500 rounded-lg text-white shadow-xl"><Trash2 className="h-4 w-4" /></button>
+                              </div>
+                            </>
+                          ) : (
+                            <label className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors">
+                              {isUploading2 ? (
+                                <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <>
+                                  <ImageIcon className="h-6 w-6 text-gray-300 mb-1" />
+                                  <span className="text-[8px] font-black text-gray-400 uppercase">Upload 2</span>
+                                </>
+                              )}
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(editingProduct.id, e.target.files[0], 2)} />
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t border-gray-200">
+                      <label className="flex items-center gap-3 cursor-pointer group">
+                        <div className="relative">
+                          <input 
+                            type="checkbox" 
+                            checked={editingProduct.showInInventory}
+                            onChange={(e) => setEditingProduct({ ...editingProduct, showInInventory: e.target.checked })}
+                            className="peer sr-only"
+                          />
+                          <div className="w-10 h-6 bg-gray-200 rounded-full peer peer-checked:bg-primary transition-all duration-300"></div>
+                          <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 peer-checked:translate-x-4"></div>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest group-hover:text-primary transition-colors">Show in Staff Inventory Explorer</span>
+                          <span className="text-[9px] text-gray-400 font-bold italic">Controls visibility in the restricted staff-facing portal</span>
+                        </div>
+                      </label>
                     </div>
                   </div>
 

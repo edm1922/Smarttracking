@@ -32,7 +32,6 @@ model Item {
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   imageUrl     String?
-  imageUrl2    String?
   batchId      String?
   categoryId   String?
   statusId     String?
@@ -40,7 +39,6 @@ model Item {
   supplierId   String?
   unit             String?          @default("pcs")
   trackingType     String           @default("INDIVIDUAL")
-  showInInventory  Boolean          @default(true)
   ActivityLog      ActivityLog[]
   batch        Batch?           @relation(fields: [batchId], references: [id], onDelete: Cascade)
   category     Category?        @relation(fields: [categoryId], references: [id])
@@ -191,6 +189,8 @@ model Product {
   threshold        Float                @default(0)
   unit             String               @default("PCS")
   imageUrl         String?
+  imageUrl2        String?
+  showInInventory  Boolean              @default(true)
   internalRequests InternalRequest[]
   stocks           ProductStock[]
   transactions     ProductTransaction[]

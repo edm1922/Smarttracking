@@ -204,12 +204,8 @@ export class ItemsService {
         description: cleanItemData.description,
         status: cleanItemData.status,
         imageUrl: cleanItemData.imageUrl,
-        imageUrl2: cleanItemData.imageUrl2,
-        isLegacy: cleanItemData.isLegacy,
-        supplierId: cleanItemData.supplierId,
         unit: cleanItemData.unit,
         trackingType: cleanItemData.trackingType,
-        showInInventory: cleanItemData.showInInventory,
         categoryId: finalData.categoryId,
         batchId: finalData.batchId,
         statusId: itemData.statusId, // Use original statusId if present
@@ -305,7 +301,6 @@ export class ItemsService {
     // Fetch ALL items that match the unit tracking criteria
     // We do this because we need to group them by name first before we can reliably paginate or search by group name
     const where: any = {
-      showInInventory: true,
       fieldValues: {
         some: {
           value: {
@@ -557,21 +552,14 @@ export class ItemsService {
     return updated;
   }
 
-  async uploadImage(slug: string, file: any, userId: string, slot: number = 1) {
+  async uploadImage(slug: string, file: any, userId: string) {
     const item = await this.findOne(slug);
-    const fileName = `${slug}-${slot}-${Date.now()}`;
+    const fileName = `${slug}-${Date.now()}`;
     const imageUrl = await this.supabaseService.uploadImage(file, fileName);
-
-    const updateData: any = {};
-    if (slot === 2) {
-      updateData.imageUrl2 = imageUrl;
-    } else {
-      updateData.imageUrl = imageUrl;
-    }
 
     const updated = await this.prisma.item.update({
       where: { slug },
-      data: updateData,
+      data: { imageUrl },
     });
 
     await this.logsService.create({

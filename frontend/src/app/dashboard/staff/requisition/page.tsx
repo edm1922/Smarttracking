@@ -19,6 +19,7 @@ interface Product {
   name: string;
   description: string | null;
   imageUrl?: string | null;
+  imageUrl2?: string | null;
   stocks: ProductStock[];
   totalStock?: number;
 }
@@ -515,10 +516,24 @@ export default function StaffRequisitionPage() {
                     key={product.id} 
                     onDoubleClick={() => setViewItem(product)}
                     className={`bg-white p-4 rounded-xl border shadow-sm flex items-center justify-between transition-all cursor-pointer ${isSelected ? 'border-primary shadow-primary/10 bg-primary/5' : 'border-gray-100 hover:border-gray-300'}`}
-                    title="Double click to view details"
                   >
-                    <div>
-                      <h3 className="text-sm font-bold text-gray-900">{product.name}</h3>
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-20 rounded-lg bg-gray-50 flex items-center justify-center border border-gray-100 overflow-hidden relative shrink-0">
+                        {product.imageUrl || product.imageUrl2 ? (
+                          <div className="flex w-full h-full">
+                            {product.imageUrl && (
+                              <img src={product.imageUrl} alt="Slot 1" className={`h-full ${product.imageUrl2 ? 'w-1/2' : 'w-full'} object-cover border-r border-white/10`} />
+                            )}
+                            {product.imageUrl2 && (
+                              <img src={product.imageUrl2} alt="Slot 2" className={`h-full ${product.imageUrl ? 'w-1/2' : 'w-full'} object-cover`} />
+                            )}
+                          </div>
+                        ) : (
+                          <Box className="h-5 w-5 text-gray-300" />
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-gray-900">{product.name}</h3>
                       {product.description && (
                         <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{product.description}</p>
                       )}
@@ -770,17 +785,31 @@ export default function StaffRequisitionPage() {
             </div>
             
             <div className="p-6 space-y-6">
-              {viewItem.imageUrl ? (
-                <div className="w-full aspect-square rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={viewItem.imageUrl} alt={viewItem.name} className="w-full h-full object-contain" />
-                </div>
-              ) : (
-                <div className="w-full aspect-square rounded-xl bg-gray-50 border border-gray-100 flex flex-col items-center justify-center text-gray-400">
-                  <Box className="h-16 w-16 mb-2 opacity-50" />
-                  <p className="text-sm font-bold">No Image Available</p>
-                </div>
-              )}
+              <div className="grid grid-cols-2 gap-3">
+                {viewItem.imageUrl ? (
+                  <div className="aspect-square rounded-xl overflow-hidden bg-gray-50 border border-gray-100 relative group">
+                    <img src={viewItem.imageUrl} alt="Primary" className="w-full h-full object-contain" />
+                    <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/50 text-white text-[8px] font-black uppercase rounded">Primary</div>
+                  </div>
+                ) : (
+                  <div className="aspect-square rounded-xl bg-gray-50 border border-gray-100 flex flex-col items-center justify-center text-gray-300">
+                    <Box className="h-8 w-8 mb-1 opacity-50" />
+                    <p className="text-[8px] font-bold">No Primary</p>
+                  </div>
+                )}
+
+                {viewItem.imageUrl2 ? (
+                  <div className="aspect-square rounded-xl overflow-hidden bg-gray-50 border border-gray-100 relative group">
+                    <img src={viewItem.imageUrl2} alt="Secondary" className="w-full h-full object-contain" />
+                    <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/50 text-white text-[8px] font-black uppercase rounded">Secondary</div>
+                  </div>
+                ) : (
+                  <div className="aspect-square rounded-xl bg-gray-50 border border-gray-100 flex flex-col items-center justify-center text-gray-300">
+                    <Box className="h-8 w-8 mb-1 opacity-50" />
+                    <p className="text-[8px] font-bold">No Secondary</p>
+                  </div>
+                )}
+              </div>
               
               <div>
                 <div className="flex items-start justify-between mb-2">

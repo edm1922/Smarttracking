@@ -9,8 +9,8 @@ export class ProductsService {
     private supabaseService: SupabaseService
   ) {}
 
-  async findAll(params: { skip?: number; take?: number; search?: string; stockFilter?: string } = {}) {
-    const { skip = 0, take = 20, search, stockFilter } = params;
+  async findAll(params: { skip?: number; take?: number; search?: string; stockFilter?: string; role?: string } = {}) {
+    const { skip = 0, take = 20, search, stockFilter, role } = params;
 
     const where: any = {};
     if (search) {
@@ -18,6 +18,10 @@ export class ProductsService {
         { name: { contains: search, mode: 'insensitive' } },
         { sku: { contains: search, mode: 'insensitive' } },
       ];
+    }
+
+    if (role !== 'admin') {
+      where.showInInventory = true;
     }
 
     const select = {
@@ -29,6 +33,8 @@ export class ProductsService {
       price: true,
       threshold: true,
       imageUrl: true,
+      imageUrl2: true,
+      showInInventory: true,
       createdAt: true,
       stocks: {
         select: {
@@ -338,16 +344,23 @@ export class ProductsService {
     });
   }
 
-  async uploadImage(id: string, file: any) {
+  async uploadImage(id: string, file: any, slot: number = 1) {
     const product = await this.prisma.product.findUnique({ where: { id } });
     if (!product) throw new BadRequestException('Product not found');
 
-    const fileName = `prod-${id}-${Date.now()}`;
+    const fileName = `prod-${id}-${slot}-${Date.now()}`;
     const imageUrl = await this.supabaseService.uploadImage(file, fileName);
+
+    const updateData: any = {};
+    if (slot === 2) {
+      updateData.imageUrl2 = imageUrl;
+    } else {
+      updateData.imageUrl = imageUrl;
+    }
 
     return this.prisma.product.update({
       where: { id },
-      data: { imageUrl },
+      data: updateData,
     });
   }
 

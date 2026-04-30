@@ -18,6 +18,7 @@ interface ProductStock {
     sku: string;
     unit: string;
     imageUrl?: string;
+    imageUrl2?: string;
   };
 }
 
@@ -200,9 +201,16 @@ export default function StaffInventoryPage() {
                   <tr key={stock.productId} className="hover:bg-gray-50/50 transition-colors group">
                     <td className="px-8 py-5">
                       <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-xl bg-gray-50 flex items-center justify-center border border-gray-100 overflow-hidden">
-                          {stock.product.imageUrl ? (
-                            <img src={stock.product.imageUrl} alt={stock.product.name} className="h-full w-full object-cover" />
+                        <div className="h-12 w-24 rounded-xl bg-gray-50 flex items-center justify-center border border-gray-100 overflow-hidden relative">
+                          {stock.product.imageUrl || stock.product.imageUrl2 ? (
+                            <div className="flex w-full h-full">
+                              {stock.product.imageUrl && (
+                                <img src={stock.product.imageUrl} alt="Slot 1" className={`h-full ${stock.product.imageUrl2 ? 'w-1/2' : 'w-full'} object-cover border-r border-white/10`} />
+                              )}
+                              {stock.product.imageUrl2 && (
+                                <img src={stock.product.imageUrl2} alt="Slot 2" className={`h-full ${stock.product.imageUrl ? 'w-1/2' : 'w-full'} object-cover`} />
+                              )}
+                            </div>
                           ) : (
                             <QrCode className="h-6 w-6 text-gray-300" />
                           )}

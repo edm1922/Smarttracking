@@ -27,12 +27,14 @@ export class ProductsController {
     @Query('take') take?: string,
     @Query('search') search?: string,
     @Query('stockFilter') stockFilter?: string,
+    @Request() req: any,
   ) {
     return this.productsService.findAll({
       skip: skip ? parseInt(skip, 10) : 0,
       take: take ? parseInt(take, 10) : 20,
       search,
       stockFilter,
+      role: req.user.role,
     });
   }
 
@@ -123,7 +125,8 @@ export class ProductsController {
   uploadImage(
     @Param('id') id: string,
     @UploadedFile() file: any,
+    @Query('slot') slot: string,
   ) {
-    return this.productsService.uploadImage(id, file);
+    return this.productsService.uploadImage(id, file, parseInt(slot, 10) || 1);
   }
 }

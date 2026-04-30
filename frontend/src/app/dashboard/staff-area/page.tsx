@@ -244,8 +244,21 @@ function StaffAreaContent() {
           <div className="w-full max-w-2xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
             <div className="p-10 space-y-8 overflow-y-auto custom-scrollbar">
               <div className="flex items-start justify-between">
-                <div className="h-20 w-20 bg-primary/5 rounded-3xl flex items-center justify-center text-primary">
-                  <Box className="h-10 w-10" />
+                <div className="flex gap-4">
+                  <div className="h-20 w-32 bg-primary/5 rounded-3xl flex items-center justify-center text-primary overflow-hidden border border-gray-100">
+                    {detailItem.productImageUrl || detailItem.productImageUrl2 ? (
+                      <div className="flex w-full h-full">
+                        {detailItem.productImageUrl && (
+                          <img src={detailItem.productImageUrl} alt="Slot 1" className={`h-full ${detailItem.productImageUrl2 ? 'w-1/2' : 'w-full'} object-cover border-r border-white/10`} />
+                        )}
+                        {detailItem.productImageUrl2 && (
+                          <img src={detailItem.productImageUrl2} alt="Slot 2" className={`h-full ${detailItem.productImageUrl ? 'w-1/2' : 'w-full'} object-cover`} />
+                        )}
+                      </div>
+                    ) : (
+                      <Box className="h-10 w-10" />
+                    )}
+                  </div>
                 </div>
                 <button 
                   onClick={() => setDetailItem(null)}
