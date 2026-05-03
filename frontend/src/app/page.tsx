@@ -25,7 +25,13 @@ export default function LoginPage() {
       localStorage.setItem('username', username);
       localStorage.setItem('userId', userId);
 
-      router.push('/dashboard');
+      if (role === 'super_admin') {
+        router.push('/admin-portal/analytics');
+      } else if (role === 'payroll_admin') {
+        router.push('/dashboard/payroll'); 
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
     } finally {
@@ -88,9 +94,6 @@ export default function LoginPage() {
           </button>
         </form>
         
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-400">QR-Based Asset Tagging System v1.0</p>
-        </div>
       </div>
     </div>
   );

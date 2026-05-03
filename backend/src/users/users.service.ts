@@ -18,7 +18,7 @@ export class UsersService {
     });
   }
 
-  async create(data: { username: string; role: 'admin' | 'inventory' }) {
+  async create(data: { username: string; role: 'admin' | 'inventory' | 'super_admin' | 'payroll_admin' }) {
     const existing = await this.prisma.user.findUnique({
       where: { username: data.username },
     });
@@ -30,7 +30,13 @@ export class UsersService {
     // Generate a simple, easy-to-read password for mobile users
     const randomDigits = Math.floor(1000 + Math.random() * 9000); // 4 digits
     const randomChars = Math.random().toString(36).substring(2, 4).toUpperCase(); // 2 chars
-    const plainPassword = `${data.role === 'admin' ? 'ADM' : 'INV'}-${randomChars}${randomDigits}`;
+    
+    let prefix = 'INV';
+    if (data.role === 'super_admin') prefix = 'SYS';
+    else if (data.role === 'admin') prefix = 'ADM';
+    else if (data.role === 'payroll_admin') prefix = 'PAY';
+    
+    const plainPassword = `${prefix}-${randomChars}${randomDigits}`;
     
     const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
@@ -52,6 +58,20 @@ export class UsersService {
             userId: user.id,
           },
         });
+      }
+
+      // If it's a payroll admin, ensure they have a profile in the payroll system
+      // We use raw SQL because 'profiles' might not be in the Prisma schema yet
+      if (data.role === 'payroll_admin') {
+        try {
+          await tx.$executeRaw`
+            INSERT INTO public.profiles (id, sys_id, full_name, role)
+            VALUES (${user.id}::uuid, ${data.username}, ${data.username}, 'payroll_admin')
+            ON CONFLICT (id) DO NOTHING
+          `;
+        } catch (err) {
+          console.error('Failed to provision payroll profile:', err);
+        }
       }
 
       return {
@@ -80,5 +100,43 @@ export class UsersService {
       },
       orderBy: { username: 'asc' },
     });
+  }
+
+  async revealCredential(id: string, adminPassword: string, requesterId: string) {
+    const requester = await this.prisma.user.findUnique({ where: { id: requesterId } });
+    if (!requester || requester.role !== 'super_admin') {
+      throw new ConflictException('Elevated clearance required for this operation.');
+    }
+
+    const isMatch = await bcrypt.compare(adminPassword, requester.password);
+    if (!isMatch) {
+      throw new ConflictException('Authorization key invalid. Access denied.');
+    }
+
+    const targetUser = await this.prisma.user.findUnique({ where: { id } });
+    if (!targetUser) {
+      throw new ConflictException('Target identity not found.');
+    }
+
+    const randomDigits = Math.floor(1000 + Math.random() * 9000);
+    const randomChars = Math.random().toString(36).substring(2, 4).toUpperCase();
+    
+    let prefix = 'INV';
+    if (targetUser.role === 'super_admin') prefix = 'SYS';
+    else if (targetUser.role === 'admin') prefix = 'ADM';
+    else if (targetUser.role === 'payroll_admin') prefix = 'PAY';
+    
+    const plainPassword = `${prefix}-${randomChars}${randomDigits}`;
+    const hashedPassword = await bcrypt.hash(plainPassword, 10);
+
+    await this.prisma.user.update({
+      where: { id },
+      data: { password: hashedPassword },
+    });
+
+    return {
+      username: targetUser.username,
+      plainPassword,
+    };
   }
 }

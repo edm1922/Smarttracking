@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { SupabaseService } from '../prisma/supabase.service';
@@ -32,16 +33,23 @@ export class ItemsService {
     const createdItems = [];
 
     for (let i = 0; i < copies; i++) {
-      let slug = '';
-      let isUnique = false;
-      while (!isUnique) {
-        const randomStr = Math.random()
-          .toString(36)
-          .substring(2, 7)
-          .toUpperCase();
-        slug = `TEL-${randomStr}`;
-        const existing = await this.prisma.item.findUnique({ where: { slug } });
-        if (!existing) isUnique = true;
+      // O(1) OPTIMIZATION: UUID-based slug generation (collision-free)
+      let slug = `TEL-${uuidv4().substring(0, 8).toUpperCase()}`;
+      
+      // Single existence check (defensive, collisions are extremely rare with UUID)
+      const existing = await this.prisma.item.findUnique({ where: { slug } });
+      if (existing) {
+        // Fallback to random string only if UUID collides (near impossible)
+        let isUnique = false;
+        while (!isUnique) {
+          const randomStr = Math.random()
+            .toString(36)
+            .substring(2, 7)
+            .toUpperCase();
+          slug = `TEL-${randomStr}`;
+          const existingCheck = await this.prisma.item.findUnique({ where: { slug } });
+          if (!existingCheck) isUnique = true;
+        }
       }
 
       const finalData: any = {
@@ -377,7 +385,7 @@ export class ItemsService {
           if (!inventory[name].specs[fieldName]) {
             inventory[name].specs[fieldName] = new Set();
           }
-          inventory[name].specs[fieldName].add(displayValue);
+          inventory[name].specs[fieldName].add(displayValue.trim());
         }
       });
 
@@ -419,8 +427,15 @@ export class ItemsService {
       result = result.filter(group => {
         // Match group name
         if (group.name.toLowerCase().includes(searchLower)) return true;
-        // Match any item slug in the group
-        if (group.items.some((it: any) => it.slug.toLowerCase().includes(searchLower))) return true;
+        // Match any item slug or specification in the group
+        if (group.items.some((it: any) => {
+          if (it.slug.toLowerCase().includes(searchLower)) return true;
+          return it.fieldValues.some((fv: any) => {
+            const v = fv.value;
+            const valStr = typeof v === 'object' ? String(v?.main || JSON.stringify(v)) : String(v);
+            return valStr.toLowerCase().includes(searchLower);
+          });
+        })) return true;
         return false;
       });
     }

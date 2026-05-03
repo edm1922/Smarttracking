@@ -9,7 +9,7 @@ export class WorkflowService {
     return this.prisma.status.findMany({
       orderBy: { orderIndex: 'asc' },
       include: {
-        fromTransition: { include: { toStatus: true } },
+        fromTransitions: { include: { toStatus: true } },
       },
     });
   }

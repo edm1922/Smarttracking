@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { LayoutDashboard, LogOut, Package, Printer, User, Box, Settings, MapPin, FileText, QrCode, ClipboardList, Database, Activity, Users, Info, X } from 'lucide-react';
+import { LayoutDashboard, LogOut, Package, Printer, User, Box, Settings, MapPin, FileText, QrCode, ClipboardList, Database, Activity, Users, Info, X, ShieldCheck, Wallet } from 'lucide-react';
 import AdminNotifications from './AdminNotifications';
 import FloatingChatButton from '@/components/chat/FloatingChatButton';
 import ChatDrawer from '@/components/chat/ChatDrawer';
@@ -19,7 +19,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState('');
   const [showDevNotice, setShowDevNotice] = useState(false);
   const [showChat, setShowChat] = useState(false);
-  const { totalUnread } = useChatPolling(8000);
+  const { totalUnread } = useChatPolling(8000, role !== 'payroll_admin');
 
 useEffect(() => {
     const token = localStorage.getItem('token');
@@ -32,8 +32,20 @@ useEffect(() => {
     setUserId(localStorage.getItem('userId') || '');
     setRole(storedRole);
 
+    // Super Admin should not be here, they have their own portal
+    if (storedRole === 'super_admin') {
+      router.push('/admin-portal/analytics');
+      return;
+    }
+
+    // Payroll Admin should not be here, they have their own portal section
+    if (storedRole === 'payroll_admin' && pathname === '/dashboard') {
+      router.push('/dashboard/payroll');
+      return;
+    }
+
     // Show dev notice for staff members once per session
-    const isStaffUser = storedRole === 'inventory' || storedRole !== 'admin';
+    const isStaffUser = storedRole === 'inventory';
     if (isStaffUser && !sessionStorage.getItem('devNoticeShown')) {
       setShowDevNotice(true);
     }
@@ -52,7 +64,9 @@ useEffect(() => {
     sessionStorage.setItem('devNoticeShown', 'true');
   };
 
-  const isStaff = role === 'inventory' || role !== 'admin';
+  const isStaff = role === 'inventory';
+  const isSuperAdmin = role === 'super_admin';
+  const isAdmin = role === 'admin';
 
   const staffItems = [
     { 
@@ -88,9 +102,9 @@ useEffect(() => {
         { name: 'Inventory', href: '/dashboard/products' },
         { name: 'Issuance Requests', href: '/dashboard/products/requests' },
         { name: 'Unit Tracking', href: '/dashboard/unit-tracking' },
+        { name: 'Locations', href: '/dashboard/locations' },
       ]
     },
-    { name: 'Locations', href: '/dashboard/locations', icon: MapPin },
     { 
       name: 'Transmittal', 
       href: '/dashboard/transmittal', 
@@ -108,7 +122,6 @@ useEffect(() => {
     { name: 'Storage', href: '/dashboard/storage', icon: Database },
     { name: 'Custom Fields', href: '/dashboard/custom-fields', icon: Package },
     { name: 'Print Labels', href: '/dashboard/print', icon: Printer },
-    { name: 'Accounts', href: '/dashboard/users', icon: User, adminOnly: true },
   ];
 
   const staffAreaItems = [
@@ -120,6 +133,15 @@ useEffect(() => {
         { name: 'Inventory Summary', href: '/dashboard/staff-area?tab=summary' },
         { name: 'Staff Activities', href: '/dashboard/staff-area?tab=activities' },
       ]
+    },
+  ];
+
+  const payrollItems = [
+    { name: 'Payroll Admin', href: '/dashboard/payroll', icon: FileText },
+    { 
+      name: role === 'payroll_admin' ? 'Payroll Records' : 'My Payslips', 
+      href: '/dashboard/payroll/my-payslips', 
+      icon: role === 'payroll_admin' ? Users : Wallet 
     },
   ];
 
@@ -138,24 +160,70 @@ useEffect(() => {
         <nav className="flex-1 space-y-6 p-4 overflow-y-auto custom-scrollbar">
           {!isStaff ? (
             <>
-              <div>
-                <p className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Inventory System</p>
-                <div className="space-y-1">
-                  {inventoryItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = pathname.startsWith(item.href) && item.href !== '/dashboard' || (item.href === '/dashboard' && pathname === '/dashboard');
-                    const isSubItemActive = (href: string) => {
-                      if (href.includes('?')) {
-                        const [path, query] = href.split('?');
-                        const tabValue = new URLSearchParams(query).get('tab');
-                        return pathname === path && currentTab === tabValue;
-                      }
-                      return pathname === href;
-                    };
+              {role !== 'payroll_admin' && (
+                <div>
+                  <p className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Inventory System</p>
+                  <div className="space-y-1">
+                    {inventoryItems.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = pathname.startsWith(item.href) && item.href !== '/dashboard' || (item.href === '/dashboard' && pathname === '/dashboard');
+                      const isSubItemActive = (href: string) => {
+                        if (href.includes('?')) {
+                          const [path, query] = href.split('?');
+                          const tabValue = new URLSearchParams(query).get('tab');
+                          return pathname === path && currentTab === tabValue;
+                        }
+                        return pathname === href;
+                      };
 
-                    return (
-                      <div key={item.name} className="space-y-1">
+                      return (
+                        <div key={item.name} className="space-y-1">
+                          <Link
+                            href={item.href}
+                            className={`flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                              isActive
+                                ? 'bg-primary text-white'
+                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                            }`}
+                          >
+                            <Icon className="mr-3 h-5 w-5" />
+                            {item.name}
+                          </Link>
+                          {item.subItems && isActive && (
+                            <div className="ml-8 space-y-1 mt-1">
+                              {item.subItems.map((subItem) => (
+                                <Link
+                                  key={subItem.name}
+                                  href={subItem.href}
+                                  className={`block rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                                    isSubItemActive(subItem.href)
+                                      ? 'text-primary bg-primary/5'
+                                      : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  {subItem.name}
+                                </Link>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {role !== 'payroll_admin' && (
+                <div>
+                  <p className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">QR Form System</p>
+                  <div className="space-y-1">
+                    {qrSystemItems.map((item: any) => {
+                      if (item.adminOnly && role !== 'admin') return null;
+                      const Icon = item.icon;
+                      const isActive = pathname === item.href;
+                      return (
                         <Link
+                          key={item.name}
                           href={item.href}
                           className={`flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                             isActive
@@ -166,72 +234,75 @@ useEffect(() => {
                           <Icon className="mr-3 h-5 w-5" />
                           {item.name}
                         </Link>
-                        {item.subItems && isActive && (
-                          <div className="ml-8 space-y-1 mt-1">
-                            {item.subItems.map((subItem) => (
-                              <Link
-                                key={subItem.name}
-                                href={subItem.href}
-                                className={`block rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                                  isSubItemActive(subItem.href)
-                                    ? 'text-primary bg-primary/5'
-                                    : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
-                                }`}
-                              >
-                                {subItem.name}
-                              </Link>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div>
-                <p className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">QR Form System</p>
-                <div className="space-y-1">
-                  {qrSystemItems.map((item: any) => {
-                    if (item.adminOnly && role !== 'admin') return null;
-                    const Icon = item.icon;
-                    const isActive = pathname === item.href;
-                    return (
-                      <Link
-                        key={item.name}
-                        href={item.href}
-                        className={`flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                          isActive
-                            ? 'bg-primary text-white'
-                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                        }`}
-                      >
-                        <Icon className="mr-3 h-5 w-5" />
-                        {item.name}
-                      </Link>
-                    );
-                  })}
+              {role !== 'payroll_admin' && (
+                <div>
+                  <p className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Staff Area</p>
+                  <div className="space-y-1">
+                    {staffAreaItems.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = pathname.startsWith(item.href);
+                      const isSubItemActive = (href: string) => {
+                        if (href.includes('?')) {
+                          const [path, query] = href.split('?');
+                          const tabValue = new URLSearchParams(query).get('tab');
+                          return pathname === path && currentTab === tabValue;
+                        }
+                        return pathname === href;
+                      };
+
+                      return (
+                        <div key={item.name} className="space-y-1">
+                          <Link
+                            href={item.href}
+                            className={`flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                              isActive
+                                ? 'bg-primary text-white'
+                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                            }`}
+                          >
+                            <Icon className="mr-3 h-5 w-5" />
+                            {item.name}
+                          </Link>
+                          {item.subItems && isActive && (
+                            <div className="ml-8 space-y-1 mt-1">
+                              {item.subItems.map((subItem) => (
+                                <Link
+                                  key={subItem.name}
+                                  href={subItem.href}
+                                  className={`block rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                                    isSubItemActive(subItem.href)
+                                      ? 'text-primary bg-primary/5'
+                                      : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  {subItem.name}
+                                </Link>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <p className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Staff Area</p>
-                <div className="space-y-1">
-                  {staffAreaItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = pathname.startsWith(item.href);
-                    const isSubItemActive = (href: string) => {
-                      if (href.includes('?')) {
-                        const [path, query] = href.split('?');
-                        const tabValue = new URLSearchParams(query).get('tab');
-                        return pathname === path && currentTab === tabValue;
-                      }
-                      return pathname === href;
-                    };
-
-                    return (
-                      <div key={item.name} className="space-y-1">
+              )}
+              {(isSuperAdmin || role === 'payroll_admin') && (
+                <div>
+                  <p className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Payroll System</p>
+                  <div className="space-y-1">
+                    {payrollItems.map((item) => {
+                      if (item.name === 'Payroll Admin' && !isSuperAdmin && role !== 'payroll_admin') return null;
+                      const Icon = item.icon;
+                      const isActive = pathname.startsWith(item.href);
+                      return (
                         <Link
+                          key={item.name}
                           href={item.href}
                           className={`flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                             isActive
@@ -242,28 +313,11 @@ useEffect(() => {
                           <Icon className="mr-3 h-5 w-5" />
                           {item.name}
                         </Link>
-                        {item.subItems && isActive && (
-                          <div className="ml-8 space-y-1 mt-1">
-                            {item.subItems.map((subItem) => (
-                              <Link
-                                key={subItem.name}
-                                href={subItem.href}
-                                className={`block rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                                  isSubItemActive(subItem.href)
-                                    ? 'text-primary bg-primary/5'
-                                    : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
-                                }`}
-                              >
-                                {subItem.name}
-                              </Link>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
             </>
           ) : (
             <div>

@@ -7,7 +7,7 @@ interface UnreadCounts {
   [conversationId: string]: number;
 }
 
-export function useChatPolling(pollInterval = 8000) {
+export function useChatPolling(pollInterval = 8000, enabled = true) {
   const [unreadCounts, setUnreadCounts] = useState<UnreadCounts>({});
   const [totalUnread, setTotalUnread] = useState(0);
 
@@ -25,12 +25,14 @@ export function useChatPolling(pollInterval = 8000) {
   }, []);
 
   useEffect(() => {
+    if (!enabled) return;
+    
     fetchUnreadCounts();
     
     const interval = setInterval(fetchUnreadCounts, pollInterval);
     
     return () => clearInterval(interval);
-  }, [fetchUnreadCounts, pollInterval]);
+  }, [fetchUnreadCounts, pollInterval, enabled]);
 
   return { unreadCounts, totalUnread, refetch: fetchUnreadCounts };
 }

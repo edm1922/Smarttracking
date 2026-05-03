@@ -38,6 +38,7 @@ interface CartItem {
   manualSlug: string;
   qty: number;
   unit: string;
+  specs?: string;
   status: 'pending' | 'scanning' | 'searching' | 'success' | 'manual';
 }
 
@@ -164,6 +165,11 @@ function UnitRequisitionContent() {
             updateCartItem(item.id, { 
               productName: res.data.name,
               unit: res.data.unit || 'pcs',
+              specs: res.data.fieldValues?.filter((fv: any) => fv.value).map((fv: any) => {
+                const v = fv.value;
+                const displayVal = typeof v === 'object' ? (v.main || '') : v;
+                return displayVal ? `${fv.name}: ${displayVal}` : null;
+              }).filter(Boolean).join(', '),
               status: 'success'
             });
           } else {
@@ -597,7 +603,14 @@ function UnitRequisitionContent() {
                           </div>
                           <div>
                             <p className="text-xs font-mono font-bold text-gray-900 leading-none mb-1">{item.item?.slug || item.itemId}</p>
-                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{item.qty} {item.unit}</p>
+                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                              {item.qty} {item.unit}
+                              {item.item?.fieldValues && (
+                                <span className="ml-2 text-primary/60">
+                                  • {item.item.fieldValues.filter((fv: any) => fv.value).map((fv: any) => typeof fv.value === 'object' ? (fv.value.main || '') : fv.value).filter(Boolean).join(', ')}
+                                </span>
+                              )}
+                            </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -617,6 +630,11 @@ function UnitRequisitionContent() {
                                 manualSlug: item.item?.slug || item.itemId,
                                 qty: item.qty,
                                 unit: item.unit || 'pcs',
+                                specs: item.item?.fieldValues?.filter((fv: any) => fv.value).map((fv: any) => {
+                                  const v = fv.value;
+                                  const displayVal = typeof v === 'object' ? (v.main || '') : v;
+                                  return displayVal ? `${fv.name}: ${displayVal}` : null;
+                                }).filter(Boolean).join(', '),
                                 imagePreview: null,
                                 referencePreview: item.imageUrl,
                                 status: 'success'
@@ -746,8 +764,9 @@ function UnitRequisitionContent() {
                                       )}
                                       {item.productName && (
                                        <span className="text-[10px] font-black text-primary uppercase animate-in fade-in zoom-in duration-300">
-                                         {item.productName}
-                                       </span>
+                                       {item.productName}
+                                       {item.specs && <span className="ml-2 opacity-60 text-[8px]">• {item.specs}</span>}
+                                     </span>
                                      )}
                                   </div>
                                   <div className="relative">
@@ -868,6 +887,37 @@ function UnitRequisitionContent() {
                       </div>
                     </div>
 
+                    <div className="flex items-center gap-2 mb-6 text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">
+                       <QrCode className="h-3.5 w-3.5 text-primary" />
+                       {product.items.length} Linked QR Codes
+                    </div>
+
+                    {/* Filter Pills */}
+                    {product.specs && Object.keys(product.specs).length > 0 && (
+                      <div className="space-y-4 mb-8">
+                        {Object.entries(product.specs).map(([specKey, values]) => (
+                          <div key={specKey} className="space-y-2">
+                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{specKey}</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {values.map(val => (
+                                <button
+                                  key={val}
+                                  onClick={() => toggleFilter(product.name, specKey, val)}
+                                  className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tight transition-all active:scale-95 ${
+                                    productFilters[product.name]?.[specKey] === val
+                                      ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-105'
+                                      : 'bg-gray-50 text-gray-400 hover:bg-gray-100 border border-gray-100'
+                                  }`}
+                                >
+                                  {val}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     <button 
                       onClick={() => setExpandedProduct(expandedProduct === product.name ? null : product.name)}
                       className="w-full mt-6 py-4 bg-gray-50 rounded-2xl text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-primary flex items-center justify-center gap-2 transition-all group"
@@ -878,10 +928,32 @@ function UnitRequisitionContent() {
 
                     {expandedProduct === product.name && (
                       <div className="mt-4 space-y-2 animate-in slide-in-from-top-4 duration-300">
-                        {product.items.map(item => (
+                        {product.items.filter(item => {
+                          const filters = productFilters[product.name] || {};
+                          return Object.entries(filters).every(([fKey, fVal]) => 
+                            item.fieldValues.some(fv => {
+                              if (fv.name !== fKey) return false;
+                              const val = fv.value;
+                              if (val && typeof val === 'object' && val.useUnitQty) return String(val.main || '') === fVal;
+                              return String(val) === fVal;
+                            })
+                          );
+                        }).map(item => (
                           <div key={item.slug} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100 hover:bg-white transition-all group/row">
                                 <div className="flex flex-col">
-                                  <span className="text-sm font-mono font-bold text-gray-900">{item.slug}</span>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-sm font-mono font-bold text-gray-900">{item.slug}</span>
+                                    {item.fieldValues?.filter((fv: any) => fv.value).map((fv: any, fvIdx: number) => {
+                                      const v = fv.value;
+                                      const displayVal = typeof v === 'object' ? (v.main || '') : v;
+                                      if (!displayVal) return null;
+                                      return (
+                                        <span key={fvIdx} className="text-[8px] font-black bg-primary/5 text-primary px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                                          {fv.name}: {displayVal}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
                                   <span className="text-[10px] font-black text-gray-400 uppercase">Batch: {item.batch || 'N/A'}</span>
                                 </div>
                                 <button 
@@ -935,7 +1007,12 @@ function UnitRequisitionContent() {
                   .map((req) => (
                     <tr key={req.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-8 py-5 text-sm font-bold text-gray-700">{new Date(req.createdAt).toLocaleDateString()}</td>
-                      <td className="px-8 py-5 text-sm font-mono font-bold text-primary">{req.item.slug}</td>
+                      <td className="px-8 py-5">
+                        <p className="text-sm font-mono font-bold text-primary leading-none mb-1">{req.item.slug}</p>
+                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                          {req.item.fieldValues?.filter((fv: any) => fv.value).map((fv: any) => typeof fv.value === 'object' ? (fv.value.main || '') : fv.value).filter(Boolean).join(', ')}
+                        </p>
+                      </td>
                       <td className="px-8 py-5 text-center font-black text-gray-900">{req.qty} <span className="text-[10px] text-gray-400 uppercase font-bold">{req.unit}</span></td>
                       <td className="px-8 py-5">
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${

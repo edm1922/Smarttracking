@@ -17,6 +17,9 @@ import { PullOutRequestsModule } from './pull-out-requests/pull-out-requests.mod
 import { StaffInventoryModule } from './staff-inventory/staff-inventory.module';
 import { ChatModule } from './chat/chat.module';
 import { ReportsModule } from './reports/reports.module';
+import { SystemAnalyticsModule } from './system-analytics/system-analytics.module';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { TrafficInterceptor } from './common/interceptors/traffic.interceptor';
 
 
 @Module({
@@ -40,8 +43,15 @@ import { ReportsModule } from './reports/reports.module';
     StaffInventoryModule,
     ChatModule,
     ReportsModule,
+    SystemAnalyticsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TrafficInterceptor,
+    },
+  ],
 })
 export class AppModule {}

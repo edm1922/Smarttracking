@@ -11,3 +11,8 @@ backend/.env
 frontend/node_modules
 frontend/.next
 frontend/.env
+*.xlsb
+*.xlsx
+backend/scratch
+frontend/scratch
+scratch

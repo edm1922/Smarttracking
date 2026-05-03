@@ -224,14 +224,14 @@ export class StaffInventoryService {
   // Admin Methods
   async findAllActivities() {
     return this.prisma.staffActivity.findMany({
-      include: { user: true },
+      include: { User: true },
       orderBy: { createdAt: 'desc' },
     });
   }
 
   async findAllStaffInventory() {
     return this.prisma.staffInventory.findMany({
-      include: { user: true },
+      include: { User: true },
       orderBy: { updatedAt: 'desc' },
     });
   }

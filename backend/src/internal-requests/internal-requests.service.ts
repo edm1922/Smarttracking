@@ -10,6 +10,11 @@ import { SupabaseService } from '../prisma/supabase.service';
 export class InternalRequestsService {
   private cachedAdminId: string | null = null;
   
+  // O(1) OPTIMIZATION: Cache for issuance counts
+  private issuanceCache: Map<string, Map<string, number>> | null = null;
+  private cacheTimestamp: number = 0;
+  private readonly CACHE_TTL = 60000; // 1 minute
+  
   constructor(
     private prisma: PrismaService,
     private supabaseService: SupabaseService,
@@ -106,29 +111,34 @@ export class InternalRequestsService {
       console.warn(`[InternalRequestsService] Slow findAll query: ${duration}ms`);
     }
 
-    // OPTIMIZED: Use groupBy for total fulfilled counts instead of loading full history
-    const issuanceCounts = await this.prisma.internalRequest.groupBy({
-      by: ['productId', 'employeeName'],
-      where: { status: 'FULFILLED' },
-      _count: {
-        productId: true,
-      },
-    });
+    // O(1) OPTIMIZATION: Use cached issuance counts with periodic refresh
+    const now = Date.now();
+    if (!this.issuanceCache || now - this.cacheTimestamp > this.CACHE_TTL) {
+      const issuanceCounts = await this.prisma.internalRequest.groupBy({
+        by: ['productId', 'employeeName'],
+        where: { status: 'FULFILLED' },
+        _count: {
+          productId: true,
+        },
+      });
 
-    // Build lookup map for fast association
-    const issuanceMap = new Map<string, Map<string, number>>();
-    issuanceCounts.forEach((i) => {
-      if (!issuanceMap.has(i.productId)) {
-        issuanceMap.set(i.productId, new Map());
-      }
-      issuanceMap.get(i.productId)?.set(i.employeeName, i._count.productId);
-    });
+      this.issuanceCache = new Map();
+      issuanceCounts.forEach((i) => {
+        if (!this.issuanceCache!.has(i.productId)) {
+          this.issuanceCache!.set(i.productId, new Map());
+        }
+        this.issuanceCache!.get(i.productId)!.set(i.employeeName, i._count.productId);
+      });
+      this.cacheTimestamp = now;
+    }
 
-    const data = requests.map((req) => ({
-      ...req,
-      previousIssuancesCount:
-        issuanceMap.get(req.productId)?.get(req.employeeName) ?? 0,
-    }));
+    const data = requests.map((req) => {
+      const productMap = this.issuanceCache?.get(req.productId);
+      return {
+        ...req,
+        previousIssuancesCount: productMap?.get(req.employeeName) ?? 0,
+      };
+    });
 
     return { data, total };
   }

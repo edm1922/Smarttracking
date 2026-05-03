@@ -6,7 +6,6 @@ import {
   Filter, Calendar, ArrowLeft, ListFilter,
   Eye, QrCode, Clock, Printer, X, Trash2
 } from 'lucide-react';
-import api from '@/lib/api';
 import { TableSkeleton, CardSkeleton } from '@/components/ui/LoadingSkeletons';
 
 interface Batch {
@@ -51,11 +50,11 @@ export default function StoragePage() {
   const fetchData = async () => {
     try {
       const [batchesRes, fieldsRes] = await Promise.all([
-        api.get('/batches'),
-        api.get('/custom-fields')
+        fetch('/api/batches').then(r => r.json()),
+        fetch('/api/custom-fields').then(r => r.json())
       ]);
-      setBatches(batchesRes.data);
-      setFields(fieldsRes.data);
+      setBatches(Array.isArray(batchesRes) ? batchesRes : []);
+      setFields(Array.isArray(fieldsRes) ? fieldsRes : []);
     } catch (err) {
       console.error('Failed to fetch storage data', err);
     } finally {
@@ -72,8 +71,8 @@ export default function StoragePage() {
     setSelectedBatch(batch);
     setViewMode('details');
     try {
-      const itemsRes = await api.get(`/items?batchId=${batch.id}`);
-      setItems(itemsRes.data);
+      const itemsRes = await fetch(`/api/items?batchId=${batch.id}`).then(r => r.json());
+      setItems(Array.isArray(itemsRes) ? itemsRes : []);
     } catch (err) {
       console.error('Failed to fetch batch items', err);
     } finally {
@@ -106,7 +105,7 @@ export default function StoragePage() {
     if (!confirm(`Are you sure you want to delete the batch "${batch.batchCode}"? This will NOT delete the items inside, but they will no longer be grouped under this batch.`)) return;
     
     try {
-      await api.delete(`/batches/${batch.id}`);
+      await fetch(`/api/batches/${batch.id}`, { method: 'DELETE' });
       if (selectedBatch?.id === batch.id) {
         setSelectedBatch(null);
         setViewMode('grid');

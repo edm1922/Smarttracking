@@ -98,7 +98,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       itemData.fieldValues?.forEach((fv: any) => {
         values[fv.fieldId] = fv.value;
         const val = fv.value;
-        if (val && typeof val === 'object' && val.useUnitQty) {
+        if (val && typeof val === 'object' && val.useUnitQty && !foundUnitData) {
           setUnitTracking({
             useUnitQty: true,
             unit: val.unit || 'Pair',

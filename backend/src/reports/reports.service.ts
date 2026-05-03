@@ -363,12 +363,12 @@ export class ReportsService {
       _count: true,
     });
 
-    // Resolve category names
+    // O(1) OPTIMIZATION: Build Map for O(1) category lookups instead of O(n) find
     const categories = await this.prisma.category.findMany();
+    const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
+
     const categoryStats = itemsByCategory.map((stat) => ({
-      name:
-        categories.find((c) => c.id === stat.categoryId)?.name ||
-        'Uncategorized',
+      name: stat.categoryId ? (categoryMap.get(stat.categoryId) || 'Uncategorized') : 'Uncategorized',
       count: stat._count,
     }));
 
