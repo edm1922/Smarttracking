@@ -3,16 +3,19 @@ import { createClient } from '@supabase/supabase-js';
 
 export async function GET(req: NextRequest) {
   try {
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Supabase credentials missing (URL or Service Key)');
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
       }
-    );
+    });
     // Fetch all users with 'staff' role in metadata
     const { data, error } = await supabaseAdmin.auth.admin.listUsers({
       perPage: 1000
@@ -57,16 +60,19 @@ export async function GET(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Supabase credentials missing (URL or Service Key)');
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
       }
-    );
+    });
     const { id } = await req.json();
     const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
     if (error) throw error;
