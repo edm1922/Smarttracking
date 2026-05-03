@@ -3,7 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { LogsService } from '../logs/logs.service';
 import { SupabaseService } from '../prisma/supabase.service';
@@ -34,7 +34,7 @@ export class ItemsService {
 
     for (let i = 0; i < copies; i++) {
       // O(1) OPTIMIZATION: UUID-based slug generation (collision-free)
-      let slug = `TEL-${uuidv4().substring(0, 8).toUpperCase()}`;
+      let slug = `TEL-${randomUUID().substring(0, 8).toUpperCase()}`;
       
       // Single existence check (defensive, collisions are extremely rare with UUID)
       const existing = await this.prisma.item.findUnique({ where: { slug } });

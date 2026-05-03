@@ -30,7 +30,6 @@
     "@nestjs/platform-express": "^11.0.1",
     "@prisma/client": "^6.0.0",
     "@supabase/supabase-js": "^2.103.3",
-    "@types/uuid": "^10.0.0",
     "bcrypt": "^6.0.0",
     "cache-manager": "^7.2.8",
     "class-transformer": "^0.5.1",
@@ -38,7 +37,6 @@
     "dotenv": "^17.4.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "uuid": "^13.0.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
