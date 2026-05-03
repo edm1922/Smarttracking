@@ -374,10 +374,10 @@ export class ItemsService {
         const v = fv.value as any;
         let displayValue: string | null = null;
 
-        if (v && typeof v === 'object' && v.useUnitQty) {
-          if (v.main) displayValue = String(v.main);
+        if (v && typeof v === 'object') {
+          displayValue = String(v.main ?? v.qty ?? JSON.stringify(v));
         } else {
-          displayValue = typeof fv.value === 'object' ? JSON.stringify(fv.value) : String(fv.value);
+          displayValue = String(fv.value);
         }
 
         if (displayValue && displayValue.trim() !== '') {

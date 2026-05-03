@@ -810,10 +810,10 @@ export default function UnitTrackingPage() {
                               const v = fv.value as any;
                               let displayValue = '';
                               
-                              if (v && typeof v === 'object' && v.useUnitQty) {
-                                displayValue = String(v.main ?? v.qty ?? 0);
+                              if (v && typeof v === 'object') {
+                                displayValue = String(v.main ?? v.qty ?? JSON.stringify(v));
                               } else {
-                                displayValue = typeof fv.value === 'object' ? JSON.stringify(fv.value) : String(fv.value);
+                                displayValue = String(fv.value);
                               }
 
                               if (!displayValue || displayValue.trim() === '') return null;
