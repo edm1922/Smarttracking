@@ -44,9 +44,9 @@ useEffect(() => {
       return;
     }
 
-    // Show dev notice for staff members once per session
-    const isStaffUser = storedRole === 'inventory';
-    if (isStaffUser && !sessionStorage.getItem('devNoticeShown')) {
+    // Show dev notice for staff and admin members once per session
+    const shouldShowNotice = storedRole === 'inventory' || storedRole === 'admin' || storedRole === 'payroll_admin';
+    if (shouldShowNotice && !sessionStorage.getItem('devNoticeShown')) {
       setShowDevNotice(true);
     }
   }, [router]);
