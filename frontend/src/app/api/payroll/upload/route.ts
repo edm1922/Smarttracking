@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
         const row = rows[i];
         if (!row || !Array.isArray(row)) continue;
         
-        const rowString = row.filter(cell => cell !== null && cell !== undefined).join('|').toLowerCase();
+        const rowString = row.filter((cell: any) => cell !== null && cell !== undefined).join('|').toLowerCase();
         if (rowString.includes('sys id') || (rowString.includes('emp name') && rowString.includes('basic pay'))) {
           targetSheetName = name;
           allRows = rows;

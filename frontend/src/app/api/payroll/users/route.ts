@@ -22,22 +22,22 @@ export async function GET(req: NextRequest) {
     if (error) throw error;
     const users = data?.users || [];
 
-    const staffUsers = users.filter(user => user.user_metadata?.role === 'staff');
+    const staffUsers = users.filter((user: any) => user.user_metadata?.role === 'staff');
 
     // Fetch run associations for these users
-    const sysIds = staffUsers.map(u => u.user_metadata?.sys_id).filter(Boolean);
+    const sysIds = staffUsers.map((u: any) => u.user_metadata?.sys_id).filter(Boolean);
     const { data: entries } = await supabaseAdmin
       .from('payroll_entries')
       .select('sys_id, payroll_run_id')
       .in('sys_id', sysIds);
 
     const userRunMap = new Map();
-    entries?.forEach(e => {
+    entries?.forEach((e: any) => {
       if (!userRunMap.has(e.sys_id)) userRunMap.set(e.sys_id, new Set());
       userRunMap.get(e.sys_id).add(e.payroll_run_id);
     });
 
-    return NextResponse.json(staffUsers.map(user => {
+    return NextResponse.json(staffUsers.map((user: any) => {
       const sysId = user.user_metadata?.sys_id;
       return {
         id: user.id,

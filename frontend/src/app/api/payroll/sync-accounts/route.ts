@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
           const [last, first] = fullName.split(',').map((s: string) => s.trim().toLowerCase());
           username = `${last}_${first.substring(0, 2)}`;
         } else {
-          const parts = fullName.split(' ').filter(Boolean).map(s => s.toLowerCase());
+          const parts = fullName.split(' ').filter(Boolean).map((s: string) => s.toLowerCase());
           if (parts.length >= 2) {
             const last = parts[parts.length - 1];
             const first = parts[0];
