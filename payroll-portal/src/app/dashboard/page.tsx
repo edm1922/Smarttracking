@@ -11,7 +11,9 @@ import {
   ChevronRight,
   TrendingUp,
   Clock,
-  User as UserIcon
+  User as UserIcon,
+  Info,
+  X
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -19,6 +21,18 @@ export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
   const [slips, setSlips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showDevNotice, setShowDevNotice] = useState(false);
+
+  useEffect(() => {
+    if (!sessionStorage.getItem('employeeDevNoticeShown')) {
+      setShowDevNotice(true);
+    }
+  }, []);
+
+  const closeDevNotice = () => {
+    setShowDevNotice(false);
+    sessionStorage.setItem('employeeDevNoticeShown', 'true');
+  };
 
   useEffect(() => {
     async function fetchData() {
@@ -188,6 +202,47 @@ export default function Dashboard() {
 
         </div>
       </main>
+
+      {/* Dev Notice Modal */}
+      {showDevNotice && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="w-full max-w-lg bg-white rounded-[2rem] shadow-2xl overflow-hidden flex flex-col p-8 border border-indigo-100">
+            <div className="flex justify-between items-start mb-6 text-gray-900">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 bg-indigo-50 text-indigo-500 rounded-2xl flex items-center justify-center shrink-0">
+                  <Info className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black tracking-tight uppercase leading-none">System Notice</h2>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Important Information</p>
+                </div>
+              </div>
+              <button 
+                onClick={closeDevNotice}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-full hover:bg-gray-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4 mb-8">
+              <p className="text-gray-600 leading-relaxed text-sm font-medium">
+                Welcome to the <strong>Employee Portal</strong>! Please note that the system is currently <span className="text-indigo-600 font-black">under active development</span>.
+              </p>
+              <p className="text-gray-500 leading-relaxed text-xs">
+                Some features may be incomplete, and you might experience occasional changes to the interface. If you encounter any bugs or have suggestions, please reach out to the administrator.
+              </p>
+            </div>
+            
+            <button 
+              onClick={closeDevNotice}
+              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-colors shadow-lg shadow-indigo-600/20 active:scale-[0.98]"
+            >
+              I Understand
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
