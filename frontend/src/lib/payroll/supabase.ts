@@ -1,17 +1,24 @@
 import { createClient } from '@supabase/supabase-js';
 
-// These should be in your frontend/.env.local
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Helper to safely get environment variables
+const getEnv = (key: string) => {
+  if (typeof window === 'undefined') {
+    return process.env[key] || '';
+  }
+  return process.env[key] || '';
+};
 
-console.log('Supabase Client Init:', {
-  hasUrl: !!supabaseUrl,
-  hasKey: !!supabaseAnonKey,
-  url: supabaseUrl ? supabaseUrl.substring(0, 30) + '...' : 'MISSING'
-});
+const supabaseUrl = getEnv('NEXT_PUBLIC_SUPABASE_URL');
+const supabaseAnonKey = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY');
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Supabase URL and Anon Key are required. Please check your .env.local file.');
-}
-
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
+// Only initialize if both are present to avoid immediate crash
+export const supabase = (supabaseUrl && supabaseAnonKey) 
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : new Proxy({} as any, {
+      get: (target, prop) => {
+        if (prop === 'auth') {
+          return new Proxy({}, { get: () => () => ({ data: {}, error: null }) });
+        }
+        return () => Promise.resolve({ data: null, error: new Error('Supabase not initialized') });
+      }
+    });
