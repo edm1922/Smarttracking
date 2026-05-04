@@ -49,6 +49,7 @@ export default function QRItemsPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentProgress, setCurrentProgress] = useState(0);
   const [totalToGenerate, setTotalToGenerate] = useState(0);
+  const [abortRequested, setAbortRequested] = useState(false);
 
   const userRole = typeof window !== 'undefined' ? localStorage.getItem('role') : '';
 
@@ -107,14 +108,21 @@ export default function QRItemsPage() {
         const copies = formData.copies;
         setIsModalOpen(false); // Close the input modal
         setIsGenerating(true);
+        setAbortRequested(false);
         setCurrentProgress(0);
         setTotalToGenerate(copies);
 
         for (let i = 0; i < copies; i++) {
+          // Use a local variable check or a state check that we can break out of
+          if ((window as any).confirmAbort) {
+            console.log('Aborting generation...');
+            break;
+          }
           await api.post('/items', { ...formData, copies: 1 });
           setCurrentProgress(i + 1);
         }
         
+        delete (window as any).confirmAbort;
         setIsGenerating(false);
         fetchData();
       }
@@ -147,6 +155,7 @@ export default function QRItemsPage() {
   };
 
   const [filterStatus, setFilterStatus] = useState('all');
+  const [selectedBatchId, setSelectedBatchId] = useState('all');
 
   const filteredItems = items.filter(item => {
     const matchesSearch = item.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -156,7 +165,10 @@ export default function QRItemsPage() {
       (filterStatus === 'released' && item.status === 'Released') ||
       (filterStatus === 'available' && item.status !== 'Released');
 
-    return matchesSearch && matchesFilter;
+    const matchesBatch = selectedBatchId === 'all' || 
+                         (selectedBatchId === 'global' ? !item.batchId : item.batchId === selectedBatchId);
+
+    return matchesSearch && matchesFilter && matchesBatch;
   });
 
   return (
@@ -193,9 +205,20 @@ export default function QRItemsPage() {
           onChange={(e) => setFilterStatus(e.target.value)}
           className="px-4 py-3 rounded-md border border-gray-300 bg-white text-sm font-bold text-gray-700 outline-none focus:ring-1 focus:ring-primary min-w-[160px]"
         >
-          <option value="all">All Items</option>
+          <option value="all">All Status</option>
           <option value="available">In Stock</option>
           <option value="released">Released Items</option>
+        </select>
+        <select 
+          value={selectedBatchId}
+          onChange={(e) => setSelectedBatchId(e.target.value)}
+          className="px-4 py-3 rounded-md border border-gray-300 bg-white text-sm font-bold text-gray-700 outline-none focus:ring-1 focus:ring-primary min-w-[160px]"
+        >
+          <option value="all">All Batches</option>
+          <option value="global">Global (No Batch)</option>
+          {batches.map(batch => (
+            <option key={batch.id} value={batch.id}>{batch.batchCode}</option>
+          ))}
         </select>
       </div>
 
@@ -376,6 +399,19 @@ export default function QRItemsPage() {
                 DO NOT CLOSE THIS TAB UNTIL FINISHED
               </p>
             </div>
+
+            <button 
+              onClick={() => {
+                if (confirm('Are you sure you want to abort the generation process? Some items may have already been created.')) {
+                  (window as any).confirmAbort = true;
+                  setAbortRequested(true);
+                }
+              }}
+              disabled={abortRequested}
+              className="w-full py-4 bg-red-50 text-red-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all disabled:opacity-50"
+            >
+              {abortRequested ? 'Aborting...' : 'Abort Generation'}
+            </button>
           </div>
         </div>
       )}

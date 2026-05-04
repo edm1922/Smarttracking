@@ -15,6 +15,7 @@ interface Item {
   slug: string;
   name: string | null;
   batchId?: string;
+  batch?: { batchCode: string };
   locked?: boolean;
 }
 
@@ -92,7 +93,8 @@ export default function PrintPage() {
 
   const filteredAvailable = availableItems.filter(item => {
     const matchesSearch = item.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.name?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+      (item.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (item.batch?.batchCode.toLowerCase() || '').includes(searchTerm.toLowerCase());
     
     const matchesBatch = selectedBatchId === 'all' || item.batchId === selectedBatchId;
     
@@ -291,16 +293,21 @@ export default function PrintPage() {
               className="flex flex-col items-center justify-center p-6 border border-gray-100 rounded-3xl bg-white shadow-sm hover:shadow-md transition-shadow relative overflow-hidden"
               style={{ pageBreakInside: 'avoid' }}
             >
-              <QRCodeSVG 
-                value={`${typeof window !== 'undefined' ? window.location.origin : ''}/i/${item.slug}`}
-                size={140}
-                level="M"
-                includeMargin={false}
-              />
-              <div className="mt-4 flex flex-col items-center">
-                <span className="text-[10px] font-mono font-black text-primary uppercase tracking-widest bg-primary/5 px-3 py-1 rounded-full">
-                  {item.slug}
-                </span>
+                {item.batch?.batchCode && (
+                  <span className="mb-2 text-[8px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-1 w-full text-center">
+                    Batch: {item.batch.batchCode}
+                  </span>
+                )}
+                <QRCodeSVG 
+                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}/i/${item.slug}`}
+                  size={130}
+                  level="M"
+                  includeMargin={false}
+                />
+                <div className="mt-4 flex flex-col items-center">
+                  <span className="text-[10px] font-mono font-black text-primary uppercase tracking-widest bg-primary/5 px-3 py-1 rounded-full">
+                    {item.slug}
+                  </span>
                 {item.name && (
                   <span className="mt-2 text-[8px] font-bold text-gray-400 uppercase truncate w-full text-center max-w-[120px]">
                     {item.name}
