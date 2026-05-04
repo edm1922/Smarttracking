@@ -5,9 +5,7 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { LayoutDashboard, LogOut, Package, Printer, User, Box, Settings, MapPin, FileText, QrCode, ClipboardList, Database, Activity, Users, Info, X, ShieldCheck, Wallet } from 'lucide-react';
 import AdminNotifications from './AdminNotifications';
-import FloatingChatButton from '@/components/chat/FloatingChatButton';
-import ChatDrawer from '@/components/chat/ChatDrawer';
-import { useChatPolling } from '@/hooks/useChatPolling';
+
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -18,8 +16,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [userId, setUserId] = useState('');
   const [role, setRole] = useState('');
   const [showDevNotice, setShowDevNotice] = useState(false);
-  const [showChat, setShowChat] = useState(false);
-  const { totalUnread } = useChatPolling(8000, role !== 'payroll_admin');
+
 
 useEffect(() => {
     const token = localStorage.getItem('token');
@@ -462,17 +459,7 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Chat Components */}
-      <FloatingChatButton onClick={() => setShowChat(true)} unreadCount={totalUnread} />
-      {showChat && (
-        <ChatDrawer 
-          isOpen={showChat} 
-          onClose={() => setShowChat(false)} 
-          currentUserId={userId}
-          currentUsername={username}
-          currentUserRole={role}
-        />
-      )}
+
     </div>
   );
 }

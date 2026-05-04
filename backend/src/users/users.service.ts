@@ -90,17 +90,7 @@ export class UsersService {
     });
   }
 
-  async findByRole(role: string) {
-    return this.prisma.user.findMany({
-      where: { role },
-      select: {
-        id: true,
-        username: true,
-        role: true,
-      },
-      orderBy: { username: 'asc' },
-    });
-  }
+
 
   async revealCredential(id: string, adminPassword: string, requesterId: string) {
     const requester = await this.prisma.user.findUnique({ where: { id: requesterId } });

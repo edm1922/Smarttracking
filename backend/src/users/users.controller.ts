@@ -43,16 +43,4 @@ export class UsersController {
   verifyPassword(@Request() req: any, @Body('password') password: string) {
     return this.usersService.verifyAdminPassword(req.user.sub, password);
   }
-  
-
-  @Get('chat-partners')
-  findChatPartners(@Request() req: any) {
-    const userRole = req.user.role;
-    // System admins see all admins, admins see all staff, staff see all admins
-    if (userRole === 'super_admin') {
-        return this.usersService.findAll();
-    }
-    const targetRole = userRole === 'admin' ? 'inventory' : 'admin';
-    return this.usersService.findByRole(targetRole);
-  }
 }
