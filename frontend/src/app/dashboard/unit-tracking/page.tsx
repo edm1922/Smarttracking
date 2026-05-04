@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useRef } from 'react';
+import Link from 'next/link';
 import { 
   Boxes, Package, Search, Filter, ArrowRight, 
   ChevronRight, ChevronLeft, ChevronDown, ChevronUp, History,
