@@ -25,6 +25,27 @@ export default function UnitTrackingPage() {
   const [requisitionSubTab, setRequisitionSubTab] = useState<'pending' | 'history'>('pending');
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
 
+  const custodianData = useMemo(() => {
+    const groups: Record<string, any> = {};
+    requests.filter(r => r.status === 'APPROVED').forEach(req => {
+      const username = req.user.username;
+      if (!groups[username]) {
+        groups[username] = {
+          username,
+          items: new Set(),
+          totalQty: 0,
+          lastActivity: req.createdAt
+        };
+      }
+      groups[username].items.add(req.item.product?.name || req.item.name || 'Unit Item');
+      groups[username].totalQty += req.qty;
+      if (new Date(req.createdAt) > new Date(groups[username].lastActivity)) {
+        groups[username].lastActivity = req.createdAt;
+      }
+    });
+    return Object.values(groups);
+  }, [requests]);
+
   const [requests, setRequests] = useState<any[]>([]);
   const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
   const [isBuildingTransmittal, setIsBuildingTransmittal] = useState(false);
@@ -762,10 +783,31 @@ export default function UnitTrackingPage() {
                                    <td className="py-4 px-4 border-l border-gray-100 text-center text-gray-300">_______</td>
                                 </tr>
                              ))}
-                             {selectedReport === 'custodian' && (
-                                <tr className="group">
+                             {selectedReport === 'custodian' && custodianData.map((custodian: any) => (
+                                <tr key={custodian.username} className="group">
+                                   <td className="py-4 px-4">
+                                      <div className="flex items-center gap-3">
+                                         <div className="h-8 w-8 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center font-black text-xs">
+                                            {custodian.username.charAt(0).toUpperCase()}
+                                         </div>
+                                         <span className="text-xs font-black text-gray-900">{custodian.username}</span>
+                                      </div>
+                                   </td>
+                                   <td className="py-4 px-4 text-xs font-medium text-gray-600">
+                                      {Array.from(custodian.items).join(', ')}
+                                   </td>
+                                   <td className="py-4 px-4 text-xs font-black text-gray-900 text-center">
+                                      {custodian.totalQty}
+                                   </td>
+                                   <td className="py-4 px-4 text-xs font-bold text-gray-400">
+                                      {new Date(custodian.lastActivity).toLocaleDateString()}
+                                   </td>
+                                </tr>
+                             ))}
+                             {selectedReport === 'custodian' && custodianData.length === 0 && (
+                                <tr>
                                    <td colSpan={4} className="py-10 text-center text-gray-400 font-medium italic">
-                                      Scanning activity logs to build responsibility map...
+                                      No custodian records found in approved logs.
                                    </td>
                                 </tr>
                              )}
