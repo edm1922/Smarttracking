@@ -57,11 +57,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
   const [username, setUsername] = useState('');
   const [pullOutQty, setPullOutQty] = useState<number>(0);
   const [pullOutRemarks, setPullOutRemarks] = useState('');
-  const [pullOutImage, setPullOutImage] = useState<string | null>(null);
   const [pullOutSupervisor, setPullOutSupervisor] = useState('');
-  const [bypassLogs, setBypassLogs] = useState(true);
-  const [isUploading1, setIsUploading1] = useState(false);
-  const [isUploading2, setIsUploading2] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -274,48 +270,6 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     }).filter(Boolean);
   };
 
-  const uploadItemImage = async (file: File) => {
-    setIsUploading1(true);
-    try {
-      const formData = new FormData();
-      formData.append('image', file);
-      await api.post(`/items/${slug}/image`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      await fetchData();
-    } catch (err) {
-      alert('Failed to upload image');
-    } finally {
-      setIsUploading1(false);
-    }
-  };
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    console.log('File selected:', file);
-    if (file) {
-      // Type validation
-      if (!file.type.startsWith('image/')) {
-        alert('Please select an image file (JPG, PNG, etc.)');
-        return;
-      }
-      
-      // Basic size check (2MB) - Vercel has a 4.5MB total limit for the entire request
-      if (file.size > 2 * 1024 * 1024) {
-        alert('Image is too large. Please keep it under 2MB to ensure successful upload.');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPullOutImage(reader.result as string);
-        console.log('Image loaded to state');
-      };
-      reader.onerror = () => {
-        console.error('FileReader error');
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
   const handleConfirmPullOut = async () => {
     if (pullOutQty <= 0) {
@@ -336,7 +290,6 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
         qty: pullOutQty,
         unit: unitTracking.unit,
         remarks: pullOutRemarks,
-        imageUrl: pullOutImage,
         supervisor: pullOutSupervisor,
       };
 
@@ -346,7 +299,6 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       
       // Reset state
       setPullOutRemarks('');
-      setPullOutImage(null);
       setPullOutSupervisor('');
       setIsPullingOut(false);
     } catch (err) {
@@ -362,8 +314,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     try {
       const payload: any = {
         ...formData,
-        fieldValues: prepareFieldValues(dynamicValues),
-        skipLogs: bypassLogs
+        fieldValues: prepareFieldValues(dynamicValues)
       };
 
       await api.patch(`/items/${slug}`, payload);
@@ -673,34 +624,6 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                   </div>
                 )}
 
-                {isEditing && (
-                  <div className="space-y-4 pt-4 border-t border-gray-100">
-                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Item Documentation Photo</h3>
-                    <div className="relative group aspect-video rounded-2xl overflow-hidden bg-gray-50 border-2 border-dashed border-gray-200 hover:border-primary/30 transition-all">
-                      {item.imageUrl ? (
-                        <>
-                          <img src={item.imageUrl} alt="Asset" className="w-full h-full object-cover" />
-                          <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
-                            <Upload className="h-6 w-6 text-white" />
-                            <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadItemImage(e.target.files[0])} />
-                          </label>
-                        </>
-                      ) : (
-                        <label className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer">
-                          {isUploading1 ? (
-                            <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <>
-                              <Camera className="h-6 w-6 text-gray-300 mb-1" />
-                              <span className="text-[8px] font-black text-gray-400 uppercase">Add Reference Photo</span>
-                            </>
-                          )}
-                          <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadItemImage(e.target.files[0])} />
-                        </label>
-                      )}
-                    </div>
-                  </div>
-                )}
 
                 <div className="space-y-4">
                   <h3 className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] pt-4">Custom Attributes</h3>
@@ -823,28 +746,6 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                 
 
 
-                {(canAdmin || canInventory) && (
-                  <div className="pt-4 border-t border-gray-100 space-y-4">
-                    <div className="px-6 pb-2">
-                      <label className="flex items-center gap-3 cursor-pointer group">
-                        <div className="relative">
-                          <input 
-                            type="checkbox" 
-                            checked={bypassLogs}
-                            onChange={(e) => setBypassLogs(e.target.checked)}
-                            className="peer sr-only"
-                          />
-                          <div className="w-10 h-6 bg-gray-200 rounded-full peer peer-checked:bg-primary transition-all duration-300"></div>
-                          <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 peer-checked:translate-x-4"></div>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest group-hover:text-primary transition-colors">Bypass Stock Logs</span>
-                          <span className="text-[9px] text-gray-400 font-bold italic">Admin: Update silently without audit trail</span>
-                        </div>
-                      </label>
-                    </div>
-                  </div>
-                )}
 
                 <div className="flex gap-3 pt-6">
                   {isEditing && (
@@ -1032,42 +933,6 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Reference Image (Proof)</label>
-                      
-                      {pullOutImage ? (
-                        <div className="relative group rounded-2xl overflow-hidden border-2 border-primary/20 bg-gray-50">
-                          <img src={pullOutImage} alt="Reference" className="w-full h-40 object-cover" />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <button 
-                              onClick={() => setPullOutImage(null)}
-                              className="bg-white/90 p-2 rounded-xl text-red-500 hover:bg-white transition-all shadow-lg"
-                            >
-                              <X className="h-5 w-5" />
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-3">
-                          <label 
-                            htmlFor="capture-input"
-                            className="flex flex-col items-center justify-center p-6 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl hover:bg-gray-100 hover:border-primary/30 transition-all cursor-pointer group"
-                          >
-                            <Camera className="h-6 w-6 text-gray-400 group-hover:text-primary mb-2" />
-                            <span className="text-[10px] font-black text-gray-400 group-hover:text-gray-600 uppercase tracking-widest">Capture</span>
-                            <input id="capture-input" type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageChange} />
-                          </label>
-                          <label 
-                            htmlFor="upload-input"
-                            className="flex flex-col items-center justify-center p-6 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl hover:bg-gray-100 hover:border-primary/30 transition-all cursor-pointer group"
-                          >
-                            <Upload className="h-6 w-6 text-gray-400 group-hover:text-primary mb-2" />
-                            <span className="text-[10px] font-black text-gray-400 group-hover:text-gray-600 uppercase tracking-widest">Upload</span>
-                            <input id="upload-input" type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
-                          </label>
-                        </div>
-                      )}
-                    </div>
                   </div>
                </div>
             </div>

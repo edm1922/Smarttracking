@@ -44,11 +44,6 @@ export default function UnitTrackingPage() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [productFilters, setProductFilters] = useState<Record<string, Record<string, string>>>({});
   
-  const [isRefillModalOpen, setIsRefillModalOpen] = useState(false);
-  const [refillItem, setRefillItem] = useState<any>(null);
-  const [refillQty, setRefillQty] = useState<number>(0);
-  const [bypassLogs, setBypassLogs] = useState(true);
-  const [isStockIn, setIsStockIn] = useState(false);
 
   const [page, setPage] = useState(1);
   const [totalRequests, setTotalRequests] = useState(0);
@@ -197,50 +192,6 @@ export default function UnitTrackingPage() {
     [inventory]
   );
 
-  const handleRefill = (item: any) => {
-    setRefillItem(item);
-    setRefillQty(item.qty);
-    
-    setBypassLogs(true);
-    setIsStockIn(false);
-    setIsRefillModalOpen(true);
-  };
-
-
-  const submitRefill = async () => {
-    if (!refillItem) return;
-    try {
-      const fieldValues = refillItem.fieldValues.map((fv: any) => {
-        if (fv.value && typeof fv.value === 'object' && fv.value.useUnitQty) {
-          return {
-            fieldId: fv.fieldId,
-            value: { ...fv.value, qty: refillQty }
-          };
-        }
-        return { fieldId: fv.fieldId, value: fv.value };
-      });
-
-      const payload: any = { fieldValues };
-      
-      if (bypassLogs) {
-        payload.skipLogs = true;
-      }
-
-      if (isStockIn) {
-        const qtyDiff = refillQty - refillItem.qty;
-        if (qtyDiff > 0) {
-          const unit = refillItem.fieldValues.find((fv: any) => fv.value?.useUnitQty)?.value?.unit || 'pcs';
-          payload.logAction = `STOCK_IN_${qtyDiff}_${unit.toUpperCase()}`;
-        }
-      }
-
-      await api.patch(`/items/${refillItem.slug}`, payload);
-      setIsRefillModalOpen(false);
-      fetchInventory();
-    } catch (err) {
-      alert('Failed to refill item');
-    }
-  };
 
   const toggleRequestSelection = (id: string) => {
     setSelectedRequestIds(prev => 
@@ -594,15 +545,6 @@ export default function UnitTrackingPage() {
                  </div>
               </div>
 
-              <div className={`bg-white p-8 rounded-[2.5rem] border shadow-xl flex items-center gap-6 transition-colors ${lowStockItems.length > 0 ? 'border-red-100 bg-red-50/10' : 'border-gray-100'}`}>
-                 <div className={`h-16 w-16 rounded-2xl flex items-center justify-center ${lowStockItems.length > 0 ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-green-50 text-green-600'}`}>
-                    <AlertTriangle className="h-8 w-8" />
-                 </div>
-                 <div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Critical Refills Needed</p>
-                    <p className={`text-3xl font-black tracking-tighter ${lowStockItems.length > 0 ? 'text-red-600' : 'text-gray-900'}`}>{lowStockItems.length}</p>
-                 </div>
-              </div>
 
               <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl flex items-center gap-6">
                  <div className="h-16 w-16 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600">
@@ -615,47 +557,6 @@ export default function UnitTrackingPage() {
               </div>
            </div>
 
-           {/* Quick Refill Queue */}
-           <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden">
-              <div className="p-8 border-b border-gray-50 flex items-center justify-between">
-                 <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 bg-red-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-red-200">
-                       <Truck className="h-6 w-6" />
-                    </div>
-                    <div>
-                       <h2 className="text-xl font-black text-gray-900 tracking-tight">Priority Refill Queue</h2>
-                       <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Cellophanes that have dropped below your custom threshold</p>
-                    </div>
-                 </div>
-              </div>
-              
-              <div className="p-8">
-                 {lowStockItems.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                       {lowStockItems.map((item: any) => (
-                          <div key={item.slug} className="p-6 rounded-3xl border border-red-100 bg-red-50/30 flex items-center justify-between group hover:bg-red-50 transition-all">
-                             <div>
-                                <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-1">QR ID: {item.slug}</p>
-                                <p className="text-lg font-black text-gray-900 tracking-tight">{item.qty} Remaining</p>
-                                <p className="text-[10px] font-bold text-red-600">Threshold: {item.threshold}</p>
-                             </div>
-                             <button 
-                                onClick={() => handleRefill(item)}
-                                className="p-4 bg-red-600 text-white rounded-2xl shadow-lg shadow-red-200 hover:scale-105 active:scale-95 transition-all"
-                             >
-                                <Activity className="h-5 w-5" />
-                             </button>
-                          </div>
-                       ))}
-                    </div>
-                 ) : (
-                    <div className="py-12 text-center">
-                       <Check className="h-12 w-12 text-green-500 mx-auto mb-4 bg-green-50 p-3 rounded-full" />
-                       <p className="text-sm font-bold text-gray-400">All cellophanes are currently above their thresholds.</p>
-                    </div>
-                 ) }
-              </div>
-           </div>
         </div>
       )}
 
@@ -799,9 +700,6 @@ export default function UnitTrackingPage() {
                               </div>
                               <span className="text-sm font-mono font-bold text-gray-700">{item.slug}</span>
                               {item.batch && <span className="px-2 py-0.5 bg-gray-200 text-[9px] font-black rounded-md">{item.batch}</span>}
-                              {isLowStock && (
-                                <span className="px-2 py-0.5 bg-red-600 text-white text-[8px] font-black rounded-md uppercase tracking-tighter">Needs Refill</span>
-                              )}
                             </div>
                           
                           {/* Form Content / Specs Breakdown */}
@@ -830,22 +728,7 @@ export default function UnitTrackingPage() {
                         <div className="flex items-center gap-4">
                            <div className="text-right mr-2">
                               <span className={`text-sm font-black ${isLowStock ? 'text-red-600' : 'text-gray-900'}`}>{item.qty}</span>
-                             {isLowStock && <p className="text-[8px] font-bold text-red-400 uppercase tracking-tighter">Limit: {item.threshold}</p>}
                            </div>
-                           <button 
-                             onClick={(e) => {
-                               e.stopPropagation();
-                               handleRefill(item);
-                             }}
-                             className={`p-2 rounded-xl transition-all ${
-                               isLowStock 
-                                 ? 'bg-red-600 text-white shadow-lg shadow-red-200' 
-                                 : 'bg-white border border-gray-100 text-gray-400 hover:text-primary hover:border-primary/20'
-                             }`}
-                             title="Refill Stock"
-                           >
-                             <Activity className="h-4 w-4" />
-                           </button>
                            <ArrowUpRight 
                              className="h-4 w-4 text-gray-300 group-hover/row:text-primary transition-colors cursor-pointer" 
                              onClick={() => window.open(`/i/${item.slug}`, '_blank')}
@@ -1439,94 +1322,6 @@ export default function UnitTrackingPage() {
 
 
 
-      {/* Refill Modal */}
-      {isRefillModalOpen && refillItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-6 overflow-y-auto">
-          <div className="w-full max-w-md rounded-[2.5rem] bg-white p-0 shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-            <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-8 py-6 flex items-center justify-between text-white">
-              <div className="flex items-center gap-4">
-                <div className="p-2 bg-white/10 rounded-xl">
-                  <Activity className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-black tracking-tight uppercase italic">Refill Stock</h2>
-                  <p className="text-[10px] text-gray-400 font-bold tracking-widest uppercase">Manual Adjustment</p>
-                </div>
-              </div>
-              <button onClick={() => setIsRefillModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-all"><X className="h-5 w-5" /></button>
-            </div>
-            
-            <div className="p-8 space-y-6">
-              <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-2">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Target Item</p>
-                <p className="text-sm font-bold text-gray-900">{refillItem.name}</p>
-                <p className="text-xs font-mono font-bold text-primary">{refillItem.slug}</p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">New Quantity</label>
-                  <input 
-                    type="number" 
-                    value={refillQty}
-                    onChange={(e) => setRefillQty(parseInt(e.target.value) || 0)}
-                    className="w-full px-6 py-4 bg-white border-2 border-gray-100 rounded-2xl text-xl font-black text-gray-900 outline-none focus:border-primary transition-all shadow-inner"
-                  />
-                </div>
-
-                <div className="space-y-3 pt-2">
-                  <label className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100 cursor-pointer hover:bg-gray-100 transition-all group">
-                    <input 
-                      type="checkbox" 
-                      checked={bypassLogs}
-                      onChange={(e) => {
-                        setBypassLogs(e.target.checked);
-                        if (e.target.checked) setIsStockIn(false);
-                      }}
-                      className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
-                    />
-                    <div>
-                      <p className="text-xs font-black text-gray-900 uppercase">Bypass Stock Logs</p>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">This will not record an audit trail for this update</p>
-                    </div>
-                  </label>
-
-                  <label className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100 cursor-pointer hover:bg-gray-100 transition-all group">
-                    <input 
-                      type="checkbox" 
-                      checked={isStockIn}
-                      onChange={(e) => {
-                        setIsStockIn(e.target.checked);
-                        if (e.target.checked) setBypassLogs(false);
-                      }}
-                      className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
-                    />
-                    <div>
-                      <p className="text-xs font-black text-gray-900 uppercase">Record as "STOCK IN"</p>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Adds a transaction record to the history logs</p>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
-              <div className="pt-4 flex gap-3">
-                <button 
-                  onClick={() => setIsRefillModalOpen(false)}
-                  className="flex-1 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-gray-900 transition-all"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={submitRefill}
-                  className="flex-[2] py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-gray-900/10 hover:bg-primary transition-all active:scale-95"
-                >
-                  Update Inventory
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

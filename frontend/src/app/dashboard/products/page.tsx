@@ -57,7 +57,6 @@ export default function ProductsPage() {
   const [releaseSearchLoading, setReleaseSearchLoading] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState('');
-  const [bypassLogs, setBypassLogs] = useState(true);
   const [isUploading1, setIsUploading1] = useState(false);
   const [isUploading2, setIsUploading2] = useState(false);
   
@@ -270,7 +269,6 @@ export default function ProductsPage() {
             locationId,
             newTotalQuantity: editableStock,
             remarks: 'Manual Stock Adjustment via Product Management',
-            skipLogs: bypassLogs
           });
         }
       }
@@ -297,7 +295,6 @@ export default function ProductsPage() {
   const handleRowDoubleClick = (product: Product) => {
     setEditingProduct({ ...product });
     setEditableStock(getTotalStock(product));
-    setBypassLogs(true);
     setIsEditModalOpen(true);
   };
 
@@ -1223,15 +1220,6 @@ export default function ProductsPage() {
                       <span className="text-xs font-bold text-gray-400">{editingProduct.unit}</span>
                     </div>
                     <p className="mt-1 text-[10px] text-blue-500 italic">Changing this will create an adjustment log automatically.</p>
-                    <label className="flex items-center gap-2 mt-3 cursor-pointer group">
-                      <input 
-                        type="checkbox" 
-                        checked={bypassLogs}
-                        onChange={(e) => setBypassLogs(e.target.checked)}
-                        className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
-                      />
-                      <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest group-hover:text-primary transition-colors">Bypass Stock Logs</span>
-                    </label>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-300 uppercase mb-1">Pending Order (Auto):</label>

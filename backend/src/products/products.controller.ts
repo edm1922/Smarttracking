@@ -74,7 +74,7 @@ export class ProductsController {
   manualStockAdjustment(
     @Param('id') productId: string,
     @Body()
-    data: { locationId: string; newTotalQuantity: number; remarks?: string; skipLogs?: boolean },
+    data: { locationId: string; newTotalQuantity: number; remarks?: string },
     @Request() req: any,
   ) {
     return this.productsService.manualStockAdjustment(
@@ -83,7 +83,6 @@ export class ProductsController {
       req.user.sub,
       data.newTotalQuantity,
       data.remarks,
-      data.skipLogs,
     );
   }
 
