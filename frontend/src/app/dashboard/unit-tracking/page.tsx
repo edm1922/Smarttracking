@@ -565,287 +565,126 @@ export default function UnitTrackingPage() {
       )}
 
       {activeTab === 'insights' && (
-        <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-           {/* Stats Row */}
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+           {/* Simple Stats Row */}
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl flex items-center gap-6">
                  <div className="h-16 w-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
                     <Boxes className="h-8 w-8" />
                  </div>
                  <div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Available Units</p>
-                    <p className="text-3xl font-black text-gray-900 tracking-tighter">{totalUnitsAvailable.toLocaleString()}</p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Items In Stock</p>
+                    <p className="text-3xl font-black text-gray-900 tracking-tighter">{totalUnitsAvailable.toLocaleString()} Units</p>
                  </div>
               </div>
 
               <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl flex items-center gap-6">
-                 <div className="h-16 w-16 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600">
-                    <LayoutGrid className="h-8 w-8" />
+                 <div className="h-16 w-16 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-600">
+                    <ArrowUpRight className="h-8 w-8" />
                  </div>
                  <div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Tracked Products</p>
-                    <p className="text-3xl font-black text-gray-900 tracking-tighter">{inventory.length}</p>
-                 </div>
-              </div>
-
-              <div className={`p-8 rounded-[2.5rem] border shadow-xl flex items-center gap-6 transition-all ${lowStockItems.length > 0 ? 'bg-red-50 border-red-100' : 'bg-white border-gray-100'}`}>
-                 <div className={`h-16 w-16 rounded-2xl flex items-center justify-center ${lowStockItems.length > 0 ? 'bg-red-500 text-white shadow-lg shadow-red-200' : 'bg-green-50 text-green-600'}`}>
-                    <AlertTriangle className="h-8 w-8" />
-                 </div>
-                 <div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Low Stock Alerts</p>
-                    <p className={`text-3xl font-black tracking-tighter ${lowStockItems.length > 0 ? 'text-red-600' : 'text-gray-900'}`}>{lowStockItems.length}</p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Pulled Out Today</p>
+                    <p className="text-3xl font-black text-gray-900 tracking-tighter">
+                      {requests.filter(r => r.status === 'APPROVED' && new Date(r.createdAt).toLocaleDateString() === new Date().toLocaleDateString()).reduce((acc, curr) => acc + curr.qty, 0).toLocaleString()} Units
+                    </p>
                  </div>
               </div>
            </div>
 
-           {/* Report Center */}
-           <div className="space-y-6">
-              <div className="flex items-center justify-between px-4">
-                 <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 bg-gray-900 rounded-xl flex items-center justify-center text-white">
-                       <FileText className="h-5 w-5" />
-                    </div>
-                    <div>
-                       <h2 className="text-xl font-black text-gray-900 tracking-tight">Audit Report Center</h2>
-                       <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Select a report to generate audit-ready documentation</p>
-                    </div>
+           {/* Simple Stock Master Table */}
+           <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden">
+              <div className="p-8 border-b border-gray-50 flex items-center justify-between">
+                 <div>
+                    <h2 className="text-xl font-black text-gray-900 tracking-tight">Master Stock Health</h2>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Aggregated by Reference Name</p>
                  </div>
-                 {selectedReport && (
-                    <button 
-                       onClick={() => setSelectedReport(null)}
-                       className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2 hover:underline"
-                    >
-                       <X className="h-4 w-4" /> Close Report
-                    </button>
-                 )}
+                 <button 
+                    onClick={() => window.print()}
+                    className="p-3 bg-gray-50 text-gray-400 rounded-xl hover:text-gray-900 transition-all"
+                 >
+                    <Printer className="h-5 w-5" />
+                 </button>
               </div>
 
-              {!selectedReport ? (
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {[
-                       { id: 'ledger', title: 'Asset Movement Ledger', desc: 'Chronological IN/OUT history for all QR units.', icon: Activity, color: 'text-blue-500', bg: 'bg-blue-50' },
-                       { id: 'custodian', title: 'Custodian Responsibility', desc: 'Active inventory grouped by staff members.', icon: User, color: 'text-purple-500', bg: 'bg-purple-50' },
-                       { id: 'reconciliation', title: 'Inventory Reconciliation', desc: 'Printable sheet for physical count audit.', icon: ClipboardList, color: 'text-orange-500', bg: 'bg-orange-50' },
-                       { id: 'critical', title: 'Critical Stock Alerts', desc: 'Full list of items below safety threshold.', icon: TrendingDown, color: 'text-red-500', bg: 'bg-red-50' }
-                    ].map((report) => (
-                       <button 
-                          key={report.id}
-                          onClick={() => setSelectedReport(report.id)}
-                          className="group bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all text-left flex flex-col h-full"
-                       >
-                          <div className={`h-12 w-12 ${report.bg} ${report.color} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                             <report.icon className="h-6 w-6" />
-                          </div>
-                          <h3 className="text-sm font-black text-gray-900 mb-2">{report.title}</h3>
-                          <p className="text-xs font-medium text-gray-400 leading-relaxed">{report.desc}</p>
-                          <div className="mt-auto pt-4 flex items-center text-[10px] font-black text-primary uppercase tracking-widest gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                             Generate <ArrowRight className="h-3 w-3" />
-                          </div>
-                       </button>
-                    ))}
-                 </div>
-              ) : (
-                 <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
-                    <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
+              <div className="overflow-x-auto">
+                 <table className="w-full text-left">
+                    <thead>
+                       <tr className="bg-gray-50/50">
+                          <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Actual Item (Reference)</th>
+                          <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Specifications Consolidate</th>
+                          <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">In Stock</th>
+                          <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Pulled Out (Today)</th>
+                       </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                       {productSummary.map((item: any) => (
+                          <tr key={item.name} className="hover:bg-gray-50/30 transition-colors">
+                             <td className="px-8 py-6">
+                                <span className="text-sm font-black text-gray-900 uppercase">{item.name}</span>
+                             </td>
+                             <td className="px-8 py-6">
+                                <div className="flex flex-wrap gap-1">
+                                   {Array.from(item.specs).slice(0, 8).map((spec: any, i) => (
+                                      <span key={i} className="px-2 py-0.5 bg-gray-100 text-[9px] font-bold text-gray-500 rounded-md">
+                                         {spec}
+                                      </span>
+                                   ))}
+                                   {item.specs.size > 8 && (
+                                      <span className="text-[9px] font-bold text-gray-400">+{item.specs.size - 8} more specs</span>
+                                   )}
+                                   {item.specs.size === 0 && <span className="text-[9px] text-gray-300 italic">No specs listed</span>}
+                                </div>
+                             </td>
+                             <td className="px-8 py-6 text-center">
+                                <span className="text-sm font-black text-gray-900">{item.totalInStock}</span>
+                             </td>
+                             <td className="px-8 py-6 text-center">
+                                <span className={`text-sm font-black ${item.outToday > 0 ? 'text-orange-600' : 'text-gray-300'}`}>
+                                   {item.outToday > 0 ? `-${item.outToday}` : '0'}
+                                </span>
+                             </td>
+                          </tr>
+                       ))}
+                       {productSummary.length === 0 && (
+                          <tr>
+                             <td colSpan={4} className="py-20 text-center text-gray-400 font-medium italic">
+                                No items found in stock records.
+                             </td>
+                          </tr>
+                       )}
+                    </tbody>
+                 </table>
+              </div>
+           </div>
+
+           {/* Recent Activity Log */}
+           <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl space-y-6">
+              <h2 className="text-xl font-black text-gray-900 tracking-tight">Recent Movement Log</h2>
+              <div className="space-y-3">
+                 {requests.filter(r => r.status === 'APPROVED').slice(0, 5).map((req) => (
+                    <div key={req.id} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-50">
                        <div className="flex items-center gap-4">
-                          <div className="h-12 w-12 bg-gray-900 rounded-2xl flex items-center justify-center text-white">
-                             {selectedReport === 'ledger' && <Activity className="h-6 w-6" />}
-                             {selectedReport === 'custodian' && <User className="h-6 w-6" />}
-                             {selectedReport === 'reconciliation' && <ClipboardList className="h-6 w-6" />}
-                             {selectedReport === 'critical' && <AlertTriangle className="h-6 w-6" />}
+                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${req.qty > 0 ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'}`}>
+                             {req.qty > 0 ? <ArrowUpRight className="h-5 w-5" /> : <Box className="h-5 w-5" />}
                           </div>
                           <div>
-                             <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">
-                                {selectedReport === 'ledger' && 'Asset Movement Ledger'}
-                                {selectedReport === 'custodian' && 'Custodian Responsibility Report'}
-                                {selectedReport === 'reconciliation' && 'Inventory Reconciliation Sheet'}
-                                {selectedReport === 'critical' && 'Critical Stock Alert Report'}
-                             </h3>
-                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                                Generated on {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
+                             <p className="text-sm font-black text-gray-900">{req.item.product?.name || req.item.name}</p>
+                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                {new Date(req.createdAt).toLocaleDateString()} at {new Date(req.createdAt).toLocaleTimeString()} • {req.user.username}
                              </p>
                           </div>
                        </div>
-                       <button 
-                          onClick={() => window.print()}
-                          className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all active:scale-95"
-                       >
-                          <Printer className="h-4 w-4" /> Print PDF
-                       </button>
-                    </div>
-
-                    <div className="p-8 overflow-x-auto no-scrollbar">
-                       <table className="w-full text-left border-collapse min-w-[800px]">
-                          <thead>
-                             <tr>
-                                {selectedReport === 'ledger' && (
-                                   <>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Date & Time</th>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Asset ID</th>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Action</th>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 text-center">Qty</th>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Requested By</th>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Status</th>
-                                   </>
-                                )}
-                                {selectedReport === 'custodian' && (
-                                   <>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Staff Member</th>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Asset Categories Held</th>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 text-center">Total Units Held</th>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Last Activity</th>
-                                   </>
-                                )}
-                                {selectedReport === 'reconciliation' && (
-                                   <>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Item Name / ID</th>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Item Name & Specs</th>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 text-center">System Stock</th>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 text-center w-32 border-l border-gray-100">Physical Count</th>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 text-center w-32 border-l border-gray-100">Variance</th>
-                                   </>
-                                )}
-                                {selectedReport === 'critical' && (
-                                   <>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Item Name / ID</th>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Item Description</th>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 text-center">Current Qty</th>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 text-center">Threshold</th>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Severity</th>
-                                   </>
-                                )}
-                             </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-50">
-                             {selectedReport === 'ledger' && requests.filter(r => r.status === 'APPROVED').map((req) => (
-                                <tr key={req.id} className="group">
-                                   <td className="py-4 px-4 text-xs font-bold text-gray-500 whitespace-nowrap">{new Date(req.createdAt).toLocaleString()}</td>
-                                   <td className="py-4 px-4 text-xs font-black text-gray-900">
-                                      {(() => {
-                                        const pName = req.item.product?.name || req.item.name || 'Unit Item';
-                                        const specs = req.item.fieldValues?.map((fv: any) => {
-                                          const v = fv.value;
-                                          return v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-                                        }).filter(Boolean).join(' - ');
-                                        return specs ? `${pName} (${specs})` : pName;
-                                      })()}
-                                      <span className="block text-[9px] font-mono font-bold text-gray-400">{req.item.slug}</span>
-                                   </td>
-                                   <td className="py-4 px-4 text-xs font-bold text-gray-600">Inventory Release</td>
-                                   <td className="py-4 px-4 text-xs font-black text-gray-900 text-center">{req.qty}</td>
-                                   <td className="py-4 px-4 text-xs font-bold text-gray-600">{req.user.username}</td>
-                                   <td className="py-4 px-4">
-                                      <span className="px-2 py-0.5 bg-green-50 text-green-600 text-[9px] font-black rounded-md uppercase">Approved</span>
-                                   </td>
-                                </tr>
-                             ))}
-                             {selectedReport === 'critical' && lowStockItems.map((item: any) => (
-                                <tr key={item.slug} className="group">
-                                   <td className="py-4 px-4 text-xs font-black text-gray-900">
-                                      {(() => {
-                                        const pName = item.product?.name || item.name || 'Unit Item';
-                                        const specs = item.fieldValues?.map((fv: any) => {
-                                          const v = fv.value;
-                                          return v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-                                        }).filter(Boolean).join(' - ');
-                                        return specs ? `${pName} (${specs})` : pName;
-                                      })()}
-                                      <span className="block text-[9px] font-mono font-bold text-gray-400">{item.slug}</span>
-                                   </td>
-                                   <td className="py-4 px-4 text-xs font-bold text-gray-600">Unit-tracked item record</td>
-                                   <td className="py-4 px-4 text-xs font-black text-red-600 text-center">{item.qty}</td>
-                                   <td className="py-4 px-4 text-xs font-bold text-gray-400 text-center">{item.threshold || 0}</td>
-                                   <td className="py-4 px-4">
-                                      <span className={`px-2 py-0.5 text-[9px] font-black rounded-md uppercase ${item.qty === 0 ? 'bg-red-500 text-white' : 'bg-orange-100 text-orange-600'}`}>
-                                         {item.qty === 0 ? 'Out of Stock' : 'Critical'}
-                                      </span>
-                                   </td>
-                                </tr>
-                             ))}
-                             {/* Custodian and Reconciliation would use derived data from inventory */}
-                             {selectedReport === 'reconciliation' && inventory.flatMap(p => p.items).map((item: any) => (
-                                <tr key={item.slug} className="group">
-                                   <td className="py-4 px-4 text-xs font-black text-gray-900">
-                                      {(() => {
-                                        const pName = item.product?.name || item.name || 'Unit Item';
-                                        const specs = item.fieldValues?.map((fv: any) => {
-                                          const v = fv.value;
-                                          return v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-                                        }).filter(Boolean).join(' - ');
-                                        return specs ? `${pName} (${specs})` : pName;
-                                      })()}
-                                      <span className="block text-[9px] font-mono font-bold text-gray-400">{item.slug}</span>
-                                   </td>
-                                   <td className="py-4 px-4 text-xs font-bold text-gray-600">Product: {item.product?.name || 'Unit Item'}</td>
-                                   <td className="py-4 px-4 text-xs font-black text-gray-900 text-center">{item.qty}</td>
-                                   <td className="py-4 px-4 border-l border-gray-100 text-center text-gray-300">_______</td>
-                                   <td className="py-4 px-4 border-l border-gray-100 text-center text-gray-300">_______</td>
-                                </tr>
-                             ))}
-                             {selectedReport === 'custodian' && custodianData.map((custodian: any) => (
-                                <tr key={custodian.username} className="group">
-                                   <td className="py-4 px-4">
-                                      <div className="flex items-center gap-3">
-                                         <div className="h-8 w-8 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center font-black text-xs">
-                                            {custodian.username.charAt(0).toUpperCase()}
-                                         </div>
-                                         <span className="text-xs font-black text-gray-900">{custodian.username}</span>
-                                      </div>
-                                   </td>
-                                   <td className="py-4 px-4 text-xs font-medium text-gray-600">
-                                      {Array.from(custodian.items).join(', ')}
-                                   </td>
-                                   <td className="py-4 px-4 text-xs font-black text-gray-900 text-center">
-                                      {custodian.totalQty}
-                                   </td>
-                                   <td className="py-4 px-4 text-xs font-bold text-gray-400">
-                                      {new Date(custodian.lastActivity).toLocaleDateString()}
-                                   </td>
-                                </tr>
-                             ))}
-                             {selectedReport === 'custodian' && custodianData.length === 0 && (
-                                <tr>
-                                   <td colSpan={4} className="py-10 text-center text-gray-400 font-medium italic">
-                                      No custodian records found in approved logs.
-                                   </td>
-                                </tr>
-                             )}
-                          </tbody>
-                       </table>
-                    </div>
-                 </div>
-              )}
-           </div>
-
-           {/* Recent Activity List */}
-           {!selectedReport && (
-              <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl space-y-6">
-                 <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-black text-gray-900 tracking-tight">Recent Activity Stream</h2>
-                    <Link href="/dashboard/transmittal/unit-tracking-log" className="text-xs font-black text-primary uppercase tracking-widest hover:underline">View Full Logs</Link>
-                 </div>
-                 <div className="space-y-3">
-                    {requests.filter(r => r.status === 'APPROVED').slice(0, 5).map((req) => (
-                       <div key={req.id} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-50 hover:bg-white hover:border-gray-100 transition-all">
-                          <div className="flex items-center gap-4">
-                             <div className="h-10 w-10 bg-green-100 text-green-600 rounded-xl flex items-center justify-center">
-                                <ArrowUpRight className="h-5 w-5" />
-                             </div>
-                             <div>
-                                <p className="text-sm font-black text-gray-900">{req.item.slug}</p>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Released to {req.user.username} • {new Date(req.createdAt).toLocaleDateString()}</p>
-                             </div>
-                          </div>
-                          <span className="text-sm font-black text-gray-900">-{req.qty} {req.unit}</span>
+                       <div className="text-right">
+                          <p className="text-sm font-black text-gray-900">-{req.qty} Units</p>
+                          <p className="text-[9px] font-mono font-bold text-gray-400 uppercase">{req.item.slug}</p>
                        </div>
-                    ))}
-                    {requests.filter(r => r.status === 'APPROVED').length === 0 && (
-                       <p className="text-center py-10 text-gray-400 font-medium italic">No recent approved movements found.</p>
-                    )}
-                 </div>
+                    </div>
+                 ))}
+                 {requests.filter(r => r.status === 'APPROVED').length === 0 && (
+                    <p className="text-center py-10 text-gray-400 font-medium italic">No movements recorded yet.</p>
+                 )}
               </div>
-           )}
+           </div>
         </div>
       )}
 
