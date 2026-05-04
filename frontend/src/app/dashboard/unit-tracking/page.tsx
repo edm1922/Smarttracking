@@ -5,7 +5,8 @@ import {
   Boxes, Package, Search, Filter, ArrowRight, 
   ChevronRight, ChevronLeft, ChevronDown, ChevronUp, History,
   TrendingDown, TrendingUp, AlertTriangle, Box,
-  QrCode, Clock, User, ArrowUpRight, Check, X, Truck, Activity, FileText, Printer, LayoutGrid, Trash2
+  QrCode, Clock, User, ArrowUpRight, Check, X, Truck, Activity, FileText, Printer, LayoutGrid, Trash2,
+  ImageIcon, Eye
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useDebounce } from '@/hooks/useDebounce';
