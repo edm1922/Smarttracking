@@ -102,7 +102,6 @@ useEffect(() => {
         { name: 'Inventory', href: '/dashboard/products' },
         { name: 'Issuance Requests', href: '/dashboard/products/requests' },
         { name: 'Unit Tracking', href: '/dashboard/unit-tracking' },
-        { name: 'Locations', href: '/dashboard/locations' },
       ]
     },
     { 

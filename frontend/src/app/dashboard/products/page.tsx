@@ -117,9 +117,11 @@ export default function ProductsPage() {
       setLocations(fetchedLocations);
       setSearchProducts(prodsRes.data.data || []);
       
-      // Auto-set default locations for forms
+      // Auto-set default locations for forms (Prefer MAIN OFFICE)
       if (fetchedLocations.length > 0) {
-        const defaultId = fetchedLocations[0].id;
+        const mainOffice = fetchedLocations.find((l: any) => l.name.toUpperCase() === 'MAIN OFFICE');
+        const defaultId = mainOffice ? mainOffice.id : fetchedLocations[0].id;
+        
         setReleaseForm(prev => ({ ...prev, sourceLocationId: defaultId }));
         setProductForm(prev => ({ ...prev, initialLocationId: defaultId }));
         setStockForm(prev => ({ ...prev, locationId: defaultId }));
@@ -189,10 +191,13 @@ export default function ProductsPage() {
   }, [debouncedSearch, stockFilter]);
 
   const handleOpenStockModal = (product: Product, type: 'IN' | 'OUT') => {
+    const mainOffice = locations.find(l => l.name.toUpperCase() === 'MAIN OFFICE');
+    const defaultId = mainOffice ? mainOffice.id : (locations[0]?.id || '');
+    
     setStockForm({
       productId: product.id,
       productName: product.name,
-      locationId: locations[0]?.id || '',
+      locationId: defaultId,
       type,
       quantity: 1,
       remarks: ''
