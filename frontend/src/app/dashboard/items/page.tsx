@@ -163,7 +163,8 @@ export default function QRItemsPage() {
     
     const matchesFilter = filterStatus === 'all' || 
       (filterStatus === 'released' && item.status === 'Released') ||
-      (filterStatus === 'available' && item.status !== 'Released');
+      (filterStatus === 'active' && !item.locked) ||
+      (filterStatus === 'locked' && item.locked);
 
     const matchesBatch = selectedBatchId === 'all' || 
                          (selectedBatchId === 'global' ? !item.batchId : item.batchId === selectedBatchId);
@@ -206,7 +207,8 @@ export default function QRItemsPage() {
           className="px-4 py-3 rounded-md border border-gray-300 bg-white text-sm font-bold text-gray-700 outline-none focus:ring-1 focus:ring-primary min-w-[160px]"
         >
           <option value="all">All Status</option>
-          <option value="available">In Stock</option>
+          <option value="active">Active Forms</option>
+          <option value="locked">Locked Forms</option>
           <option value="released">Released Items</option>
         </select>
         <select 
