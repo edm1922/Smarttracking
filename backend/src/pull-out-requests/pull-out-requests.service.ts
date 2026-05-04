@@ -191,6 +191,9 @@ export class PullOutRequestsService {
           unit: true,
           status: true,
           remarks: true,
+          imageUrl: true,
+          attachmentUrl: true,
+          additionalImages: true,
           createdAt: true,
           supervisor: true,
           item: {
@@ -394,6 +397,8 @@ export class PullOutRequestsService {
           status: true,
           remarks: true,
           imageUrl: true,
+          attachmentUrl: true,
+          additionalImages: true,
           createdAt: true,
           supervisor: true,
           item: {

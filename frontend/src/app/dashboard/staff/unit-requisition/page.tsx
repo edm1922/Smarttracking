@@ -1008,10 +1008,24 @@ function UnitRequisitionContent() {
                     <tr key={req.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-8 py-5 text-sm font-bold text-gray-700">{new Date(req.createdAt).toLocaleDateString()}</td>
                       <td className="px-8 py-5">
-                        <p className="text-sm font-mono font-bold text-primary leading-none mb-1">{req.item.slug}</p>
-                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
-                          {req.item.fieldValues?.filter((fv: any) => fv.value).map((fv: any) => typeof fv.value === 'object' ? (fv.value.main || '') : fv.value).filter(Boolean).join(', ')}
-                        </p>
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden flex items-center justify-center">
+                            {req.imageUrl ? (
+                              <img src={req.imageUrl} className="w-full h-full object-cover" alt="Unit" />
+                            ) : (
+                              <Box className="h-4 w-4 text-gray-300" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-sm font-mono font-bold text-primary leading-none mb-1">{req.item.slug}</p>
+                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                              {req.item.fieldValues?.filter((fv: any) => fv.value).map((fv: any) => typeof fv.value === 'object' ? (fv.value.main || '') : fv.value).filter(Boolean).join(', ')}
+                            </p>
+                          </div>
+                          {(req.attachmentUrl || (req.additionalImages && req.additionalImages.length > 0)) && (
+                            <ImageIcon className="h-3.5 w-3.5 text-orange-500 ml-auto" />
+                          )}
+                        </div>
                       </td>
                       <td className="px-8 py-5 text-center font-black text-gray-900">{req.qty} <span className="text-[10px] text-gray-400 uppercase font-bold">{req.unit}</span></td>
                       <td className="px-8 py-5">

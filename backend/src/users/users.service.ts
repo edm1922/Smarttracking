@@ -139,4 +139,12 @@ export class UsersService {
       plainPassword,
     };
   }
+
+  async verifyAdminPassword(userId: string, password: string): Promise<{ success: boolean }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new BadRequestException('User not found');
+    
+    const isMatch = await bcrypt.compare(password, user.password);
+    return { success: isMatch };
+  }
 }

@@ -38,6 +38,11 @@ export class UsersController {
   revealCredential(@Request() req: any, @Param('id') id: string, @Body('adminPassword') adminPassword: string) {
     return this.usersService.revealCredential(id, adminPassword, req.user.sub);
   }
+
+  @Post('verify-password')
+  verifyPassword(@Request() req: any, @Body('password') password: string) {
+    return this.usersService.verifyAdminPassword(req.user.sub, password);
+  }
   
 
   @Get('chat-partners')

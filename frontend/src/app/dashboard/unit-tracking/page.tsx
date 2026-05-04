@@ -488,12 +488,21 @@ export default function UnitTrackingPage() {
                 
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 bg-gray-50 rounded-xl flex items-center justify-center group-hover:bg-orange-50 transition-colors">
-                      <Truck className="h-5 w-5 text-gray-400 group-hover:text-orange-600" />
+                    <div className="h-12 w-12 bg-gray-50 rounded-xl overflow-hidden flex items-center justify-center group-hover:bg-orange-50 transition-colors border border-gray-100">
+                      {req.imageUrl ? (
+                        <img src={req.imageUrl} className="w-full h-full object-cover" alt="Attached" />
+                      ) : (
+                        <Truck className="h-5 w-5 text-gray-400 group-hover:text-orange-600" />
+                      )}
                     </div>
                     <div>
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Asset ID</p>
-                      <p className="text-sm font-mono font-bold text-gray-900">{req.item.slug}</p>
+                      <p className="text-sm font-mono font-bold text-gray-900 flex items-center gap-2">
+                        {req.item.slug}
+                        {(req.attachmentUrl || (req.additionalImages && req.additionalImages.length > 0)) && (
+                          <ImageIcon className="h-3 w-3 text-orange-500" />
+                        )}
+                      </p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -891,7 +900,23 @@ export default function UnitTrackingPage() {
                         <p className="text-[10px] text-primary font-bold">{req.itemsCount} QRs • {req.slugs.slice(0,2).join(', ')}{req.slugs.length > 2 ? '...' : ''}</p>
                       </div>
                     ) : (
-                      <span className="text-sm font-mono font-bold text-primary bg-primary/5 px-2 py-1 rounded-md">{req.item.slug}</span>
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden flex items-center justify-center">
+                          {req.imageUrl ? (
+                            <img src={req.imageUrl} className="w-full h-full object-cover" alt="Unit" />
+                          ) : (
+                            <Box className="h-4 w-4 text-gray-300" />
+                          )}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-mono font-bold text-primary bg-primary/5 px-2 py-0.5 rounded-md w-fit">{req.item.slug}</span>
+                          {(req.attachmentUrl || (req.additionalImages && req.additionalImages.length > 0)) && (
+                             <span className="text-[8px] font-black text-orange-600 uppercase mt-0.5 ml-1 flex items-center gap-1">
+                               <ImageIcon className="h-2 w-2" /> Has Attachments
+                             </span>
+                          )}
+                        </div>
+                      </div>
                     )}
                   </td>
                   <td className="px-8 py-5">

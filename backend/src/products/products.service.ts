@@ -342,6 +342,7 @@ export class ProductsService {
     userId: string,
     newTotalQuantity: number,
     remarks: string = 'Manual Stock Adjustment',
+    skipLog: boolean = false,
   ) {
     return this.prisma.$transaction(async (tx) => {
       const existingStock = await tx.productStock.findUnique({
@@ -357,25 +358,27 @@ export class ProductsService {
       const quantity = Math.abs(diff);
 
       // Update stock
-      await tx.productStock.upsert({
+      const result = await tx.productStock.upsert({
         where: { productId_locationId: { productId, locationId } },
         create: { productId, locationId, quantity: newTotalQuantity },
         update: { quantity: newTotalQuantity },
       });
 
-      // Log transaction
-      await tx.productTransaction.create({
-        data: {
-          productId,
-          locationId,
-          userId,
-          type,
-          quantity,
-          remarks: `${remarks} (Previous: ${currentQty}, New: ${newTotalQuantity})`,
-        },
-      });
+      // Log transaction ONLY if skipLog is false
+      if (!skipLog) {
+        await tx.productTransaction.create({
+          data: {
+            productId,
+            locationId,
+            userId,
+            type,
+            quantity,
+            remarks: `${remarks} (Previous: ${currentQty}, New: ${newTotalQuantity})`,
+          },
+        });
+      }
 
-      return existingStock;
+      return result;
     });
   }
 
