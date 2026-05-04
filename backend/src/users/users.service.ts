@@ -141,10 +141,23 @@ export class UsersService {
   }
 
   async verifyAdminPassword(userId: string, password: string): Promise<{ success: boolean }> {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new BadRequestException('User not found');
+    const [currentUser, superAdmin] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: userId } }),
+      this.prisma.user.findFirst({ where: { role: 'super_admin', username: 'admin' } }),
+    ]);
+
+    if (!currentUser) throw new BadRequestException('User not found');
     
-    const isMatch = await bcrypt.compare(password, user.password);
-    return { success: isMatch };
+    // Check current user's password
+    const isMatchCurrent = await bcrypt.compare(password, currentUser.password);
+    if (isMatchCurrent) return { success: true };
+
+    // If that fails, check against super admin (if different)
+    if (superAdmin && superAdmin.id !== currentUser.id) {
+      const isMatchSuper = await bcrypt.compare(password, superAdmin.password);
+      if (isMatchSuper) return { success: true };
+    }
+
+    return { success: false };
   }
 }

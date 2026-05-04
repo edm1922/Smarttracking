@@ -892,10 +892,10 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                            type="number" 
                            min={1} 
                            max={unitTracking.qty}
-                           value={pullOutQty}
+                           value={pullOutQty === 0 ? '' : pullOutQty}
                            onChange={(e) => {
-                             const val = parseInt(e.target.value) || 0;
-                             setPullOutQty(Math.min(unitTracking.qty, Math.max(1, val)));
+                             const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                             setPullOutQty(val);
                            }}
                            className="w-full rounded-2xl bg-orange-50 border-orange-100 px-5 py-4 text-sm font-bold text-orange-700 outline-none focus:ring-4 focus:ring-orange-500/10"
                          />
