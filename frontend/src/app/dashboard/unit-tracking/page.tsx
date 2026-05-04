@@ -25,6 +25,9 @@ export default function UnitTrackingPage() {
   const [requisitionSubTab, setRequisitionSubTab] = useState<'pending' | 'history'>('pending');
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
 
+  const [requests, setRequests] = useState<any[]>([]);
+  const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
+
   const custodianData = useMemo(() => {
     const groups: Record<string, any> = {};
     requests.filter(r => r.status === 'APPROVED').forEach(req => {
@@ -45,9 +48,6 @@ export default function UnitTrackingPage() {
     });
     return Object.values(groups);
   }, [requests]);
-
-  const [requests, setRequests] = useState<any[]>([]);
-  const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
   const [isBuildingTransmittal, setIsBuildingTransmittal] = useState(false);
   const [groupBySpecs, setGroupBySpecs] = useState(false);
   const [transmittalHeader, setTransmittalHeader] = useState({
