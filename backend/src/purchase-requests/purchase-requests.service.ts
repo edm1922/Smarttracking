@@ -18,7 +18,8 @@ export class PurchaseRequestsService {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // 1. Check if any PR exists for this day
+    // Always increment the PR number instead of reusing the same-day number
+    /*
     const sameDayPr = await this.prisma.purchaseRequest.findFirst({
       where: {
         date: {
@@ -31,6 +32,7 @@ export class PurchaseRequestsService {
     if (sameDayPr) {
       return sameDayPr.prNo;
     }
+    */
 
     // 2. If new day, find max PR number and increment
     const allPrs = await this.prisma.purchaseRequest.findMany({

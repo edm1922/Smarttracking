@@ -761,7 +761,7 @@ model PullOutRequest {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model PurchaseRequest {
-  id              String   @id
+  id              String   @id @default(uuid())
   prNo            String
   date            DateTime @default(now())
   department      String
