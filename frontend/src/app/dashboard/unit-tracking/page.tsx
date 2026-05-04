@@ -61,6 +61,41 @@ export default function UnitTrackingPage() {
     approvedBy: '',
     remarks: ''
   });
+
+  const productSummary = useMemo(() => {
+    const summary: Record<string, any> = {};
+    
+    inventory.forEach(p => {
+      const pName = p.name || 'Unnamed Product';
+      if (!summary[pName]) {
+        summary[pName] = {
+          name: pName,
+          totalInStock: 0,
+          outToday: 0,
+          specs: new Set(),
+        };
+      }
+      summary[pName].totalInStock += p.totalQty;
+      
+      p.items.forEach((item: any) => {
+        item.fieldValues?.forEach((fv: any) => {
+           const v = fv.value;
+           const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+           if (val) summary[pName].specs.add(String(val));
+        });
+      });
+    });
+
+    const today = new Date().toLocaleDateString();
+    requests.filter(r => r.status === 'APPROVED' && new Date(r.createdAt).toLocaleDateString() === today).forEach(req => {
+       const pName = req.item.product?.name || req.item.name || 'Unit Item';
+       if (summary[pName]) {
+         summary[pName].outToday += req.qty;
+       }
+    });
+
+    return Object.values(summary);
+  }, [inventory, requests]);
   
   const [logSearch, setLogSearch] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
