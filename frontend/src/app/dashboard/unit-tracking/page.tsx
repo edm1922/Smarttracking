@@ -678,7 +678,7 @@ export default function UnitTrackingPage() {
                                 )}
                                 {selectedReport === 'reconciliation' && (
                                    <>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Asset ID / QR</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Item Name / ID</th>
                                       <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Item Name & Specs</th>
                                       <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 text-center">System Stock</th>
                                       <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 text-center w-32 border-l border-gray-100">Physical Count</th>
@@ -687,7 +687,7 @@ export default function UnitTrackingPage() {
                                 )}
                                 {selectedReport === 'critical' && (
                                    <>
-                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Asset ID</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Item Name / ID</th>
                                       <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Item Description</th>
                                       <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 text-center">Current Qty</th>
                                       <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 text-center">Threshold</th>
@@ -700,7 +700,10 @@ export default function UnitTrackingPage() {
                              {selectedReport === 'ledger' && requests.filter(r => r.status === 'APPROVED').map((req) => (
                                 <tr key={req.id} className="group">
                                    <td className="py-4 px-4 text-xs font-bold text-gray-500 whitespace-nowrap">{new Date(req.createdAt).toLocaleString()}</td>
-                                   <td className="py-4 px-4 text-xs font-mono font-black text-gray-900">{req.item.slug}</td>
+                                   <td className="py-4 px-4 text-xs font-black text-gray-900">
+                                      {req.item.product?.name || req.item.name || 'Unnamed Item'}
+                                      <span className="block text-[9px] font-mono font-bold text-gray-400">{req.item.slug}</span>
+                                   </td>
                                    <td className="py-4 px-4 text-xs font-bold text-gray-600">Inventory Release</td>
                                    <td className="py-4 px-4 text-xs font-black text-gray-900 text-center">{req.qty}</td>
                                    <td className="py-4 px-4 text-xs font-bold text-gray-600">{req.user.username}</td>
@@ -711,7 +714,10 @@ export default function UnitTrackingPage() {
                              ))}
                              {selectedReport === 'critical' && lowStockItems.map((item: any) => (
                                 <tr key={item.slug} className="group">
-                                   <td className="py-4 px-4 text-xs font-mono font-black text-gray-900">{item.slug}</td>
+                                   <td className="py-4 px-4 text-xs font-black text-gray-900">
+                                      {item.product?.name || item.name || 'Unnamed Item'}
+                                      <span className="block text-[9px] font-mono font-bold text-gray-400">{item.slug}</span>
+                                   </td>
                                    <td className="py-4 px-4 text-xs font-bold text-gray-600">Unit-tracked item record</td>
                                    <td className="py-4 px-4 text-xs font-black text-red-600 text-center">{item.qty}</td>
                                    <td className="py-4 px-4 text-xs font-bold text-gray-400 text-center">{item.threshold || 0}</td>
@@ -725,7 +731,10 @@ export default function UnitTrackingPage() {
                              {/* Custodian and Reconciliation would use derived data from inventory */}
                              {selectedReport === 'reconciliation' && inventory.flatMap(p => p.items).map((item: any) => (
                                 <tr key={item.slug} className="group">
-                                   <td className="py-4 px-4 text-xs font-mono font-black text-gray-900">{item.slug}</td>
+                                   <td className="py-4 px-4 text-xs font-black text-gray-900">
+                                      {item.product?.name || item.name || 'Unnamed Item'}
+                                      <span className="block text-[9px] font-mono font-bold text-gray-400">{item.slug}</span>
+                                   </td>
                                    <td className="py-4 px-4 text-xs font-bold text-gray-600">Product: {item.product?.name || 'Unit Item'}</td>
                                    <td className="py-4 px-4 text-xs font-black text-gray-900 text-center">{item.qty}</td>
                                    <td className="py-4 px-4 border-l border-gray-100 text-center text-gray-300">_______</td>
