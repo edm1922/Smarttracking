@@ -628,37 +628,48 @@ export default function UnitTrackingPage() {
 
            {/* Simple Stock Master Table */}
            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden print:shadow-none print:border-none print:rounded-none">
-              <div className="p-8 border-b border-gray-50 flex items-center justify-between print:px-0">
+              
+              {/* PRINT ONLY HEADER */}
+              <div className="hidden print:block mb-8">
+                 <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">Summary</h1>
+                 <h2 className="text-lg font-bold text-gray-700 uppercase tracking-widest mt-1">Master Stock Health Report</h2>
+                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-2">
+                    Generated on {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
+                 </p>
+                 <div className="w-full h-px bg-gray-900 mt-4 mb-2"></div>
+              </div>
+
+              <div className="p-8 border-b border-gray-50 flex items-center justify-between print:hidden">
                  <div>
                     <h2 className="text-xl font-black text-gray-900 tracking-tight">Master Stock Health</h2>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Aggregated by Reference Name</p>
                  </div>
                  <button 
                     onClick={() => window.print()}
-                    className="p-3 bg-gray-50 text-gray-400 rounded-xl hover:text-gray-900 transition-all print:hidden"
+                    className="p-3 bg-gray-50 text-gray-400 rounded-xl hover:text-gray-900 transition-all"
                  >
                     <Printer className="h-5 w-5" />
                  </button>
               </div>
 
               <div className="overflow-x-auto">
-                 <table className="w-full text-left">
+                 <table className="w-full text-left print:border-collapse">
                     <thead>
-                       <tr className="bg-gray-50/50">
-                          <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Actual Item (Reference)</th>
-                          <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Specifications Consolidate</th>
-                          <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">In Stock</th>
-                          <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Pulled Out (Today)</th>
+                       <tr className="bg-gray-50/50 print:bg-transparent print:border-b-2 print:border-gray-900">
+                          <th className="px-8 py-4 print:px-2 print:py-2 text-[10px] font-black text-gray-400 print:text-gray-900 uppercase tracking-widest">Actual Item (Reference)</th>
+                          <th className="px-8 py-4 print:px-2 print:py-2 text-[10px] font-black text-gray-400 print:text-gray-900 uppercase tracking-widest">Specifications</th>
+                          <th className="px-8 py-4 print:px-2 print:py-2 text-[10px] font-black text-gray-400 print:text-gray-900 uppercase tracking-widest text-center">In Stock</th>
+                          <th className="px-8 py-4 print:px-2 print:py-2 text-[10px] font-black text-gray-400 print:text-gray-900 uppercase tracking-widest text-center">Pulled Out (Today)</th>
                        </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody className="divide-y divide-gray-50 print:divide-gray-300">
                        {productSummary.map((item: any) => (
-                          <tr key={item.name} className="hover:bg-gray-50/30 transition-colors">
-                             <td className="px-8 py-6">
-                                <span className="text-sm font-black text-gray-900 uppercase">{item.name}</span>
+                          <tr key={item.name} className="hover:bg-gray-50/30 transition-colors print:break-inside-avoid">
+                             <td className="px-8 py-6 print:px-2 print:py-3 align-top">
+                                <span className="text-sm print:text-xs font-black text-gray-900 uppercase">{item.name}</span>
                              </td>
-                             <td className="px-8 py-6">
-                                <div className="flex flex-wrap gap-1">
+                             <td className="px-8 py-6 print:px-2 print:py-3 align-top">
+                                <div className="flex flex-wrap gap-1 print:hidden">
                                    {Array.from(item.specs).slice(0, 8).map((spec: any, i) => (
                                       <span key={i} className="px-2 py-0.5 bg-gray-100 text-[9px] font-bold text-gray-500 rounded-md">
                                          {spec}
@@ -669,12 +680,15 @@ export default function UnitTrackingPage() {
                                    )}
                                    {item.specs.size === 0 && <span className="text-[9px] text-gray-300 italic">No specs listed</span>}
                                 </div>
+                                <div className="hidden print:block text-[10px] font-bold text-gray-600 max-w-md">
+                                   {item.specs.size > 0 ? Array.from(item.specs).join(', ') : <span className="italic text-gray-400">No specifications</span>}
+                                </div>
                              </td>
-                             <td className="px-8 py-6 text-center">
-                                <span className="text-sm font-black text-gray-900">{item.totalInStock}</span>
+                             <td className="px-8 py-6 print:px-2 print:py-3 text-center align-top">
+                                <span className="text-sm print:text-xs font-black text-gray-900">{item.totalInStock}</span>
                              </td>
-                             <td className="px-8 py-6 text-center">
-                                <span className={`text-sm font-black ${item.outToday > 0 ? 'text-orange-600' : 'text-gray-300'}`}>
+                             <td className="px-8 py-6 print:px-2 print:py-3 text-center align-top">
+                                <span className={`text-sm print:text-xs font-black ${item.outToday > 0 ? 'text-orange-600 print:text-gray-900' : 'text-gray-300 print:text-gray-400'}`}>
                                    {item.outToday > 0 ? `-${item.outToday}` : '0'}
                                 </span>
                              </td>
@@ -682,7 +696,7 @@ export default function UnitTrackingPage() {
                        ))}
                        {productSummary.length === 0 && (
                           <tr>
-                             <td colSpan={4} className="py-20 text-center text-gray-400 font-medium italic">
+                             <td colSpan={4} className="py-20 text-center text-gray-400 font-medium italic print:py-8">
                                 No items found in stock records.
                              </td>
                           </tr>
@@ -690,6 +704,28 @@ export default function UnitTrackingPage() {
                     </tbody>
                  </table>
               </div>
+
+              {/* PRINT ONLY FOOTER */}
+              <div className="hidden print:flex justify-between items-end mt-16 pt-8 break-inside-avoid">
+                 <div className="w-1/3 text-center">
+                    <div className="border-t border-gray-900 pt-2 mx-8">
+                       <p className="text-[10px] font-black uppercase tracking-widest text-gray-900">Prepared By</p>
+                       <p className="text-[9px] text-gray-500 mt-1">Signature over printed name</p>
+                    </div>
+                 </div>
+                 <div className="w-1/3 text-center">
+                    <div className="border-t border-gray-900 pt-2 mx-8">
+                       <p className="text-[10px] font-black uppercase tracking-widest text-gray-900">Checked By</p>
+                       <p className="text-[9px] text-gray-500 mt-1">Signature over printed name</p>
+                    </div>
+                 </div>
+                 <div className="w-1/3 text-center">
+                    <div className="border-t border-gray-900 pt-2 mx-8">
+                       <p className="text-[10px] font-black uppercase tracking-widest text-gray-900">Date</p>
+                    </div>
+                 </div>
+              </div>
+
            </div>
 
            {/* Recent Activity Log */}
