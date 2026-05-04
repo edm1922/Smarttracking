@@ -20,8 +20,9 @@ export default function UnitTrackingPage() {
   const isFirstLoad = useRef(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'inventory' | 'summary' | 'requisition'>('inventory');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'insights' | 'requisition'>('inventory');
   const [requisitionSubTab, setRequisitionSubTab] = useState<'pending' | 'history'>('pending');
+  const [selectedReport, setSelectedReport] = useState<string | null>(null);
 
   const [requests, setRequests] = useState<any[]>([]);
   const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
@@ -349,11 +350,11 @@ export default function UnitTrackingPage() {
                Detailed List
              </button>
              <button 
-               onClick={() => setActiveTab('summary')}
-               className={`px-4 py-2 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'summary' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-400 hover:text-gray-900 bg-gray-50'}`}
-             >
-               Summary Dashboard
-             </button>
+                onClick={() => setActiveTab('insights')}
+                className={`px-4 py-2 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'insights' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-400 hover:text-gray-900 bg-gray-50'}`}
+              >
+                Insights & Audit
+              </button>
              <button 
                onClick={() => setActiveTab('requisition')}
                className={`px-4 py-2 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'requisition' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-400 hover:text-gray-900 bg-gray-50'}`}
@@ -541,9 +542,9 @@ export default function UnitTrackingPage() {
         </div>
       )}
 
-      {activeTab === 'summary' && (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-           {/* Stats Grid */}
+      {activeTab === 'insights' && (
+        <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+           {/* Stats Row */}
            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl flex items-center gap-6">
                  <div className="h-16 w-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
@@ -555,18 +556,223 @@ export default function UnitTrackingPage() {
                  </div>
               </div>
 
-
               <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl flex items-center gap-6">
                  <div className="h-16 w-16 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600">
                     <LayoutGrid className="h-8 w-8" />
                  </div>
                  <div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Tracked Product Types</p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Tracked Products</p>
                     <p className="text-3xl font-black text-gray-900 tracking-tighter">{inventory.length}</p>
+                 </div>
+              </div>
+
+              <div className={`p-8 rounded-[2.5rem] border shadow-xl flex items-center gap-6 transition-all ${lowStockItems.length > 0 ? 'bg-red-50 border-red-100' : 'bg-white border-gray-100'}`}>
+                 <div className={`h-16 w-16 rounded-2xl flex items-center justify-center ${lowStockItems.length > 0 ? 'bg-red-500 text-white shadow-lg shadow-red-200' : 'bg-green-50 text-green-600'}`}>
+                    <AlertTriangle className="h-8 w-8" />
+                 </div>
+                 <div>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Low Stock Alerts</p>
+                    <p className={`text-3xl font-black tracking-tighter ${lowStockItems.length > 0 ? 'text-red-600' : 'text-gray-900'}`}>{lowStockItems.length}</p>
                  </div>
               </div>
            </div>
 
+           {/* Report Center */}
+           <div className="space-y-6">
+              <div className="flex items-center justify-between px-4">
+                 <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 bg-gray-900 rounded-xl flex items-center justify-center text-white">
+                       <FileText className="h-5 w-5" />
+                    </div>
+                    <div>
+                       <h2 className="text-xl font-black text-gray-900 tracking-tight">Audit Report Center</h2>
+                       <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Select a report to generate audit-ready documentation</p>
+                    </div>
+                 </div>
+                 {selectedReport && (
+                    <button 
+                       onClick={() => setSelectedReport(null)}
+                       className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2 hover:underline"
+                    >
+                       <X className="h-4 w-4" /> Close Report
+                    </button>
+                 )}
+              </div>
+
+              {!selectedReport ? (
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {[
+                       { id: 'ledger', title: 'Asset Movement Ledger', desc: 'Chronological IN/OUT history for all QR units.', icon: Activity, color: 'text-blue-500', bg: 'bg-blue-50' },
+                       { id: 'custodian', title: 'Custodian Responsibility', desc: 'Active inventory grouped by staff members.', icon: User, color: 'text-purple-500', bg: 'bg-purple-50' },
+                       { id: 'reconciliation', title: 'Inventory Reconciliation', desc: 'Printable sheet for physical count audit.', icon: ClipboardList, color: 'text-orange-500', bg: 'bg-orange-50' },
+                       { id: 'critical', title: 'Critical Stock Alerts', desc: 'Full list of items below safety threshold.', icon: TrendingDown, color: 'text-red-500', bg: 'bg-red-50' }
+                    ].map((report) => (
+                       <button 
+                          key={report.id}
+                          onClick={() => setSelectedReport(report.id)}
+                          className="group bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all text-left flex flex-col h-full"
+                       >
+                          <div className={`h-12 w-12 ${report.bg} ${report.color} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+                             <report.icon className="h-6 w-6" />
+                          </div>
+                          <h3 className="text-sm font-black text-gray-900 mb-2">{report.title}</h3>
+                          <p className="text-xs font-medium text-gray-400 leading-relaxed">{report.desc}</p>
+                          <div className="mt-auto pt-4 flex items-center text-[10px] font-black text-primary uppercase tracking-widest gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                             Generate <ArrowRight className="h-3 w-3" />
+                          </div>
+                       </button>
+                    ))}
+                 </div>
+              ) : (
+                 <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
+                       <div className="flex items-center gap-4">
+                          <div className="h-12 w-12 bg-gray-900 rounded-2xl flex items-center justify-center text-white">
+                             {selectedReport === 'ledger' && <Activity className="h-6 w-6" />}
+                             {selectedReport === 'custodian' && <User className="h-6 w-6" />}
+                             {selectedReport === 'reconciliation' && <ClipboardList className="h-6 w-6" />}
+                             {selectedReport === 'critical' && <AlertTriangle className="h-6 w-6" />}
+                          </div>
+                          <div>
+                             <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">
+                                {selectedReport === 'ledger' && 'Asset Movement Ledger'}
+                                {selectedReport === 'custodian' && 'Custodian Responsibility Report'}
+                                {selectedReport === 'reconciliation' && 'Inventory Reconciliation Sheet'}
+                                {selectedReport === 'critical' && 'Critical Stock Alert Report'}
+                             </h3>
+                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                Generated on {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
+                             </p>
+                          </div>
+                       </div>
+                       <button 
+                          onClick={() => window.print()}
+                          className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all active:scale-95"
+                       >
+                          <Printer className="h-4 w-4" /> Print PDF
+                       </button>
+                    </div>
+
+                    <div className="p-8 overflow-x-auto no-scrollbar">
+                       <table className="w-full text-left border-collapse min-w-[800px]">
+                          <thead>
+                             <tr>
+                                {selectedReport === 'ledger' && (
+                                   <>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Date & Time</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Asset ID</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Action</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 text-center">Qty</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Requested By</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Status</th>
+                                   </>
+                                )}
+                                {selectedReport === 'custodian' && (
+                                   <>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Staff Member</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Asset Categories Held</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 text-center">Total Units Held</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Last Activity</th>
+                                   </>
+                                )}
+                                {selectedReport === 'reconciliation' && (
+                                   <>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Asset ID / QR</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Item Name & Specs</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 text-center">System Stock</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 text-center w-32 border-l border-gray-100">Physical Count</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 text-center w-32 border-l border-gray-100">Variance</th>
+                                   </>
+                                )}
+                                {selectedReport === 'critical' && (
+                                   <>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Asset ID</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Item Description</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 text-center">Current Qty</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 text-center">Threshold</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Severity</th>
+                                   </>
+                                )}
+                             </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                             {selectedReport === 'ledger' && requests.filter(r => r.status === 'APPROVED').map((req) => (
+                                <tr key={req.id} className="group">
+                                   <td className="py-4 px-4 text-xs font-bold text-gray-500 whitespace-nowrap">{new Date(req.createdAt).toLocaleString()}</td>
+                                   <td className="py-4 px-4 text-xs font-mono font-black text-gray-900">{req.item.slug}</td>
+                                   <td className="py-4 px-4 text-xs font-bold text-gray-600">Inventory Release</td>
+                                   <td className="py-4 px-4 text-xs font-black text-gray-900 text-center">{req.qty}</td>
+                                   <td className="py-4 px-4 text-xs font-bold text-gray-600">{req.user.username}</td>
+                                   <td className="py-4 px-4">
+                                      <span className="px-2 py-0.5 bg-green-50 text-green-600 text-[9px] font-black rounded-md uppercase">Approved</span>
+                                   </td>
+                                </tr>
+                             ))}
+                             {selectedReport === 'critical' && lowStockItems.map((item: any) => (
+                                <tr key={item.slug} className="group">
+                                   <td className="py-4 px-4 text-xs font-mono font-black text-gray-900">{item.slug}</td>
+                                   <td className="py-4 px-4 text-xs font-bold text-gray-600">Unit-tracked item record</td>
+                                   <td className="py-4 px-4 text-xs font-black text-red-600 text-center">{item.qty}</td>
+                                   <td className="py-4 px-4 text-xs font-bold text-gray-400 text-center">{item.threshold || 0}</td>
+                                   <td className="py-4 px-4">
+                                      <span className={`px-2 py-0.5 text-[9px] font-black rounded-md uppercase ${item.qty === 0 ? 'bg-red-500 text-white' : 'bg-orange-100 text-orange-600'}`}>
+                                         {item.qty === 0 ? 'Out of Stock' : 'Critical'}
+                                      </span>
+                                   </td>
+                                </tr>
+                             ))}
+                             {/* Custodian and Reconciliation would use derived data from inventory */}
+                             {selectedReport === 'reconciliation' && inventory.flatMap(p => p.items).map((item: any) => (
+                                <tr key={item.slug} className="group">
+                                   <td className="py-4 px-4 text-xs font-mono font-black text-gray-900">{item.slug}</td>
+                                   <td className="py-4 px-4 text-xs font-bold text-gray-600">Product: {item.product?.name || 'Unit Item'}</td>
+                                   <td className="py-4 px-4 text-xs font-black text-gray-900 text-center">{item.qty}</td>
+                                   <td className="py-4 px-4 border-l border-gray-100 text-center text-gray-300">_______</td>
+                                   <td className="py-4 px-4 border-l border-gray-100 text-center text-gray-300">_______</td>
+                                </tr>
+                             ))}
+                             {selectedReport === 'custodian' && (
+                                <tr className="group">
+                                   <td colSpan={4} className="py-10 text-center text-gray-400 font-medium italic">
+                                      Scanning activity logs to build responsibility map...
+                                   </td>
+                                </tr>
+                             )}
+                          </tbody>
+                       </table>
+                    </div>
+                 </div>
+              )}
+           </div>
+
+           {/* Recent Activity List */}
+           {!selectedReport && (
+              <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl space-y-6">
+                 <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-black text-gray-900 tracking-tight">Recent Activity Stream</h2>
+                    <Link href="/dashboard/transmittal/unit-tracking-log" className="text-xs font-black text-primary uppercase tracking-widest hover:underline">View Full Logs</Link>
+                 </div>
+                 <div className="space-y-3">
+                    {requests.filter(r => r.status === 'APPROVED').slice(0, 5).map((req) => (
+                       <div key={req.id} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-50 hover:bg-white hover:border-gray-100 transition-all">
+                          <div className="flex items-center gap-4">
+                             <div className="h-10 w-10 bg-green-100 text-green-600 rounded-xl flex items-center justify-center">
+                                <ArrowUpRight className="h-5 w-5" />
+                             </div>
+                             <div>
+                                <p className="text-sm font-black text-gray-900">{req.item.slug}</p>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Released to {req.user.username} • {new Date(req.createdAt).toLocaleDateString()}</p>
+                             </div>
+                          </div>
+                          <span className="text-sm font-black text-gray-900">-{req.qty} {req.unit}</span>
+                       </div>
+                    ))}
+                    {requests.filter(r => r.status === 'APPROVED').length === 0 && (
+                       <p className="text-center py-10 text-gray-400 font-medium italic">No recent approved movements found.</p>
+                    )}
+                 </div>
+              </div>
+           )}
         </div>
       )}
 
