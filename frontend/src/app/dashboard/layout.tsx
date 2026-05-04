@@ -414,8 +414,8 @@ useEffect(() => {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 pl-64">
-        <div className="mx-auto max-w-7xl p-8">{children}</div>
+      <main className="flex-1 pl-64 print:pl-0">
+        <div className="mx-auto max-w-7xl p-8 print:max-w-none print:p-0 print:m-0 w-full">{children}</div>
       </main>
 
       {/* Dev Notice Modal */}
