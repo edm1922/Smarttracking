@@ -394,9 +394,9 @@ export default function UnitTrackingPage() {
   }
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-700">
+    <div className="space-y-10 animate-in fade-in duration-700 print:space-y-0">
       {/* Header & Stats */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 print:hidden">
         <div>
           <h1 className="text-4xl font-black text-gray-900 tracking-tighter mb-4">Unit Tracking Hub</h1>
           <div className="flex items-center gap-2 mb-2">
@@ -600,9 +600,9 @@ export default function UnitTrackingPage() {
       )}
 
       {activeTab === 'insights' && (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 print:space-y-0">
            {/* Simple Stats Row */}
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:hidden">
               <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl flex items-center gap-6">
                  <div className="h-16 w-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
                     <Boxes className="h-8 w-8" />
@@ -627,15 +627,15 @@ export default function UnitTrackingPage() {
            </div>
 
            {/* Simple Stock Master Table */}
-           <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden">
-              <div className="p-8 border-b border-gray-50 flex items-center justify-between">
+           <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden print:shadow-none print:border-none print:rounded-none">
+              <div className="p-8 border-b border-gray-50 flex items-center justify-between print:px-0">
                  <div>
                     <h2 className="text-xl font-black text-gray-900 tracking-tight">Master Stock Health</h2>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Aggregated by Reference Name</p>
                  </div>
                  <button 
                     onClick={() => window.print()}
-                    className="p-3 bg-gray-50 text-gray-400 rounded-xl hover:text-gray-900 transition-all"
+                    className="p-3 bg-gray-50 text-gray-400 rounded-xl hover:text-gray-900 transition-all print:hidden"
                  >
                     <Printer className="h-5 w-5" />
                  </button>
@@ -693,7 +693,7 @@ export default function UnitTrackingPage() {
            </div>
 
            {/* Recent Activity Log */}
-           <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl space-y-6">
+           <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl space-y-6 print:hidden">
               <h2 className="text-xl font-black text-gray-900 tracking-tight">Recent Movement Log</h2>
               <div className="space-y-3">
                  {requests.filter(r => r.status === 'APPROVED').slice(0, 5).map((req) => (
