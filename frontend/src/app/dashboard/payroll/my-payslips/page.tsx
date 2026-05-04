@@ -391,6 +391,7 @@ export default function IntegratedEmployeePayslips() {
             </div>
           </motion.div>
         </div>
+      )}
     </div>
   );
 }
