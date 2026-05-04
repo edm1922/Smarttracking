@@ -701,7 +701,14 @@ export default function UnitTrackingPage() {
                                 <tr key={req.id} className="group">
                                    <td className="py-4 px-4 text-xs font-bold text-gray-500 whitespace-nowrap">{new Date(req.createdAt).toLocaleString()}</td>
                                    <td className="py-4 px-4 text-xs font-black text-gray-900">
-                                      {req.item.product?.name || req.item.name || 'Unnamed Item'}
+                                      {(() => {
+                                        const pName = req.item.product?.name || req.item.name || 'Unit Item';
+                                        const specs = req.item.fieldValues?.map((fv: any) => {
+                                          const v = fv.value;
+                                          return v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+                                        }).filter(Boolean).join(' - ');
+                                        return specs ? `${pName} (${specs})` : pName;
+                                      })()}
                                       <span className="block text-[9px] font-mono font-bold text-gray-400">{req.item.slug}</span>
                                    </td>
                                    <td className="py-4 px-4 text-xs font-bold text-gray-600">Inventory Release</td>
@@ -715,7 +722,14 @@ export default function UnitTrackingPage() {
                              {selectedReport === 'critical' && lowStockItems.map((item: any) => (
                                 <tr key={item.slug} className="group">
                                    <td className="py-4 px-4 text-xs font-black text-gray-900">
-                                      {item.product?.name || item.name || 'Unnamed Item'}
+                                      {(() => {
+                                        const pName = item.product?.name || item.name || 'Unit Item';
+                                        const specs = item.fieldValues?.map((fv: any) => {
+                                          const v = fv.value;
+                                          return v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+                                        }).filter(Boolean).join(' - ');
+                                        return specs ? `${pName} (${specs})` : pName;
+                                      })()}
                                       <span className="block text-[9px] font-mono font-bold text-gray-400">{item.slug}</span>
                                    </td>
                                    <td className="py-4 px-4 text-xs font-bold text-gray-600">Unit-tracked item record</td>
@@ -732,7 +746,14 @@ export default function UnitTrackingPage() {
                              {selectedReport === 'reconciliation' && inventory.flatMap(p => p.items).map((item: any) => (
                                 <tr key={item.slug} className="group">
                                    <td className="py-4 px-4 text-xs font-black text-gray-900">
-                                      {item.product?.name || item.name || 'Unnamed Item'}
+                                      {(() => {
+                                        const pName = item.product?.name || item.name || 'Unit Item';
+                                        const specs = item.fieldValues?.map((fv: any) => {
+                                          const v = fv.value;
+                                          return v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+                                        }).filter(Boolean).join(' - ');
+                                        return specs ? `${pName} (${specs})` : pName;
+                                      })()}
                                       <span className="block text-[9px] font-mono font-bold text-gray-400">{item.slug}</span>
                                    </td>
                                    <td className="py-4 px-4 text-xs font-bold text-gray-600">Product: {item.product?.name || 'Unit Item'}</td>
