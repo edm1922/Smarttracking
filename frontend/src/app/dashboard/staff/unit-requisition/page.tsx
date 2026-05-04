@@ -1237,7 +1237,7 @@ function UnitRequisitionContent() {
                   <div className="header"><h1 style={{ fontSize: '20px', margin: '0' }}>UNIT PULL-OUT REQUEST</h1><p style={{ margin: '5px 0' }}>Date: {new Date(form.date).toLocaleDateString()}</p></div>
                   <div className="details"><div><p><strong>Supervisor:</strong> {form.supervisorName}</p><p><strong>Remarks:</strong> {form.remarks || 'N/A'}</p></div></div>
                   <table><thead><tr><th>QR ID / Slug</th><th>Product</th><th>Quantity</th></tr></thead>
-                    <tbody>{cart.map(item => (<tr key={item.id}><td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{item.manualSlug}</td><td>{item.productName || 'Manual Entry'}</td><td style={{ fontWeight: 'bold' }}>{item.qty} Pairs</td></tr>))}</tbody>
+                    <tbody>{cart.map(item => (<tr key={item.id}><td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{item.manualSlug}</td><td>{item.productName || 'Manual Entry'}</td><td style={{ fontWeight: 'bold' }}>{item.qty} {item.unit || 'pcs'}</td></tr>))}</tbody>
                   </table>
                   <div className="signatures"><div style={{ textAlign: 'center' }}><br/><br/><br/><div className="sig-line">Supervisor Approval Signature</div></div></div>
                 </div>

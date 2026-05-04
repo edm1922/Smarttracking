@@ -27,6 +27,7 @@ export default function IntegratedEmployeePayslips() {
   const [isAdminView, setIsAdminView] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSlip, setSelectedSlip] = useState<any>(null);
+  const [showPayrollBreakdown, setShowPayrollBreakdown] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -202,7 +203,11 @@ export default function IntegratedEmployeePayslips() {
         
         {/* Left Column: Summary Info */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-primary rounded-[2.5rem] p-8 text-white shadow-xl shadow-primary/20 relative overflow-hidden group">
+          <div 
+            onDoubleClick={() => isAdminView && setShowPayrollBreakdown(true)}
+            className={`bg-primary rounded-[2.5rem] p-8 text-white shadow-xl shadow-primary/20 relative overflow-hidden group transition-all ${isAdminView ? 'cursor-pointer hover:scale-[1.02] active:scale-95' : ''}`}
+            title={isAdminView ? "Double-click to view run breakdown" : ""}
+          >
             <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12 blur-xl"></div>
             <p className="text-[10px] font-black uppercase tracking-widest text-blue-100 mb-4 opacity-70">
               {isAdminView ? 'Total Payroll (Run)' : (selectedRunId === 'all' ? 'Latest Payout' : 'Period Payout')}
@@ -215,24 +220,14 @@ export default function IntegratedEmployeePayslips() {
             <p className="text-blue-100/60 text-xs font-medium">
               {isAdminView ? `${filteredSlips.length} Records found` : `Released: ${filteredSlips[0]?.payroll_runs?.payroll_date || 'N/A'}`}
             </p>
+            {isAdminView && (
+              <div className="mt-4 pt-4 border-t border-white/10 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="text-[8px] font-black uppercase tracking-[0.2em] text-blue-200">Double-Click for breakdown</span>
+                <ChevronRight className="h-3 w-3 text-blue-300" />
+              </div>
+            )}
           </div>
 
-          <div className="bg-white rounded-[2.5rem] p-8 border border-gray-200 shadow-sm">
-            <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
-              <UserIcon className="h-3 w-3" />
-              {isAdminView ? 'Admin Context' : 'Portal Status'}
-            </h4>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-gray-50">
-                <span className="text-xs font-bold text-gray-500">{isAdminView ? 'Admin ID' : 'Employee ID'}</span>
-                <span className="text-xs font-black text-gray-900">{isAdminView ? 'ADM-ADMIN' : user?.user_metadata?.sys_id || 'CSC-####'}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-500">Verification</span>
-                <span className="px-2 py-1 bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase tracking-tighter rounded-md border border-emerald-100">Verified</span>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Right Column: Payslip List */}
@@ -326,6 +321,76 @@ export default function IntegratedEmployeePayslips() {
         </div>
 
       </div>
+
+      {/* Payroll Breakdown Modal */}
+      {showPayrollBreakdown && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl overflow-hidden"
+          >
+            <div className="bg-gray-900 p-8 text-white flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-black uppercase tracking-tight">Payroll Run Breakdown</h2>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Aggregated Totals for Current Filter</p>
+              </div>
+              <button 
+                onClick={() => setShowPayrollBreakdown(false)}
+                className="p-3 bg-white/10 hover:bg-white/20 rounded-full transition-all"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="p-10 grid grid-cols-2 gap-10 bg-gray-50/30">
+              <div className="space-y-6">
+                <h3 className="text-[10px] font-black text-primary uppercase tracking-widest border-b border-blue-100 pb-2">Earnings Summary</h3>
+                <div className="space-y-4">
+                  {[
+                    { label: 'Basic Pay', value: filteredSlips.reduce((a, c) => a + (c.basic_pay || 0), 0) },
+                    { label: 'Overtime', value: filteredSlips.reduce((a, c) => a + (c.overtime_pay || 0), 0) },
+                    { label: 'Allowances', value: filteredSlips.reduce((a, c) => a + (c.allowance || 0), 0) },
+                    { label: 'Gross Pay', value: filteredSlips.reduce((a, c) => a + (c.gross_pay || 0), 0), highlight: true },
+                  ].map((item, i) => (
+                    <div key={i} className={`flex justify-between items-center ${item.highlight ? 'pt-4 border-t border-gray-200 mt-4' : ''}`}>
+                      <span className={`text-[10px] font-bold uppercase tracking-tighter ${item.highlight ? 'text-gray-900 font-black' : 'text-gray-400'}`}>{item.label}</span>
+                      <span className={`text-sm font-black ${item.highlight ? 'text-primary' : 'text-gray-700'}`}>₱{item.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <h3 className="text-[10px] font-black text-red-500 uppercase tracking-widest border-b border-red-100 pb-2">Deductions Summary</h3>
+                <div className="space-y-4">
+                  {[
+                    { label: 'SSS', value: filteredSlips.reduce((a, c) => a + (c.sss || 0), 0) },
+                    { label: 'PhilHealth', value: filteredSlips.reduce((a, c) => a + (c.phic || 0), 0) },
+                    { label: 'Pag-IBIG', value: filteredSlips.reduce((a, c) => a + (c.hdmf || 0), 0) },
+                    { label: 'Loans/Others', value: filteredSlips.reduce((a, c) => a + (c.loans || 0), 0) },
+                    { label: 'Total Deductions', value: filteredSlips.reduce((a, c) => a + (c.total_deductions || 0), 0), highlight: true },
+                  ].map((item, i) => (
+                    <div key={i} className={`flex justify-between items-center ${item.highlight ? 'pt-4 border-t border-gray-200 mt-4' : ''}`}>
+                      <span className={`text-[10px] font-bold uppercase tracking-tighter ${item.highlight ? 'text-gray-900 font-black' : 'text-gray-400'}`}>{item.label}</span>
+                      <span className={`text-sm font-black ${item.highlight ? 'text-red-600' : 'text-gray-700'}`}>₱{item.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-8 bg-gray-900 text-center">
+              <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-1">Final Net Disbursement</p>
+              <h4 className="text-3xl font-black text-white leading-none tracking-tight">
+                ₱{filteredSlips.reduce((a, c) => a + (c.net_pay || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </h4>
+              <p className="text-gray-600 text-[9px] font-bold uppercase mt-4 italic tracking-widest">
+                Calculated across {filteredSlips.length} employee records
+              </p>
+            </div>
+          </motion.div>
+        </div>
     </div>
   );
 }
