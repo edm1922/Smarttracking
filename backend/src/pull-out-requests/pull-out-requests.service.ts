@@ -197,7 +197,19 @@ export class PullOutRequestsService {
           createdAt: true,
           supervisor: true,
           item: {
-            select: { id: true, name: true, slug: true }
+            select: { 
+              id: true, 
+              name: true, 
+              slug: true,
+              product: { select: { id: true, name: true } },
+              fieldValues: {
+                select: {
+                  fieldId: true,
+                  value: true,
+                  field: { select: { id: true, name: true } }
+                }
+              }
+            }
           },
           user: {
             select: { id: true, username: true }
