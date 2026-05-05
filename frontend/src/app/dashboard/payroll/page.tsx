@@ -53,6 +53,51 @@ export default function IntegratedPayrollAdmin() {
   const [syncText, setSyncText] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // Storage Handlers
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setSelectedFiles(Array.from(e.target.files));
+    }
+  };
+
+  const handleUpload = async () => {
+    if (selectedFiles.length === 0 || !clientLabel || !periodStart || !periodEnd) return;
+    
+    setUploading(true);
+    setStatus(null);
+    
+    try {
+      const formData = new FormData();
+      formData.append('client_name', clientLabel);
+      formData.append('period_start', periodStart);
+      formData.append('period_end', periodEnd);
+      
+      selectedFiles.forEach(file => {
+        formData.append('files', file);
+      });
+
+      const res = await fetch('/api/payroll/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+      setStatus({ type: 'success', message: `Successfully uploaded ${data.count} documents!` });
+      setIsImportModalOpen(false);
+      setSelectedFiles([]);
+      fetchRuns();
+    } catch (err: any) {
+      setStatus({ type: 'error', message: err.message });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const fetchRuns = async () => {
     setLoadingRuns(true);
     try {
@@ -200,21 +245,52 @@ export default function IntegratedPayrollAdmin() {
                     </div>
                   </div>
 
-                  <div className="border-2 border-dashed border-gray-200 rounded-[2rem] p-12 text-center hover:border-primary/40 transition-colors cursor-pointer bg-gray-50/50">
-                    <Upload className="h-10 w-10 text-gray-300 mx-auto mb-4" />
-                    <p className="text-sm font-bold text-gray-500">Drop PDF files here or click to browse</p>
-                    <p className="text-[10px] font-bold text-gray-400 mt-2">Files should be named with Employee ID (e.g. CSC-1001.pdf)</p>
-                    <input type="file" multiple className="hidden" accept=".pdf" />
+                  <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-primary'); }}
+                    onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove('border-primary'); }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.classList.remove('border-primary');
+                      if (e.dataTransfer.files) {
+                        setSelectedFiles(Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.pdf')));
+                      }
+                    }}
+                    className="border-2 border-dashed border-gray-200 rounded-[2rem] p-12 text-center hover:border-primary/40 transition-colors cursor-pointer bg-gray-50/50"
+                  >
+                    {selectedFiles.length > 0 ? (
+                      <div className="space-y-2">
+                        <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto mb-2" />
+                        <p className="text-sm font-black text-gray-900">{selectedFiles.length} files selected</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Click to change selection</p>
+                      </div>
+                    ) : (
+                      <>
+                        <Upload className="h-10 w-10 text-gray-300 mx-auto mb-4" />
+                        <p className="text-sm font-bold text-gray-500">Drop PDF files here or click to browse</p>
+                        <p className="text-[10px] font-bold text-gray-400 mt-2">Files should be named with Employee ID (e.g. CSC-1001.pdf)</p>
+                      </>
+                    )}
+                    <input 
+                      type="file" 
+                      multiple 
+                      className="hidden" 
+                      accept=".pdf" 
+                      ref={fileInputRef}
+                      onChange={handleFileSelect}
+                    />
                   </div>
                 </div>
 
                 <div className="p-8 border-t border-gray-100 flex justify-end gap-4 bg-gray-50/30">
                   <button onClick={() => setIsImportModalOpen(false)} className="px-6 py-3 font-bold text-gray-500 hover:text-gray-700">Cancel</button>
                   <button 
-                    disabled={!clientLabel || !periodStart || !periodEnd}
-                    className="bg-primary text-white px-10 py-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 disabled:opacity-50"
+                    onClick={handleUpload}
+                    disabled={uploading || selectedFiles.length === 0 || !clientLabel || !periodStart || !periodEnd}
+                    className="bg-primary text-white px-10 py-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center gap-2"
                   >
-                    Start Upload
+                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                    {uploading ? 'Uploading...' : 'Start Upload'}
                   </button>
                 </div>
               </motion.div>

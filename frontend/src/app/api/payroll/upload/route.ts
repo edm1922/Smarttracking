@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
+import { PDFDocument } from 'pdf-lib';
+import pdf from 'pdf-parse';
 
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
-    const clientLabel = formData.get('label') as string;
-    const periodStart = formData.get('periodStart') as string;
-    const periodEnd = formData.get('periodEnd') as string;
+    const clientLabel = (formData.get('label') || formData.get('client_name')) as string;
+    const periodStart = (formData.get('periodStart') || formData.get('period_start')) as string;
+    const periodEnd = (formData.get('periodEnd') || formData.get('period_end')) as string;
     const files = formData.getAll('files') as File[];
 
     if (!clientLabel || !files.length) {
@@ -32,39 +34,69 @@ export async function POST(req: NextRequest) {
     let successCount = 0;
     const errors = [];
 
-    // 3. Process each file
+    // 3. Process each uploaded file
     for (const file of files) {
       try {
-        const fileName = file.name;
-        // Extract ID from filename (e.g. CSC-1001.pdf -> CSC-1001)
-        const idMatch = fileName.match(/^(CSC-\d+)/i);
-        const sys_id = idMatch ? idMatch[1].toUpperCase() : null;
+        const bytes = await file.arrayBuffer();
+        const mainPdfDoc = await PDFDocument.load(bytes);
+        const pageCount = mainPdfDoc.getPageCount();
 
-        let userId = null;
-        if (sys_id) {
-          const user = await prisma.user.findUnique({ where: { sys_id } });
-          if (user) userId = user.id;
+        // Map to hold [sys_id] -> [array of page indices]
+        const employeePages: Record<string, number[]> = {};
+
+        // SCAN PAGES TO IDENTIFY EMPLOYEES
+        for (let i = 0; i < pageCount; i++) {
+          // Extract text for this specific page
+          const subDoc = await PDFDocument.create();
+          const [page] = await subDoc.copyPages(mainPdfDoc, [i]);
+          subDoc.addPage(page);
+          const subBytes = await subDoc.save();
+          
+          const textData = await pdf(Buffer.from(subBytes));
+          const text = textData.text;
+
+          // Find CSC- ID
+          const idMatch = text.match(/CSC-[\d-]+/i);
+          const sys_id = idMatch ? idMatch[0].toUpperCase() : 'UNKNOWN';
+
+          if (!employeePages[sys_id]) employeePages[sys_id] = [];
+          employeePages[sys_id].push(i);
         }
 
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
-        const filePath = join(uploadDir, fileName);
-        const relativePath = `/uploads/documents/${batch.id}/${fileName}`;
+        // GENERATE PDFs FOR EACH EMPLOYEE
+        for (const [sys_id, pageIndices] of Object.entries(employeePages)) {
+          const newPdf = await PDFDocument.create();
+          const copiedPages = await newPdf.copyPages(mainPdfDoc, pageIndices);
+          copiedPages.forEach(p => newPdf.addPage(p));
+          
+          const newBytes = await newPdf.save();
+          const fileName = `${sys_id}_${batch.id}.pdf`;
+          const filePath = join(uploadDir, fileName);
+          const relativePath = `/uploads/documents/${batch.id}/${fileName}`;
 
-        await writeFile(filePath, buffer);
+          await writeFile(filePath, Buffer.from(newBytes));
 
-        await prisma.document.create({
-          data: {
-            batch_id: batch.id,
-            sys_id: sys_id || 'UNKNOWN',
-            user_id: userId,
-            file_name: fileName,
-            storage_path: relativePath,
-            file_type: 'PDF'
+          // Find corresponding User
+          let userId = null;
+          if (sys_id !== 'UNKNOWN') {
+            const user = await prisma.user.findUnique({ where: { sys_id } });
+            if (user) userId = user.id;
           }
-        });
 
-        successCount++;
+          await prisma.document.create({
+            data: {
+              batch_id: batch.id,
+              sys_id: sys_id,
+              user_id: userId,
+              file_name: fileName,
+              storage_path: relativePath,
+              file_type: 'PDF'
+            }
+          });
+
+          successCount++;
+        }
+
       } catch (fileErr: any) {
         console.error(`Error processing file ${file.name}:`, fileErr);
         errors.push({ file: file.name, error: fileErr.message });
@@ -75,6 +107,7 @@ export async function POST(req: NextRequest) {
       success: true,
       batchId: batch.id,
       count: successCount,
+      message: `Successfully processed ${successCount} payslips.`,
       errors: errors.length > 0 ? errors : undefined
     });
 
