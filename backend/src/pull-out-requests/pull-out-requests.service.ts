@@ -201,7 +201,6 @@ export class PullOutRequestsService {
               id: true, 
               name: true, 
               slug: true,
-              product: { select: { id: true, name: true } },
               fieldValues: {
                 select: {
                   fieldId: true,
