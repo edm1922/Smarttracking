@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { PDFDocument } from 'pdf-lib';
-const pdf = require('pdf-parse');
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,6 +15,9 @@ export async function POST(req: NextRequest) {
     if (!clientLabel || !files.length) {
       return NextResponse.json({ error: 'Missing client label or files' }, { status: 400 });
     }
+
+    // Load pdfjs-dist dynamically at runtime to avoid build errors
+    const pdfjs = require('pdfjs-dist/legacy/build/pdf');
 
     // 1. Create the Storage Batch
     const batch = await prisma.storageBatch.create({
@@ -38,29 +40,34 @@ export async function POST(req: NextRequest) {
     for (const file of files) {
       try {
         const bytes = await file.arrayBuffer();
+        
+        // Use pdf-lib for splitting
         const mainPdfDoc = await PDFDocument.load(bytes);
         const pageCount = mainPdfDoc.getPageCount();
+
+        // Use pdfjs-dist for text extraction
+        const loadingTask = pdfjs.getDocument({
+          data: new Uint8Array(bytes),
+          useSystemFonts: true,
+          disableFontFace: true,
+        });
+        const doc = await loadingTask.promise;
 
         // Map to hold [sys_id] -> [array of page indices]
         const employeePages: Record<string, number[]> = {};
 
         // SCAN PAGES TO IDENTIFY EMPLOYEES
-        for (let i = 0; i < pageCount; i++) {
-          // Extract text for this specific page
-          const subDoc = await PDFDocument.create();
-          const [page] = await subDoc.copyPages(mainPdfDoc, [i]);
-          subDoc.addPage(page);
-          const subBytes = await subDoc.save();
-          
-          const textData = await pdf(Buffer.from(subBytes));
-          const text = textData.text;
+        for (let i = 1; i <= pageCount; i++) {
+          const page = await doc.getPage(i);
+          const textContent = await page.getTextContent();
+          const text = textContent.items.map((item: any) => item.str).join(' ');
 
           // Find CSC- ID
           const idMatch = text.match(/CSC-[\d-]+/i);
           const sys_id = idMatch ? idMatch[0].toUpperCase() : 'UNKNOWN';
 
           if (!employeePages[sys_id]) employeePages[sys_id] = [];
-          employeePages[sys_id].push(i);
+          employeePages[sys_id].push(i - 1); // pdf-lib uses 0-based indices
         }
 
         // GENERATE PDFs FOR EACH EMPLOYEE
@@ -70,7 +77,7 @@ export async function POST(req: NextRequest) {
           copiedPages.forEach(p => newPdf.addPage(p));
           
           const newBytes = await newPdf.save();
-          const fileName = `${sys_id}_${batch.id}.pdf`;
+          const fileName = `${sys_id}_${batch.id}_${Math.random().toString(36).substring(7)}.pdf`;
           const filePath = join(uploadDir, fileName);
           const relativePath = `/uploads/documents/${batch.id}/${fileName}`;
 
