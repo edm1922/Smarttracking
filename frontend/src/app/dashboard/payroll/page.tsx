@@ -158,9 +158,18 @@ export default function IntegratedPayrollAdmin() {
   const confirmSheet = () => {
     if (!discoveryData || !discoveryData.sheets[selectedSheetIndex]) return;
     const sheet = discoveryData.sheets[selectedSheetIndex];
-    setHeaderRowIndex(sheet.suggestedHeaderIndex);
     
-    // Auto-map based on headers
+    // Extract headers from the row the user manually selected
+    const rawHeaders = sheet.preview[headerRowIndex] || [];
+    const processedHeaders = rawHeaders.map((h: any, idx: number) => ({
+      index: idx,
+      name: String(h || `Column ${idx + 1}`).trim(),
+      letter: getColLetter(idx)
+    }));
+
+    setAvailableHeaders(processedHeaders);
+    
+    // Auto-map based on these new headers
     const newMapping: Record<string, number> = {};
     const rules: Record<string, string[]> = {
       sys_id: ['sys id', 'employee id', 'id', 'emp id', 'employee no'],
@@ -171,10 +180,12 @@ export default function IntegratedPayrollAdmin() {
       total_deductions: ['total deductions']
     };
 
-    (sheet.headers || []).forEach((h: any) => {
+    processedHeaders.forEach((h: any) => {
       const name = String(h.name || '').toLowerCase();
       Object.entries(rules).forEach(([key, keywords]) => {
-        if (keywords.some(k => name.includes(k))) newMapping[key] = h.index;
+        if (keywords.some(k => name.includes(k))) {
+          newMapping[key] = h.index;
+        }
       });
     });
 
