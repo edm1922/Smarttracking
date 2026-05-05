@@ -102,8 +102,10 @@ export default function IntegratedPayrollAdmin() {
   const fetchRuns = async () => {
     setLoadingRuns(true);
     try {
-      const res = await fetch('/api/payroll/runs');
-      const data = await res.json();
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${apiUrl}/payroll/runs`);
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : [];
       if (res.ok && Array.isArray(data)) setRuns(data);
     } catch (err) {
       console.error('Failed to fetch runs:', err);
@@ -114,9 +116,11 @@ export default function IntegratedPayrollAdmin() {
 
   const fetchLatestRun = async () => {
     try {
-      const res = await fetch('/api/payroll/latest-run');
-      const data = await res.json();
-      if (res.ok) setLatestRun(data);
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${apiUrl}/payroll/latest-run`);
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : null;
+      if (res.ok && data) setLatestRun(data);
     } catch (err) {
       console.error('Failed to fetch latest run:', err);
     }
@@ -125,8 +129,10 @@ export default function IntegratedPayrollAdmin() {
   const fetchUsers = async () => {
     setLoadingUsers(true);
     try {
-      const res = await fetch('/api/payroll/users');
-      const data = await res.json();
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${apiUrl}/payroll/users`);
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : [];
       if (res.ok) setUsers(data);
     } catch (err) {
       console.error('Failed to fetch users:', err);
@@ -151,7 +157,8 @@ export default function IntegratedPayrollAdmin() {
     setStatus(null);
 
     try {
-      const res = await fetch('/api/payroll/sync-bulk', {
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${apiUrl}/payroll/sync-bulk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: syncText }),

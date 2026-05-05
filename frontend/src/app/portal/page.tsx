@@ -19,15 +19,26 @@ export default function EmployeeLoginPage() {
     setError(null);
 
     try {
-      const lowercaseEmail = email.toLowerCase();
-      const finalEmail = lowercaseEmail.includes('@') ? lowercaseEmail : `${lowercaseEmail}@gaisano.com`;
+      const { data: user, error: dbError } = await supabase
+        .from('User')
+        .select('*')
+        .eq('username', email.toLowerCase().trim())
+        .eq('password', password.trim())
+        .single();
 
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email: finalEmail,
-        password,
-      });
+      if (dbError || !user) {
+        throw new Error('Invalid username or password.');
+      }
 
-      if (authError) throw authError;
+      // Store user data in localStorage for session management
+      localStorage.setItem('portalUser', JSON.stringify({
+        id: user.id,
+        sys_id: user.sys_id,
+        fullName: user.fullName,
+        username: user.username,
+        role: user.role
+      }));
+
       router.push('/portal/dashboard');
     } catch (err: any) {
       setError(err.message || 'Authentication failed. Please check your credentials.');

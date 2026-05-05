@@ -1,10 +1,13 @@
 import { 
   Controller, 
+  Get,
   Post, 
+  Delete,
   UseInterceptors, 
   UploadedFile,
   UploadedFiles,
   Body, 
+  Param,
   HttpException, 
   HttpStatus 
 } from '@nestjs/common';
@@ -43,5 +46,35 @@ export class PayrollController {
         HttpStatus.INTERNAL_SERVER_ERROR
       );
     }
+  }
+
+  @Get('users')
+  async getUsers() {
+    return this.payrollService.getEmployees();
+  }
+
+  @Get('runs')
+  async getRuns() {
+    return this.payrollService.getBatches();
+  }
+
+  @Get('latest-run')
+  async getLatestRun() {
+    return this.payrollService.getLatestBatch();
+  }
+
+  @Post('sync-bulk')
+  async syncBulk(@Body('text') text: string) {
+    return this.payrollService.syncBulkEmployees(text);
+  }
+
+  @Get('my-payslips/:sysId')
+  async getMyPayslips(@Param('sysId') sysId: string) {
+    return this.payrollService.getEmployeePayslips(sysId);
+  }
+
+  @Delete('users/:id')
+  async deleteUser(@Param('id') id: string) {
+    return this.payrollService.deleteEmployee(id);
   }
 }

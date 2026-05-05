@@ -27,34 +27,24 @@ export default function EmployeeDashboard() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const { data: authData, error: authError } = await supabase.auth.getUser();
-        if (authError) throw authError;
-        
-        const currentUser = authData?.user;
+        const storedUser = localStorage.getItem('portalUser');
+        if (!storedUser) {
+          window.location.href = '/portal';
+          return;
+        }
+
+        const currentUser = JSON.parse(storedUser);
         setUser(currentUser);
 
-        if (currentUser) {
-          const { data: { session } } = await supabase.auth.getSession();
-          const token = session?.access_token;
+        const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+        const response = await fetch(`${apiUrl}/payroll/my-payslips/${currentUser.sys_id}`);
 
-          if (!token) {
-            throw new Error('No active session');
-          }
-
-          const response = await fetch('/api/portal/payslips', {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to fetch payslips');
-          }
-
-          const { entries } = await response.json();
-          setSlips(entries || []);
+        if (!response.ok) {
+          throw new Error('Failed to fetch payslips');
         }
+
+        const entries = await response.json();
+        setSlips(entries || []);
       } catch (err: any) {
         console.error('Portal Fetch Data Error:', err.message);
       } finally {
@@ -64,8 +54,8 @@ export default function EmployeeDashboard() {
     fetchData();
   }, []);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
+  const handleLogout = () => {
+    localStorage.removeItem('portalUser');
     window.location.href = '/portal';
   };
 
@@ -102,8 +92,8 @@ export default function EmployeeDashboard() {
 
           <div className="flex items-center gap-6">
             <div className="hidden md:flex flex-col items-end">
-              <span className="text-sm font-bold text-gray-900">{user?.user_metadata?.full_name || 'Employee'}</span>
-              <span className="text-[10px] font-bold text-primary uppercase tracking-tighter">{user?.user_metadata?.sys_id}</span>
+              <span className="text-sm font-bold text-gray-900">{user?.fullName || 'Employee'}</span>
+              <span className="text-[10px] font-bold text-primary uppercase tracking-tighter">{user?.sys_id}</span>
             </div>
             <button 
               onClick={handleLogout}
@@ -127,7 +117,7 @@ export default function EmployeeDashboard() {
                  <h3 className="text-4xl font-black text-gray-900 mb-1">
                    ₱{slips[0]?.net_pay?.toLocaleString() || '0.00'}
                  </h3>
-                 <p className="text-gray-400 text-xs font-medium">Released: {slips[0]?.payroll_runs?.payroll_date || 'N/A'}</p>
+                 <p className="text-gray-400 text-xs font-medium">Released: {slips[0]?.batch?.created_at ? new Date(slips[0].batch.created_at).toLocaleDateString() : 'N/A'}</p>
                  
                  <div className="mt-8 pt-8 border-t border-gray-50 flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -148,8 +138,8 @@ export default function EmployeeDashboard() {
               </h4>
               <div className="space-y-4">
                 {[
-                  { label: 'Employee ID', value: user?.user_metadata?.sys_id },
-                  { label: 'Full Name', value: user?.user_metadata?.full_name },
+                  { label: 'Employee ID', value: user?.sys_id },
+                  { label: 'Full Name', value: user?.fullName },
                   { label: 'Portal Access', value: 'Verified', color: 'emerald' },
                 ].map((item, i) => (
                   <div key={i} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
@@ -189,22 +179,24 @@ export default function EmployeeDashboard() {
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-gray-900 mb-1">
-                        Period: {slip.payroll_runs?.period_start} to {slip.payroll_runs?.period_end}
+                        Period: {slip.batch?.period_start ? new Date(slip.batch.period_start).toLocaleDateString() : 'N/A'} to {slip.batch?.period_end ? new Date(slip.batch.period_end).toLocaleDateString() : 'N/A'}
                       </h4>
                       <div className="flex items-center gap-4">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Net: <span className="text-emerald-500 font-bold">₱{slip.net_pay.toLocaleString()}</span></span>
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date: {slip.payroll_runs?.payroll_date}</span>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Type: <span className="text-indigo-500 font-bold">{slip.file_type}</span></span>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Released: {new Date(slip.created_at).toLocaleDateString()}</span>
                       </div>
                     </div>
                   </div>
                   
-                  <button 
-                    onClick={() => handleDownloadPDF(slip)}
+                  <a 
+                    href={slip.storage_path}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-dark text-white rounded-xl font-bold text-xs transition-all active:scale-95 shadow-lg shadow-primary/20"
                   >
                      <Download className="h-4 w-4" />
-                     <span className="hidden sm:inline">PDF</span>
-                   </button>
+                     <span className="hidden sm:inline">View PDF</span>
+                   </a>
                 </motion.div>
               )) : (
                 <div className="py-20 text-center border-2 border-dashed border-gray-100 rounded-[2.5rem]">
