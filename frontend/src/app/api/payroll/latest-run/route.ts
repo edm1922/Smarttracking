@@ -18,16 +18,15 @@ export async function GET(req: NextRequest) {
         persistSession: false
       }
     });
-    const { data: latestRun, error } = await supabase
+    const { data: runs, error } = await supabase
       .from('payroll_runs')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+      .limit(1);
 
     if (error) throw error;
 
-    return NextResponse.json(latestRun);
+    return NextResponse.json(runs?.[0] || null);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

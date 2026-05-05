@@ -56,7 +56,10 @@ export async function POST(req: NextRequest) {
 
     // 2. Map system fields autonomously
     const mapping: Record<string, number> = {};
-    const headers = allRows[headerRowIndex].map((h: any, i: number) => ({ name: String(h || `Column ${i}`).trim(), index: i }));
+    const rawHeaders = allRows[headerRowIndex] || [];
+    const headers = rawHeaders
+      .map((h: any, i: number) => (h != null ? { name: String(h).trim(), index: i } : null))
+      .filter((h: any) => h !== null);
 
     const rules: Record<string, string[]> = {
       sys_id: ['sys id', 'employee id', 'id', 'emp id', 'employee no'],

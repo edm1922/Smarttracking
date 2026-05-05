@@ -674,16 +674,16 @@ export default function IntegratedPayrollAdmin() {
                             {field.label}
                             {field.required && <span className="text-red-500">*</span>}
                           </label>
-                          <select 
-                            value={fieldMapping[field.key] ?? ''}
-                            onChange={(e) => setFieldMapping({...fieldMapping, [field.key]: parseInt(e.target.value)})}
-                            className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary/20 outline-none"
-                          >
-                            <option value="">Select Column...</option>
-                            {(availableHeaders || []).map((h: any) => (
-                              <option key={h.index} value={h.index}>{h.name}</option>
-                            ))}
-                          </select>
+       <select 
+                         value={fieldMapping[field.key] ?? ''}
+                         onChange={(e) => setFieldMapping({...fieldMapping, [field.key]: parseInt(e.target.value)})}
+                         className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary/20 outline-none"
+                       >
+                         <option value="">Select Column...</option>
+                         {(availableHeaders || []).filter((h: any) => h != null).map((h: any) => (
+                           <option key={h.index} value={h.index}>{h.name}</option>
+                         ))}
+                       </select>
                         </div>
                       ))}
                     </div>
