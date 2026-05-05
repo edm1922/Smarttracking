@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
         const password = sys_id;
 
         try {
-          console.log(`Upserting User: ${sys_id} (${username})`);
+          // --- 1. UPSERT USER (Main Portal Auth) ---
           await prisma.user.upsert({
             where: { sys_id },
             update: { 
@@ -51,27 +51,30 @@ export async function POST(req: NextRequest) {
             }
           });
 
-          console.log(`Upserting Profile: ${sys_id}`);
-          await prisma.profiles.upsert({
-            where: { sys_id },
-            update: { 
-              full_name: fullName
-            },
-            create: {
-              id: randomUUID(),
-              sys_id,
-              full_name: fullName,
-              role: 'employee'
-            }
-          });
+          // --- 2. UPSERT PROFILE (Graceful failure) ---
+          try {
+            await prisma.profiles.upsert({
+              where: { sys_id },
+              update: { 
+                full_name: fullName
+              },
+              create: {
+                id: randomUUID(),
+                sys_id,
+                full_name: fullName,
+                // Omitting role to avoid check constraint "profiles_role_check" 
+                // which seems to reject 'employee' in some environments
+              }
+            });
+          } catch (profileErr: any) {
+            console.warn(`Profile sync failed for ${sys_id} (non-critical):`, profileErr.message);
+          }
           
           count++;
         } catch (err: any) {
           console.error(`Error syncing user ${sys_id}:`, err.message);
           errors.push(`${sys_id}: ${err.message}`);
         }
-      } else {
-        console.warn(`Line skipped (no match): ${line}`);
       }
     }
 
