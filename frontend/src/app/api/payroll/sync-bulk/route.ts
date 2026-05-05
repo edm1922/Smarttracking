@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
         
         // --- 1. GENERATE USERNAME & PASSWORD ---
         // Format: VENTURA, CARL VENCENT DAISOG -> venturaca
-        const nameParts = fullName.split(',').map(p => p.trim());
+        const nameParts = fullName.split(',').map((p: string) => p.trim());
         const lastName = nameParts[0] || '';
         const firstName = nameParts[1] || '';
         const cleanLast = lastName.toLowerCase().replace(/[^a-z0-9]/g, '');
