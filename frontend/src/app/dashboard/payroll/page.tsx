@@ -23,6 +23,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 export default function IntegratedPayrollAdmin() {
   const [activeTab, setActiveTab] = useState<'records' | 'credentials' | 'formats'>('records');
@@ -363,7 +364,8 @@ export default function IntegratedPayrollAdmin() {
   });
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <ErrorBoundary>
+      <div className="space-y-8 animate-in fade-in duration-500">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
@@ -900,5 +902,6 @@ export default function IntegratedPayrollAdmin() {
       </AnimatePresence>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }
