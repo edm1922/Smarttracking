@@ -891,21 +891,21 @@ export default function StaffRequisitionPage() {
             </tr>
           </thead>
           <tbody>
-            {[...Array(18)].map((_, i) => (
+            {[...Array(15)].map((_, i) => (
               <tr key={i} className="border-b border-gray-400">
-                <td className="py-5 px-4 border-r-2 border-gray-900 text-center text-xs font-black text-gray-400">{i + 1}</td>
-                <td className="py-5 px-4 border-r-2 border-gray-900"></td>
-                <td className="py-5 px-4 border-r-2 border-gray-900"></td>
-                <td className="py-5 px-4 border-r-2 border-gray-900"></td>
-                <td className="py-5 px-4"></td>
+                <td className="py-3 px-4 border-r-2 border-gray-900 text-center text-xs font-black text-gray-400">{i + 1}</td>
+                <td className="py-3 px-4 border-r-2 border-gray-900"></td>
+                <td className="py-3 px-4 border-r-2 border-gray-900"></td>
+                <td className="py-3 px-4 border-r-2 border-gray-900"></td>
+                <td className="py-3 px-4"></td>
               </tr>
             ))}
           </tbody>
         </table>
 
-        <div className="mb-12">
-          <span className="text-xs font-black text-gray-600 uppercase tracking-widest mb-2 block">General Remarks:</span>
-          <div className="border-2 border-gray-400 w-full h-24 rounded-lg"></div>
+        <div className="mb-6">
+          <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">General Remarks:</span>
+          <div className="border-2 border-gray-400 w-full h-16 rounded-lg"></div>
         </div>
 
         <div className="flex justify-end pt-6">
