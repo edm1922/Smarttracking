@@ -910,24 +910,9 @@ export default function StaffRequisitionPage() {
           <div className="border-2 border-gray-400 w-full h-24 rounded-lg"></div>
         </div>
 
-        <div className="grid grid-cols-4 gap-8 pt-6">
-          <div className="space-y-8">
-            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Requested By:</div>
-            <div className="border-b-2 border-gray-900"></div>
-            <div className="text-center text-[8px] font-bold text-gray-400 uppercase italic tracking-tighter">Signature - Date</div>
-          </div>
-          <div className="space-y-8">
-            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Approved By (Supervisor):</div>
-            <div className="border-b-2 border-gray-900"></div>
-            <div className="text-center text-[8px] font-bold text-gray-400 uppercase italic tracking-tighter">Signature - Date</div>
-          </div>
-          <div className="space-y-8">
-            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Released By (Inv. Manager):</div>
-            <div className="border-b-2 border-gray-900"></div>
-            <div className="text-center text-[8px] font-bold text-gray-400 uppercase italic tracking-tighter">Signature - Date</div>
-          </div>
-          <div className="space-y-8">
-            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Received By (Employee):</div>
+        <div className="flex justify-end pt-6">
+          <div className="space-y-8 w-64">
+            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Approved By:</div>
             <div className="border-b-2 border-gray-900"></div>
             <div className="text-center text-[8px] font-bold text-gray-400 uppercase italic tracking-tighter">Signature - Date</div>
           </div>
