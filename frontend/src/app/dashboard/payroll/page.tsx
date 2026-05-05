@@ -227,9 +227,13 @@ export default function IntegratedPayrollAdmin() {
       if (res.ok) {
         setAvailableHeaders(data.headers);
         setHeaderRowIndex(data.headerRowIndex);
-        autoMapFields(data.headers); // Trigger auto-mapping
+        setFieldMapping(data.mapping || {}); // Apply autonomous mapping from backend
         setShowMappingUI(true);
-        setStatus({ type: 'success', message: 'Template parsed. Columns have been auto-detected where possible.' });
+        const detectedCount = Object.keys(data.mapping || {}).length;
+        setStatus({ 
+          type: 'success', 
+          message: `Autonomous scan complete! Detected ${detectedCount} fields automatically. You can review them below.` 
+        });
       } else {
         throw new Error(data.error);
       }
@@ -241,36 +245,6 @@ export default function IntegratedPayrollAdmin() {
     }
   };
 
-  const autoMapFields = (headers: any[]) => {
-    const mapping: Record<string, number> = {};
-    const rules: Record<string, string[]> = {
-      sys_id: ['sys id', 'employee id', 'id', 'emp id', 'employee no'],
-      full_name: ['full name', 'employee name', 'emp name', 'name'], 
-      basic_pay: ['basic pay', 'basic', 'monthly rate', 'daily rate'],
-      gross_pay: ['gross pay', 'gross', 'total earnings'],
-      overtime_pay: ['overtime', 'ot pay', 'total ot'],
-      allowance: ['allowance', 'total allowance'],
-      sss: ['sss', 'sss contribution'],
-      phic: ['phic', 'philhealth'],
-      hdmf: ['hdmf', 'pag-ibig', 'pagibig'],
-      loans: ['loans', 'total loans'],
-      total_deductions: ['total deductions', 'total deduction', 'deductions'],
-      net_pay: ['net pay', 'net', 'take home pay']
-    };
-
-    headers.forEach(h => {
-      const name = h.name.toLowerCase();
-      if (name.includes('bank') || name.includes('account')) return;
-      
-      Object.entries(rules).forEach(([key, keywords]) => {
-        if (keywords.some(k => name === k || name.includes(k)) && mapping[key] === undefined) {
-          mapping[key] = h.index;
-        }
-      });
-    });
-
-    setFieldMapping(mapping);
-  };
 
   const saveFormat = async () => {
     if (!newFormatName) {
