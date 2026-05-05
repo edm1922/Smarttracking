@@ -10,10 +10,14 @@ export class PayrollService {
   private supabaseAdmin;
 
   constructor(private prisma: PrismaService) {
-    this.supabaseAdmin = createClient(
-      process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    );
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      this.logger.error('Supabase configuration missing (URL or Key)');
+    }
+
+    this.supabaseAdmin = createClient(supabaseUrl || '', supabaseKey || '');
   }
 
   async processMasterPdf(file: Express.Multer.File, batchData: any) {
@@ -26,8 +30,8 @@ export class PayrollService {
     const batch = await this.prisma.storageBatch.create({
       data: {
         client_name: clientName,
-        period_start: new Date(periodStart),
-        period_end: new Date(periodEnd),
+        period_start: periodStart ? new Date(periodStart) : null,
+        period_end: periodEnd ? new Date(periodEnd) : null,
         label: label,
       },
     });
@@ -42,7 +46,7 @@ export class PayrollService {
       if (!employeeGroups.has(id)) {
         employeeGroups.set(id, []);
       }
-      employeeGroups.get(id).push(page);
+      employeeGroups.get(id)!.push(page);
     });
 
     // 3. Extract and upload for each employee
@@ -60,7 +64,7 @@ export class PayrollService {
         const filePath = `${batch.id}/${fileName}`;
 
         // Upload to Supabase
-        const { data: uploadData, error: uploadError } = await this.supabaseAdmin
+        const { error: uploadError } = await this.supabaseAdmin
           .storage
           .from('payroll-documents')
           .upload(filePath, splitPdfBytes, {
@@ -81,21 +85,18 @@ export class PayrollService {
           where: { sys_id: employeeId }
         });
 
-        if (employee) {
-          await this.prisma.storageDocument.create({
-            data: {
-              batch_id: batch.id,
-              user_id: employee.id,
-              file_path: publicUrl,
-              file_name: fileName,
-              file_type: 'PAYSLIP',
-            },
-          });
-          results.push({ id: employeeId, status: 'success' });
-        } else {
-          this.logger.warn(`Employee ${employeeId} not found in database`);
-          results.push({ id: employeeId, status: 'user_not_found' });
-        }
+        await this.prisma.document.create({
+          data: {
+            batch_id: batch.id,
+            user_id: employee?.id || null,
+            sys_id: employeeId,
+            storage_path: publicUrl,
+            file_name: fileName,
+            file_type: 'PAYSLIP',
+          },
+        });
+        
+        results.push({ id: employeeId, status: employee ? 'success' : 'user_not_found' });
       } catch (err) {
         this.logger.error(`Failed to process employee ${employeeId}: ${err.message}`);
         results.push({ id: employeeId, status: 'error', error: err.message });
