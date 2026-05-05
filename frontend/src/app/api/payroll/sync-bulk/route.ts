@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { randomUUID } from 'crypto';
 
 export async function POST(req: NextRequest) {
   try {
-    console.log('--- START BULK SYNC (BATCH MODE) ---');
+    console.log('--- START BULK SYNC (SAFE UNIQUE USERNAME) ---');
     const { text } = await req.json();
 
     if (!text) {
@@ -12,7 +11,6 @@ export async function POST(req: NextRequest) {
     }
 
     const lines = text.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0);
-    console.log(`Total lines to process: ${lines.length}`);
     
     const validEntries = [];
     for (const line of lines) {
@@ -27,24 +25,25 @@ export async function POST(req: NextRequest) {
         const cleanLast = lastName.toLowerCase().replace(/[^a-z0-9]/g, '');
         const cleanFirstTwo = firstName.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 2);
         
+        // To ensure uniqueness while keeping requested format:
+        // Append the last part of the sys_id (e.g. beltranje1548)
+        const idSuffix = sys_id.split('-').pop() || '';
+        const username = `${cleanLast}${cleanFirstTwo}${idSuffix}`;
+        
         validEntries.push({
           sys_id,
           fullName,
-          username: `${cleanLast}${cleanFirstTwo}`,
+          username,
           password: sys_id
         });
       }
     }
 
-    console.log(`Found ${validEntries.length} valid entries. Processing in batches...`);
-
     let successCount = 0;
     const batchSize = 50;
     
-    // Process in batches of 50 to avoid timeouts
     for (let i = 0; i < validEntries.length; i += batchSize) {
       const batch = validEntries.slice(i, i + batchSize);
-      console.log(`Processing batch ${Math.floor(i/batchSize) + 1}...`);
       
       await prisma.$transaction(
         batch.map(entry => 
@@ -66,22 +65,17 @@ export async function POST(req: NextRequest) {
         )
       );
       
-      // Also try to sync profiles in the same batch (non-blocking if possible, but transaction is atomic)
-      // To prevent profile errors from killing the whole batch, we'll do profiles separately or skipping if needed
-      // Given the previous constraint error, let's skip profiles in the main transaction to ensure User accounts are created.
-      
       successCount += batch.length;
     }
 
-    console.log(`--- BULK SYNC COMPLETE. Success: ${successCount} ---`);
     return NextResponse.json({
       success: true,
       count: successCount,
-      message: `Successfully provisioned ${successCount} accounts.`
+      message: `Successfully provisioned ${successCount} accounts with unique IDs.`
     });
 
   } catch (error: any) {
-    console.error('CRITICAL Bulk Sync Error:', error);
+    console.error('Bulk Sync Error:', error);
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }
