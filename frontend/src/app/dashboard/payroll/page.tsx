@@ -23,7 +23,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import ErrorBoundary from '@/components/ErrorBoundary';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export default function IntegratedPayrollAdmin() {
   const [activeTab, setActiveTab] = useState<'records' | 'credentials' | 'formats'>('records');
