@@ -51,7 +51,7 @@ export class PayrollService {
         const pageBytes = await singlePagePdf.save();
 
         // Scan this specific page for IDs
-        const idsOnPage = await this.scanSinglePageForIds(pageBytes);
+        const idsOnPage = await this.scanSinglePageForIds(Buffer.from(pageBytes));
         
         if (idsOnPage.length === 0) {
           this.logger.warn(`No ID found on page ${pageNumber}, skipping.`);
