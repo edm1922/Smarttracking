@@ -554,14 +554,29 @@ export default function UnitTrackingPage() {
                         <Truck className="h-5 w-5 text-gray-400 group-hover:text-orange-600" />
                       )}
                     </div>
-                    <div>
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Asset ID</p>
-                      <p className="text-sm font-mono font-bold text-gray-900 flex items-center gap-2">
-                        {req.item.slug}
-                        {(req.attachmentUrl || (req.additionalImages && req.additionalImages.length > 0)) && (
-                          <ImageIcon className="h-3 w-3 text-orange-500" />
-                        )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Item Reference</p>
+                      <p className="text-sm font-black text-gray-900 uppercase truncate">
+                         {req.item.product?.name || req.item.name || 'Unnamed Item'}
                       </p>
+                      <p className="text-[10px] text-gray-500 truncate mt-0.5 max-w-[200px]">
+                         {req.item.fieldValues && req.item.fieldValues.length > 0 ? 
+                           req.item.fieldValues.map((fv: any) => {
+                             const v = fv.value;
+                             const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+                             return val ? String(val) : '';
+                           }).filter(Boolean).join(', ')
+                           : <span className="italic text-gray-400">No specifications</span>
+                         }
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[9px] font-mono font-bold text-gray-400">QR: {req.item.slug}</span>
+                        {(req.attachmentUrl || (req.additionalImages && req.additionalImages.length > 0)) && (
+                          <span className="text-[8px] font-black text-orange-600 uppercase flex items-center gap-1">
+                            <ImageIcon className="h-2 w-2" /> Has Attachments
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="text-right">
@@ -1056,7 +1071,7 @@ export default function UnitTrackingPage() {
                    />
                 </th>
                 <th className="px-4 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
-                <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">{groupBySpecs ? 'Assets' : 'Asset ID'}</th>
+                <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">{groupBySpecs ? 'Assets' : 'Item & Specs'}</th>
                 <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Requester</th>
                 <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Qty</th>
                 <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
@@ -1098,13 +1113,28 @@ export default function UnitTrackingPage() {
                             <Box className="h-4 w-4 text-gray-300" />
                           )}
                         </div>
-                        <div className="flex flex-col">
-                          <span className="text-sm font-mono font-bold text-primary bg-primary/5 px-2 py-0.5 rounded-md w-fit">{req.item.slug}</span>
-                          {(req.attachmentUrl || (req.additionalImages && req.additionalImages.length > 0)) && (
-                             <span className="text-[8px] font-black text-orange-600 uppercase mt-0.5 ml-1 flex items-center gap-1">
-                               <ImageIcon className="h-2 w-2" /> Has Attachments
-                             </span>
-                          )}
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-black text-gray-900 uppercase truncate">
+                            {req.item.product?.name || req.item.name || 'Unnamed Item'}
+                          </span>
+                          <span className="text-[10px] text-gray-500 mt-0.5 truncate max-w-[250px]">
+                            {req.item.fieldValues && req.item.fieldValues.length > 0 ? 
+                              req.item.fieldValues.map((fv: any) => {
+                                const v = fv.value;
+                                const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+                                return val ? String(val) : '';
+                              }).filter(Boolean).join(', ')
+                              : <span className="italic text-gray-400">No specifications</span>
+                            }
+                          </span>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[9px] font-mono font-bold text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">QR: {req.item.slug}</span>
+                            {(req.attachmentUrl || (req.additionalImages && req.additionalImages.length > 0)) && (
+                               <span className="text-[8px] font-black text-orange-600 uppercase flex items-center gap-1">
+                                 <ImageIcon className="h-2 w-2" /> Has Attachments
+                               </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}
