@@ -13,42 +13,42 @@ export async function POST(req: NextRequest) {
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: 'buffer' });
     
-    let targetSheetName = '';
-    let allRows: any[][] = [];
-    let headerRowIndex = -1;
-
     // Scan sheets for a row that has multiple filled columns, typical of a header
-    // We try to find a row that looks like a header (e.g. contains 'ID', 'Name', 'Basic')
+    // 1. Scan ALL sheets to find the most complete payroll data
+    let bestSheet = { name: '', rows: [] as any[][], headerIndex: -1, score: 0 };
+    const keywords = ['sys id', 'employee id', 'emp name', 'full name', 'basic pay', 'net pay', 'gross pay', 'sss', 'phic', 'hdmf'];
+
     for (const name of workbook.SheetNames) {
       const worksheet = workbook.Sheets[name];
       const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
       
-      for (let i = 0; i < rows.length; i++) {
+      for (let i = 0; i < Math.min(rows.length, 50); i++) {
         const row = rows[i];
         if (!row || !Array.isArray(row)) continue;
         
-        const rowString = row.filter((cell: any) => cell !== null && cell !== undefined).join('|').toLowerCase();
+        const rowString = row.join('|').toLowerCase();
+        // Count how many keywords this row contains
+        let score = keywords.reduce((acc, k) => acc + (rowString.includes(k) ? 1 : 0), 0);
         
-        // Typical keywords to identify a payroll header row
-        if (
-          rowString.includes('sys id') || 
-          rowString.includes('employee no') ||
-          (rowString.includes('name') && rowString.includes('basic')) ||
-          (rowString.includes('emp') && rowString.includes('pay')) ||
-          rowString.includes('net pay')
-        ) {
-          targetSheetName = name;
-          allRows = rows;
-          headerRowIndex = i;
-          break;
+        // Massive bonus if the sheet name contains "payroll"
+        if (name.toLowerCase().includes('payroll')) {
+          score += 20;
+        }
+        
+        // If this row/sheet is better than anything we've seen, remember it
+        if (score > bestSheet.score) {
+          bestSheet = { name, rows, headerIndex: i, score };
         }
       }
-      if (targetSheetName) break;
     }
 
-    if (!targetSheetName) {
-      return NextResponse.json({ error: 'Could not identify a header row in any sheet. Ensure the file contains typical payroll headers like "Sys ID", "Basic Pay", or "Name".' }, { status: 400 });
+    if (bestSheet.score === 0 || !bestSheet.name) {
+      return NextResponse.json({ error: 'Could not find a sheet with recognizable payroll data. Please ensure the file contains columns like "Sys ID", "Basic Pay", or "Net Pay".' }, { status: 400 });
     }
+
+    const allRows = bestSheet.rows;
+    const headerRowIndex = bestSheet.headerIndex;
+    const targetSheetName = bestSheet.name;
 
     // Extract headers
     // Data rows to scan for pattern matching
