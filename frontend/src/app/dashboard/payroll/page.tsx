@@ -79,7 +79,8 @@ export default function IntegratedPayrollAdmin() {
         formData.append('files', file);
       });
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/payroll/upload`, {
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${apiUrl}/payroll/upload`, {
         method: 'POST',
         body: formData,
       });
