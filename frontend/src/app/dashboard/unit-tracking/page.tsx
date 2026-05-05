@@ -564,7 +564,7 @@ export default function UnitTrackingPage() {
                            req.item.fieldValues.map((fv: any) => {
                              const v = fv.value;
                              const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-                             return val ? String(val) : '';
+                             return val ? `${fv.field?.name || 'Spec'}: ${val}` : '';
                            }).filter(Boolean).join(', ')
                            : <span className="italic text-gray-400">No specifications</span>
                          }
@@ -1122,7 +1122,7 @@ export default function UnitTrackingPage() {
                               req.item.fieldValues.map((fv: any) => {
                                 const v = fv.value;
                                 const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-                                return val ? String(val) : '';
+                                return val ? `${fv.field?.name || 'Spec'}: ${val}` : '';
                               }).filter(Boolean).join(', ')
                               : <span className="italic text-gray-400">No specifications</span>
                             }
@@ -1476,8 +1476,20 @@ export default function UnitTrackingPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[10px] font-black text-gray-400 uppercase">Product:</span>
-                    <span className="text-sm font-bold text-gray-900 text-right">{viewingLog.item.name || 'Unnamed Asset'}</span>
+                    <span className="text-sm font-bold text-gray-900 text-right">{viewingLog.item.name || viewingLog.item.product?.name || 'Unnamed Asset'}</span>
                   </div>
+                  {viewingLog.item.fieldValues && viewingLog.item.fieldValues.length > 0 && (
+                    <div className="flex justify-between items-start">
+                      <span className="text-[10px] font-black text-gray-400 uppercase mt-0.5">Specs:</span>
+                      <span className="text-xs font-bold text-gray-600 text-right max-w-[200px]">
+                        {viewingLog.item.fieldValues.map((fv: any) => {
+                          const v = fv.value;
+                          const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+                          return val ? `${fv.field?.name || 'Spec'}: ${val}` : '';
+                        }).filter(Boolean).join(', ')}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-[10px] font-black text-gray-400 uppercase">Release Qty:</span>
                     <span className="text-sm font-black text-gray-900">{viewingLog.qty}</span>
