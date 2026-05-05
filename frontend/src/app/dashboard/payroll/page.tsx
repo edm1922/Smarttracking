@@ -55,6 +55,7 @@ export default function IntegratedPayrollAdmin() {
   const [fieldMapping, setFieldMapping] = useState<Record<string, number>>({});
   const [clientLabel, setClientLabel] = useState('');
   const [parsingHeaders, setParsingHeaders] = useState(false);
+  const [availableHeaders, setAvailableHeaders] = useState<any[]>([]);
 
   const systemFields = [
     { key: 'sys_id', label: 'Employee ID', required: true },
