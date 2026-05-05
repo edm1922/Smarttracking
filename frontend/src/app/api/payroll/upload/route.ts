@@ -115,16 +115,16 @@ export async function POST(req: NextRequest) {
       if (!sysId) continue;
 
       // Extract fields based on mapping
-      const basicPay = getVal(row, 'basic_pay');
-      const grossPay = getVal(row, 'gross_pay');
+      const basic_pay = getVal(row, 'basic_pay');
+      const gross_pay = getVal(row, 'gross_pay');
       const allowance = getVal(row, 'allowance');
-      const overtimePay = getVal(row, 'overtime_pay');
+      const overtime_pay = getVal(row, 'overtime_pay');
       const sss = getVal(row, 'sss');
       const phic = getVal(row, 'phic');
       const hdmf = getVal(row, 'hdmf');
       const loans = getVal(row, 'loans');
-      const totalDeductions = getVal(row, 'total_deductions');
-      const netPay = getVal(row, 'net_pay');
+      const total_deductions = getVal(row, 'total_deductions');
+      const net_pay = getVal(row, 'net_pay');
 
       // We can also store extra fields in raw_data if we want
       const rawData: Record<string, any> = {
