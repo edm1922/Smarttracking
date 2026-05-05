@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { 
-  Plus, Search, Box, X, User, ClipboardList, Send, Clock, Trash2, MapPin, CheckCircle
+  Plus, Search, Box, X, User, ClipboardList, Send, Clock, Trash2, MapPin, CheckCircle, Printer
 } from 'lucide-react';
 import api from '@/lib/api';
 import { PageHeaderSkeleton, CardSkeleton } from '@/components/ui/LoadingSkeletons';
@@ -297,10 +297,19 @@ export default function StaffRequisitionPage() {
   }
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
-      <div>
-        <h1 className="text-3xl font-black text-gray-900 tracking-tight">Staff Requisition Portal</h1>
-        <p className="text-sm text-gray-500 font-medium">Browse inventory and build your material request</p>
+    <>
+    <div className="max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500 pb-20 print:hidden">
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Staff Requisition Portal</h1>
+          <p className="text-sm text-gray-500 font-medium">Browse inventory and build your material request</p>
+        </div>
+        <button 
+          onClick={() => window.print()}
+          className="px-6 py-2.5 bg-white border border-gray-200 text-gray-700 hover:text-primary hover:border-primary/30 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm flex items-center gap-2"
+        >
+          <Printer className="h-4 w-4" /> Print Blank Form
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -837,5 +846,93 @@ export default function StaffRequisitionPage() {
       )}
 
     </div>
+
+      {/* PRINT-ONLY BLANK FORM */}
+      <div className="hidden print:block bg-white text-gray-900 p-8 min-h-screen">
+        <div className="text-center mb-8 border-b-4 border-gray-900 pb-6">
+          <h1 className="text-3xl font-black uppercase tracking-tighter text-gray-900 mb-1">Staff Material Requisition Form</h1>
+          <p className="text-sm font-bold text-gray-500 uppercase tracking-widest">Internal Inventory Request Document</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-x-12 gap-y-6 mb-8">
+          <div className="flex items-end gap-4">
+            <span className="text-xs font-black text-gray-600 uppercase tracking-widest w-24">Date:</span>
+            <div className="border-b-2 border-gray-400 flex-1 h-6"></div>
+          </div>
+          <div className="flex items-end gap-4">
+            <span className="text-xs font-black text-gray-600 uppercase tracking-widest w-24">Shift:</span>
+            <div className="border-b-2 border-gray-400 flex-1 h-6"></div>
+          </div>
+          <div className="flex items-end gap-4">
+            <span className="text-xs font-black text-gray-600 uppercase tracking-widest w-32">Dept/Area:</span>
+            <div className="border-b-2 border-gray-400 flex-1 h-6"></div>
+          </div>
+          <div className="flex items-end gap-4">
+            <span className="text-xs font-black text-gray-600 uppercase tracking-widest w-32">Supervisor:</span>
+            <div className="border-b-2 border-gray-400 flex-1 h-6"></div>
+          </div>
+        </div>
+
+        <div className="mb-8">
+          <div className="flex items-start gap-4">
+            <span className="text-xs font-black text-gray-600 uppercase tracking-widest w-32 pt-2">Employee(s):</span>
+            <div className="flex-1 space-y-6">
+              <div className="border-b-2 border-gray-400 w-full h-4"></div>
+              <div className="border-b-2 border-gray-400 w-full h-4"></div>
+              <div className="border-b-2 border-gray-400 w-full h-4"></div>
+            </div>
+          </div>
+        </div>
+
+        <table className="w-full border-collapse border-2 border-gray-900 mb-8">
+          <thead>
+            <tr className="border-b-2 border-gray-900 bg-gray-100">
+              <th className="py-3 px-4 border-r-2 border-gray-900 text-left text-[10px] font-black uppercase tracking-widest w-12 text-center">No.</th>
+              <th className="py-3 px-4 border-r-2 border-gray-900 text-left text-[10px] font-black uppercase tracking-widest">Item Description / SKU</th>
+              <th className="py-3 px-4 border-r-2 border-gray-900 text-center text-[10px] font-black uppercase tracking-widest w-32">Quantity</th>
+              <th className="py-3 px-4 text-left text-[10px] font-black uppercase tracking-widest">Remarks</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...Array(18)].map((_, i) => (
+              <tr key={i} className="border-b border-gray-400">
+                <td className="py-5 px-4 border-r-2 border-gray-900 text-center text-xs font-black text-gray-400">{i + 1}</td>
+                <td className="py-5 px-4 border-r-2 border-gray-900"></td>
+                <td className="py-5 px-4 border-r-2 border-gray-900"></td>
+                <td className="py-5 px-4"></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <div className="mb-12">
+          <span className="text-xs font-black text-gray-600 uppercase tracking-widest mb-2 block">General Remarks:</span>
+          <div className="border-2 border-gray-400 w-full h-24 rounded-lg"></div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-8 pt-6">
+          <div className="space-y-8">
+            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Requested By:</div>
+            <div className="border-b-2 border-gray-900"></div>
+            <div className="text-center text-[8px] font-bold text-gray-400 uppercase italic tracking-tighter">Signature - Date</div>
+          </div>
+          <div className="space-y-8">
+            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Approved By (Supervisor):</div>
+            <div className="border-b-2 border-gray-900"></div>
+            <div className="text-center text-[8px] font-bold text-gray-400 uppercase italic tracking-tighter">Signature - Date</div>
+          </div>
+          <div className="space-y-8">
+            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Released By (Inv. Manager):</div>
+            <div className="border-b-2 border-gray-900"></div>
+            <div className="text-center text-[8px] font-bold text-gray-400 uppercase italic tracking-tighter">Signature - Date</div>
+          </div>
+          <div className="space-y-8">
+            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Received By (Employee):</div>
+            <div className="border-b-2 border-gray-900"></div>
+            <div className="text-center text-[8px] font-bold text-gray-400 uppercase italic tracking-tighter">Signature - Date</div>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
