@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { PDFDocument } from 'pdf-lib';
-import pdf from 'pdf-parse';
+const pdf = require('pdf-parse');
 
 export async function POST(req: NextRequest) {
   try {
