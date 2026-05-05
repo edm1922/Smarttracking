@@ -13,13 +13,12 @@ export async function POST(req: NextRequest) {
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: 'buffer' });
     
-    // Discovery: Return info about all sheets
     const sheets = workbook.SheetNames.map(name => {
       const worksheet = workbook.Sheets[name];
       const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
       
-      // Find a likely header row for this specific sheet
-      const keywords = ['sys id', 'employee id', 'emp name', 'full name', 'basic pay', 'net pay', 'gross pay'];
+      // Discovery: Find the best header candidate for this sheet
+      const keywords = ['sys id', 'employee id', 'id', 'full name', 'name', 'basic pay', 'net pay'];
       let suggestedHeaderIndex = 0;
       let maxScore = -1;
 
@@ -32,10 +31,19 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // Pre-process headers with column letters for easy mapping
+      const rawHeaders = rows[suggestedHeaderIndex] || [];
+      const headers = rawHeaders.map((h, idx) => ({
+        index: idx,
+        name: String(h || `Column ${idx + 1}`).trim(),
+        letter: getColLetter(idx)
+      }));
+
       return {
         name,
         rowCount: rows.length,
-        preview: rows.slice(0, 50), // Send 50 rows for a better visual grid
+        preview: rows.slice(0, 30), // First 30 rows for preview
+        headers,
         suggestedHeaderIndex
       };
     });
@@ -49,4 +57,14 @@ export async function POST(req: NextRequest) {
     console.error('Discovery Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+}
+
+function getColLetter(index: number) {
+  let letter = "";
+  let i = index;
+  while (i >= 0) {
+    letter = String.fromCharCode((i % 26) + 65) + letter;
+    i = Math.floor(i / 26) - 1;
+  }
+  return letter;
 }
