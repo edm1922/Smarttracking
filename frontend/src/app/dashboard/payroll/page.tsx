@@ -423,7 +423,7 @@ export default function IntegratedPayrollAdmin() {
         </AnimatePresence>
 
         <AnimatePresence mode="wait">
-        {activeTab === 'records' ? (
+          {activeTab === 'records' && (
           <motion.div 
             key="records"
             initial={{ opacity: 0, x: -20 }}
@@ -608,7 +608,9 @@ export default function IntegratedPayrollAdmin() {
               </div>
             </div>
           </motion.div>
-        ) : activeTab === 'formats' ? (
+        )}
+
+        {activeTab === 'formats' && (
           <motion.div 
             key="formats"
             initial={{ opacity: 0, y: 20 }}
@@ -762,7 +764,9 @@ export default function IntegratedPayrollAdmin() {
               </div>
             </div>
           </motion.div>
-        ) : (
+        )}
+
+        {activeTab === 'credentials' && (
           <motion.div 
             key="credentials"
             initial={{ opacity: 0, x: 20 }}
