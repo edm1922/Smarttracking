@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     for (const line of lines) {
       // Regex to match "ID Name" pattern (e.g. CSC-1001 Juan Dela Cruz)
       // Matches CSC- followed by digits, then a space, then everything else as the name
-      const match = line.match(/^(CSC-\d+)\s+(.+)$/i);
+      const match = line.match(/^(CSC-[\d-]+)\s+(.+)$/i);
       
       if (match) {
         const sys_id = match[1].toUpperCase();
@@ -28,7 +28,9 @@ export async function POST(req: NextRequest) {
         
         // Generate a standard username and password
         const username = sys_id.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const password = `Welcome${sys_id.split('-')[1] || '2026'}!`;
+        const idParts = sys_id.split('-');
+        const lastPart = idParts[idParts.length - 1];
+        const password = `Welcome${lastPart || '2026'}!`;
 
         await prisma.user.upsert({
           where: { sys_id },
