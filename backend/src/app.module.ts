@@ -18,6 +18,7 @@ import { StaffInventoryModule } from './staff-inventory/staff-inventory.module';
 
 import { ReportsModule } from './reports/reports.module';
 import { SystemAnalyticsModule } from './system-analytics/system-analytics.module';
+import { PayrollModule } from './payroll/payroll.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { TrafficInterceptor } from './common/interceptors/traffic.interceptor';
 
@@ -44,6 +45,7 @@ import { TrafficInterceptor } from './common/interceptors/traffic.interceptor';
 
     ReportsModule,
     SystemAnalyticsModule,
+    PayrollModule,
   ],
   controllers: [AppController],
   providers: [
