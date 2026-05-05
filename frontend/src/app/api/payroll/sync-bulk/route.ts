@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { randomUUID } from 'crypto';
 
 export async function POST(req: NextRequest) {
   try {
+    console.log('--- START BULK SYNC ---');
     const { text } = await req.json();
 
     if (!text) {
@@ -10,19 +12,18 @@ export async function POST(req: NextRequest) {
     }
 
     const lines = text.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0);
+    console.log(`Processing ${lines.length} lines`);
     
     let count = 0;
     const errors = [];
 
     for (const line of lines) {
-      // Regex to match "ID Name" pattern (e.g. CSC-2026-2268 VENTURA, CARL VENCENT DAISOG)
       const match = line.match(/^(CSC-[\d-]+)\s+(.+)$/i);
       
       if (match) {
         const sys_id = match[1].toUpperCase();
         const fullName = match[2].trim();
         
-        // --- 1. GENERATE USERNAME & PASSWORD ---
         const nameParts = fullName.split(',').map((p: string) => p.trim());
         const lastName = nameParts[0] || '';
         const firstName = nameParts[1] || '';
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
         const password = sys_id;
 
         try {
-          // --- 2. UPSERT INTO PUBLIC SCHEMA ONLY ---
+          console.log(`Upserting User: ${sys_id} (${username})`);
           await prisma.user.upsert({
             where: { sys_id },
             update: { 
@@ -50,14 +51,14 @@ export async function POST(req: NextRequest) {
             }
           });
 
-          // Sync profiles for compatibility
+          console.log(`Upserting Profile: ${sys_id}`);
           await prisma.profiles.upsert({
             where: { sys_id },
             update: { 
               full_name: fullName
             },
             create: {
-              id: crypto.randomUUID(), // New UUID since we aren't using Auth IDs
+              id: randomUUID(),
               sys_id,
               full_name: fullName,
               role: 'employee'
@@ -69,18 +70,21 @@ export async function POST(req: NextRequest) {
           console.error(`Error syncing user ${sys_id}:`, err.message);
           errors.push(`${sys_id}: ${err.message}`);
         }
+      } else {
+        console.warn(`Line skipped (no match): ${line}`);
       }
     }
 
+    console.log(`--- BULK SYNC COMPLETE. Success: ${count}, Errors: ${errors.length} ---`);
     return NextResponse.json({
       success: true,
       count,
       errors: errors.length > 0 ? errors : undefined,
-      message: `Successfully provisioned ${count} accounts in the User table.`
+      message: `Successfully provisioned ${count} accounts.`
     });
 
   } catch (error: any) {
-    console.error('Bulk Sync Global Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('CRITICAL Bulk Sync Error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }
