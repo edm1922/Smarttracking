@@ -849,6 +849,11 @@ export default function StaffRequisitionPage() {
 
       {/* PRINT-ONLY BLANK FORM */}
       <div className="hidden print:block bg-white text-gray-900 p-8 min-h-screen">
+        <style>{`
+          @media print {
+            @page { size: landscape; margin: 10mm; }
+          }
+        `}</style>
         <div className="text-center mb-8 border-b-4 border-gray-900 pb-6">
           <h1 className="text-3xl font-black uppercase tracking-tighter text-gray-900 mb-1">Staff Material Requisition Form</h1>
           <p className="text-sm font-bold text-gray-500 uppercase tracking-widest">Internal Inventory Request Document</p>
@@ -873,21 +878,13 @@ export default function StaffRequisitionPage() {
           </div>
         </div>
 
-        <div className="mb-8">
-          <div className="flex items-start gap-4">
-            <span className="text-xs font-black text-gray-600 uppercase tracking-widest w-32 pt-2">Employee(s):</span>
-            <div className="flex-1 space-y-6">
-              <div className="border-b-2 border-gray-400 w-full h-4"></div>
-              <div className="border-b-2 border-gray-400 w-full h-4"></div>
-              <div className="border-b-2 border-gray-400 w-full h-4"></div>
-            </div>
-          </div>
-        </div>
+
 
         <table className="w-full border-collapse border-2 border-gray-900 mb-8">
           <thead>
             <tr className="border-b-2 border-gray-900 bg-gray-100">
               <th className="py-3 px-4 border-r-2 border-gray-900 text-left text-[10px] font-black uppercase tracking-widest w-12 text-center">No.</th>
+              <th className="py-3 px-4 border-r-2 border-gray-900 text-left text-[10px] font-black uppercase tracking-widest w-64">Employee Name</th>
               <th className="py-3 px-4 border-r-2 border-gray-900 text-left text-[10px] font-black uppercase tracking-widest">Item Description / SKU</th>
               <th className="py-3 px-4 border-r-2 border-gray-900 text-center text-[10px] font-black uppercase tracking-widest w-32">Quantity</th>
               <th className="py-3 px-4 text-left text-[10px] font-black uppercase tracking-widest">Remarks</th>
@@ -897,6 +894,7 @@ export default function StaffRequisitionPage() {
             {[...Array(18)].map((_, i) => (
               <tr key={i} className="border-b border-gray-400">
                 <td className="py-5 px-4 border-r-2 border-gray-900 text-center text-xs font-black text-gray-400">{i + 1}</td>
+                <td className="py-5 px-4 border-r-2 border-gray-900"></td>
                 <td className="py-5 px-4 border-r-2 border-gray-900"></td>
                 <td className="py-5 px-4 border-r-2 border-gray-900"></td>
                 <td className="py-5 px-4"></td>
