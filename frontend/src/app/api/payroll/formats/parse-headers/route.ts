@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       return {
         name,
         rowCount: rows.length,
-        preview: rows.slice(0, 15), // Send first 15 rows for UI preview
+        preview: rows.slice(0, 50), // Send 50 rows for a better visual grid
         suggestedHeaderIndex
       };
     });

@@ -63,6 +63,16 @@ export default function IntegratedPayrollAdmin() {
   const [headerRowIndex, setHeaderRowIndex] = useState(0);
   const [fieldMapping, setFieldMapping] = useState<Record<string, number>>({});
 
+  const getColLetter = (index: number) => {
+    let letter = "";
+    let i = index;
+    while (i >= 0) {
+      letter = String.fromCharCode((i % 26) + 65) + letter;
+      i = Math.floor(i / 26) - 1;
+    }
+    return letter;
+  };
+
   const systemFields = [
     { key: 'sys_id', label: 'Employee ID (Sys ID)', required: true },
     { key: 'full_name', label: 'Full Name', required: true },
@@ -724,8 +734,23 @@ export default function IntegratedPayrollAdmin() {
                           <div className="overflow-x-auto">
                             <table className="w-full text-[10px] font-medium text-gray-500">
                               <tbody className="divide-y divide-gray-200">
-                                {discoveryData.sheets[selectedSheetIndex].preview.slice(0, 10).map((row, rIdx) => (
-                                  <tr key={rIdx} className={rIdx === discoveryData.sheets[selectedSheetIndex].suggestedHeaderIndex ? 'bg-purple-100/50' : ''}>
+                                {discoveryData.sheets[selectedSheetIndex].preview.slice(0, 20).map((row, rIdx) => (
+                                  <tr 
+                                    key={rIdx} 
+                                    onClick={() => {
+                                      const sheet = discoveryData.sheets[selectedSheetIndex];
+                                      sheet.suggestedHeaderIndex = rIdx;
+                                      setDiscoveryData({...discoveryData});
+                                    }}
+                                    className={`cursor-pointer transition-colors ${
+                                      rIdx === discoveryData.sheets[selectedSheetIndex].suggestedHeaderIndex 
+                                        ? 'bg-purple-100 border-2 border-purple-500' 
+                                        : 'hover:bg-gray-100'
+                                    }`}
+                                  >
+                                    <td className="px-2 py-1 bg-gray-100 text-[8px] font-bold text-gray-400 text-center border-r border-gray-200">
+                                      {rIdx + 1}
+                                    </td>
                                     {row.map((cell, cIdx) => (
                                       <td key={cIdx} className="px-3 py-2 whitespace-nowrap border-r border-gray-100 last:border-0">
                                         {String(cell || '')}
@@ -737,6 +762,9 @@ export default function IntegratedPayrollAdmin() {
                             </table>
                           </div>
                         </div>
+                        <p className="text-[10px] font-bold text-gray-400 italic">
+                          Click any row above to set it as the Header Row (highlighted in purple).
+                        </p>
                       </div>
                     )}
 
@@ -783,11 +811,13 @@ export default function IntegratedPayrollAdmin() {
                           <select 
                             value={fieldMapping[field.key] ?? ''}
                             onChange={(e) => setFieldMapping({...fieldMapping, [field.key]: parseInt(e.target.value)})}
-                            className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary/20 outline-none font-bold text-gray-700"
+                            className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary/20 outline-none font-bold text-gray-700 appearance-none"
                           >
                             <option value="">Select Column...</option>
                             {(availableHeaders || []).map((h: any) => (
-                              <option key={h.index} value={h.index}>{h.name}</option>
+                              <option key={h.index} value={h.index}>
+                                [{getColLetter(h.index)}] {h.name.substring(0, 30)}
+                              </option>
                             ))}
                           </select>
                         </div>
