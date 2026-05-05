@@ -234,18 +234,18 @@ export default function IntegratedPayrollAdmin() {
         body: formData,
       });
       const data = await res.json();
-      if (res.ok) {
-        setAvailableHeaders(data.headers);
-        setHeaderRowIndex(data.headerRowIndex);
-        setFieldMapping(data.mapping || {}); // Apply autonomous mapping from backend
+      if (res.ok && data) {
+        setAvailableHeaders(data.headers || []);
+        setHeaderRowIndex(data.headerRowIndex ?? -1);
+        setFieldMapping(data.mapping || {}); 
         setShowMappingUI(true);
         const detectedCount = Object.keys(data.mapping || {}).length;
         setStatus({ 
           type: 'success', 
-          message: `Autonomous scan complete! Detected ${detectedCount} fields automatically. You can review them below.` 
+          message: `Autonomous scan complete! Identified ${detectedCount} fields in "${data.sheetName || 'Sheet1'}".` 
         });
       } else {
-        throw new Error(data.error);
+        throw new Error(data?.error || 'Failed to analyze template');
       }
     } catch (err: any) {
       setStatus({ type: 'error', message: err.message });
@@ -398,7 +398,31 @@ export default function IntegratedPayrollAdmin() {
         </div>
       </div>
 
-      <AnimatePresence mode="wait">
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto">
+        {/* Universal Status Indicator */}
+        <AnimatePresence>
+          {status && (
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={`p-4 rounded-[2rem] border mb-8 flex items-center gap-4 shadow-xl shadow-gray-200/50 ${
+                status.type === 'success' ? 'bg-green-50 border-green-100 text-green-700' : 'bg-red-50 border-red-100 text-red-700'
+              }`}
+            >
+              <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${
+                status.type === 'success' ? 'bg-green-100' : 'bg-red-100'
+              }`}>
+                {status.type === 'success' ? <CheckCircle2 className="h-6 w-6" /> : <AlertCircle className="h-6 w-6" />}
+              </div>
+              <p className="text-sm font-black tracking-tight">{status.message}</p>
+              <button onClick={() => setStatus(null)} className="ml-auto text-[10px] font-black uppercase opacity-50 hover:opacity-100 tracking-widest">Dismiss</button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence mode="wait">
         {activeTab === 'records' ? (
           <motion.div 
             key="records"
