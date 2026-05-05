@@ -22,6 +22,9 @@ export async function POST(req: NextRequest) {
       const worksheet = workbook.Sheets[name];
       const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
       
+      // Skip very empty sheets
+      if (rows.length < 5) continue;
+
       for (let i = 0; i < Math.min(rows.length, 50); i++) {
         const row = rows[i];
         if (!row || !Array.isArray(row)) continue;
@@ -30,19 +33,30 @@ export async function POST(req: NextRequest) {
         // Count how many keywords this row contains
         let score = keywords.reduce((acc, k) => acc + (rowString.includes(k) ? 1 : 0), 0);
         
+        // Bonus for actual data volume (Payroll sheets are long, summaries are short)
+        if (rows.length > 50) score += 10;
+        if (rows.length > 200) score += 20;
+
+        // Penalty for very short sheets (likely summaries)
+        if (rows.length < 25) score -= 15;
+
         // Massive bonus if the sheet name contains "payroll"
         if (name.toLowerCase().includes('payroll')) {
-          score += 20;
+          score += 30;
         }
 
         // Penalty for summary/variance sheets
         if (name.toLowerCase().includes('summary') || name.toLowerCase().includes('variance')) {
-          score -= 10;
+          score -= 40;
         }
         
+        // Check for row diversity (Payroll rows have a mix of text and numbers)
+        const hasText = row.some(cell => typeof cell === 'string' && cell.length > 3);
+        const hasNumbers = row.some(cell => typeof cell === 'number' || (!isNaN(parseFloat(String(cell))) && String(cell).includes('.')));
+        if (hasText && hasNumbers) score += 5;
+
         // If this row/sheet is better than anything we've seen, remember it
-        // Or if score is the same, pick the one with "payroll" in name
-        if (score > bestSheet.score || (score === bestSheet.score && name.toLowerCase().includes('payroll') && !bestSheet.name.toLowerCase().includes('payroll'))) {
+        if (score > bestSheet.score || (score === bestSheet.score && rows.length > bestSheet.rows.length)) {
           bestSheet = { name, rows, headerIndex: i, score };
         }
       }
