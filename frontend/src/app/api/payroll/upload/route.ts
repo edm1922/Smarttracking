@@ -1,9 +1,8 @@
-// v2.1: Final PDF reader fix
+// v2.2: Use Supabase Storage for Vercel compatibility
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
 import { PDFDocument } from 'pdf-lib';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 // Import pdfreader (Pure JS)
 const { PdfReader } = require("pdfreader");
@@ -44,10 +43,6 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    // 2. Prepare upload directory
-    const uploadDir = join(process.cwd(), 'public', 'uploads', 'documents', batch.id);
-    await mkdir(uploadDir, { recursive: true });
-
     let successCount = 0;
     const errors = [];
 
@@ -65,13 +60,11 @@ export async function POST(req: NextRequest) {
 
         // SCAN PAGES TO IDENTIFY EMPLOYEES
         for (let i = 0; i < pageCount; i++) {
-          // Create a single-page PDF to extract text from
           const subDoc = await PDFDocument.create();
           const [page] = await subDoc.copyPages(mainPdfDoc, [i]);
           subDoc.addPage(page);
           const subBytes = await subDoc.save();
           
-          // Get text using pdfreader (Pure JS)
           const text = await getPageText(Buffer.from(subBytes));
 
           // Find CSC- ID
@@ -82,7 +75,7 @@ export async function POST(req: NextRequest) {
           employeePages[sys_id].push(i);
         }
 
-        // GENERATE PDFs FOR EACH EMPLOYEE
+        // GENERATE PDFs AND UPLOAD TO SUPABASE
         for (const [sys_id, pageIndices] of Object.entries(employeePages)) {
           const newPdf = await PDFDocument.create();
           const copiedPages = await newPdf.copyPages(mainPdfDoc, pageIndices);
@@ -90,10 +83,22 @@ export async function POST(req: NextRequest) {
           
           const newBytes = await newPdf.save();
           const fileName = `${sys_id}_${batch.id}_${Math.random().toString(36).substring(7)}.pdf`;
-          const filePath = join(uploadDir, fileName);
-          const relativePath = `/uploads/documents/${batch.id}/${fileName}`;
+          const storagePath = `documents/${batch.id}/${fileName}`;
 
-          await writeFile(filePath, Buffer.from(newBytes));
+          // UPLOAD TO SUPABASE STORAGE
+          const { error: uploadError } = await supabaseAdmin.storage
+            .from('payroll-documents')
+            .upload(storagePath, Buffer.from(newBytes), {
+              contentType: 'application/pdf',
+              upsert: true
+            });
+
+          if (uploadError) throw new Error(`Supabase Upload Error: ${uploadError.message}`);
+
+          // Get Public URL
+          const { data: { publicUrl } } = supabaseAdmin.storage
+            .from('payroll-documents')
+            .getPublicUrl(storagePath);
 
           // Find corresponding User
           let userId = null;
@@ -108,7 +113,7 @@ export async function POST(req: NextRequest) {
               sys_id: sys_id,
               user_id: userId,
               file_name: fileName,
-              storage_path: relativePath,
+              storage_path: publicUrl, // Store the public URL
               file_type: 'PDF'
             }
           });
