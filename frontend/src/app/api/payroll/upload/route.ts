@@ -1,3 +1,4 @@
+// v2.1: Final PDF reader fix
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { writeFile, mkdir } from 'fs/promises';
