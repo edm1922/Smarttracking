@@ -77,9 +77,14 @@ export default function IntegratedPayrollAdmin() {
     try {
       const res = await fetch('/api/payroll/formats');
       const data = await res.json();
-      if (res.ok) setFormats(data);
+      if (res.ok && Array.isArray(data)) {
+        setFormats(data);
+      } else {
+        setFormats([]);
+      }
     } catch (err) {
       console.error('Failed to fetch formats:', err);
+      setFormats([]);
     } finally {
       setLoadingFormats(false);
     }
@@ -90,9 +95,14 @@ export default function IntegratedPayrollAdmin() {
     try {
       const res = await fetch('/api/payroll/runs');
       const data = await res.json();
-      if (res.ok) setRuns(data);
+      if (res.ok && Array.isArray(data)) {
+        setRuns(data);
+      } else {
+        setRuns([]);
+      }
     } catch (err) {
       console.error('Failed to fetch runs:', err);
+      setRuns([]);
     } finally {
       setLoadingRuns(false);
     }
@@ -331,8 +341,8 @@ export default function IntegratedPayrollAdmin() {
     }
   };
 
-  const filteredUsers = users.filter(user => {
-    const search = searchTerm.toLowerCase();
+  const filteredUsers = (users || []).filter(user => {
+    const search = (searchTerm || '').toLowerCase();
     const matchesSearch = (
       user.fullName?.toLowerCase().includes(search) ||
       user.sys_id?.toLowerCase().includes(search) ||
@@ -341,8 +351,8 @@ export default function IntegratedPayrollAdmin() {
 
     if (selectedCredentialLabel === 'all') return matchesSearch;
 
-    const runIdsWithLabel = runs
-      .filter(r => (r.label || 'General') === selectedCredentialLabel)
+    const runIdsWithLabel = (runs || [])
+      .filter(r => (r?.label || 'General') === selectedCredentialLabel)
       .map(r => r.id);
     
     const hasEntryInSelectedRun = user.run_ids?.some((runId: any) => 
