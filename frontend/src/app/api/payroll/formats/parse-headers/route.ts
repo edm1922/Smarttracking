@@ -34,9 +34,15 @@ export async function POST(req: NextRequest) {
         if (name.toLowerCase().includes('payroll')) {
           score += 20;
         }
+
+        // Penalty for summary/variance sheets
+        if (name.toLowerCase().includes('summary') || name.toLowerCase().includes('variance')) {
+          score -= 10;
+        }
         
         // If this row/sheet is better than anything we've seen, remember it
-        if (score > bestSheet.score) {
+        // Or if score is the same, pick the one with "payroll" in name
+        if (score > bestSheet.score || (score === bestSheet.score && name.toLowerCase().includes('payroll') && !bestSheet.name.toLowerCase().includes('payroll'))) {
           bestSheet = { name, rows, headerIndex: i, score };
         }
       }
@@ -91,17 +97,20 @@ export async function POST(req: NextRequest) {
 
         // Try fuzzy match
         if (keywords.some(k => name.includes(k))) {
-          // Verify with data scan if it's a numeric field
-          if (['basic_pay', 'gross_pay', 'net_pay', 'total_deductions'].includes(key)) {
-            const hasNumbers = dataRows.some(row => {
-              const val = String(row[h.index] || '');
-              return val && !isNaN(parseFloat(val.replace(/,/g, '')));
-            });
+          // Verify with data scan
+          const colData = dataRows.map(row => String(row[h.index] || '').trim()).filter(Boolean);
+          
+          if (['basic_pay', 'gross_pay', 'net_pay', 'total_deductions', 'overtime_pay', 'allowance', 'sss', 'phic', 'hdmf', 'loans'].includes(key)) {
+            const hasNumbers = colData.some(val => !isNaN(parseFloat(val.replace(/,/g, ''))));
             if (hasNumbers) mapping[key] = h.index;
           } else if (key === 'sys_id') {
              // Look for CSC- or similar patterns in data
-             const hasIdPattern = dataRows.some(row => String(row[h.index] || '').includes('CSC-'));
+             const hasIdPattern = colData.some(val => val.includes('CSC-') || /^\d+$/.test(val));
              if (hasIdPattern) mapping[key] = h.index;
+          } else if (key === 'full_name') {
+             // For names, ensure it's NOT numeric and has some length
+             const isProbablyName = colData.some(val => isNaN(parseFloat(val)) && val.length > 3);
+             if (isProbablyName) mapping[key] = h.index;
           } else {
             mapping[key] = h.index;
           }
