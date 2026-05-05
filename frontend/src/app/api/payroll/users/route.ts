@@ -27,7 +27,8 @@ export async function GET(req: NextRequest) {
       fullName: user.fullName,
       sys_id: user.sys_id,
       password: user.password,
-      run_ids: user.documents.map(d => d.batch_id), // Map documents to "runs" for frontend compatibility
+      role: user.role,
+      run_ids: user.documents.map(d => d.batch_id),
       createdAt: user.createdAt,
     })));
   } catch (error: any) {
