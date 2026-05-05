@@ -427,7 +427,7 @@ export default function IntegratedPayrollAdmin() {
                       className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none font-bold text-gray-600"
                     >
                       <option value="">Select Format...</option>
-                      {formats.map(f => (
+                      {(formats || []).map(f => (
                         <option key={f.id} value={f.id}>{f.client_name}</option>
                       ))}
                     </select>
@@ -517,12 +517,12 @@ export default function IntegratedPayrollAdmin() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {loadingRuns && runs.length === 0 ? (
+                      {loadingRuns && (runs || []).length === 0 ? (
                         <tr><td colSpan={4} className="px-8 py-10 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" /></td></tr>
-                      ) : runs.length === 0 ? (
+                      ) : (runs || []).length === 0 ? (
                         <tr><td colSpan={4} className="px-8 py-10 text-center text-gray-400 text-sm font-medium">No payroll runs found.</td></tr>
                       ) : (
-                        runs.map((run) => (
+                        (runs || []).map((run) => (
                           <tr key={run.id} className="hover:bg-gray-50/50 transition-colors">
                             <td className="px-8 py-5">
                               <p className="text-xs font-black text-gray-900">{new Date(run.created_at).toLocaleDateString()}</p>
@@ -652,7 +652,7 @@ export default function IntegratedPayrollAdmin() {
                             className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary/20 outline-none"
                           >
                             <option value="">Select Column...</option>
-                            {availableHeaders.map((h: any) => (
+                            {(availableHeaders || []).map((h: any) => (
                               <option key={h.index} value={h.index}>{h.name}</option>
                             ))}
                           </select>
@@ -691,10 +691,10 @@ export default function IntegratedPayrollAdmin() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {formats.length === 0 ? (
+                      {(formats || []).length === 0 ? (
                         <tr><td colSpan={4} className="px-8 py-10 text-center text-gray-400 text-sm">No formats defined.</td></tr>
                       ) : (
-                        formats.map((f) => (
+                        (formats || []).map((f) => (
                           <tr key={f.id} className="hover:bg-gray-50/50 transition-colors">
                             <td className="px-8 py-5">
                               <p className="text-xs font-black text-gray-900">{f.client_name}</p>
