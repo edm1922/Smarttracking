@@ -50,13 +50,18 @@ export default function IntegratedPayrollAdmin() {
   const [payrollDate, setPayrollDate] = useState('');
   const [loadingFormats, setLoadingFormats] = useState(false);
 
-  // Format Creation State
+  // Wizard Creation State
+  const [wizardStep, setWizardStep] = useState<'upload' | 'sheets' | 'mapping'>('upload');
+  const [discoveryData, setDiscoveryData] = useState<{
+    sheets: { name: string; rowCount: number; preview: any[][]; suggestedHeaderIndex: number }[];
+  } | null>(null);
+  const [selectedSheetIndex, setSelectedSheetIndex] = useState<number>(0);
+  
   const [parsingHeaders, setParsingHeaders] = useState(false);
   const [availableHeaders, setAvailableHeaders] = useState<any[]>([]);
   const [newFormatName, setNewFormatName] = useState('');
   const [headerRowIndex, setHeaderRowIndex] = useState(0);
   const [fieldMapping, setFieldMapping] = useState<Record<string, number>>({});
-  const [showMappingUI, setShowMappingUI] = useState(false);
 
   const systemFields = [
     { key: 'sys_id', label: 'Employee ID (Sys ID)', required: true },
@@ -236,15 +241,12 @@ export default function IntegratedPayrollAdmin() {
       });
       const data = await res.json();
       if (res.ok && data) {
-        setAvailableHeaders(data.headers || []);
-        setHeaderRowIndex(data.headerRowIndex ?? -1);
-        setFieldMapping(data.mapping || {}); 
-        setShowMappingUI(true);
-        const detectedCount = Object.keys(data.mapping || {}).length;
-        setStatus({ 
-          type: 'success', 
-          message: `Autonomous scan complete! Identified ${detectedCount} fields in "${data.sheetName || 'Sheet1'}".` 
-        });
+        setDiscoveryData(data);
+        setWizardStep('sheets');
+        // Pre-select sheet with most rows
+        const bestIdx = (data.sheets || []).reduce((best: number, curr: any, idx: number) => 
+          curr.rowCount > (data.sheets[best]?.rowCount || 0) ? idx : best, 0);
+        setSelectedSheetIndex(bestIdx);
       } else {
         throw new Error(data?.error || 'Failed to analyze template');
       }
@@ -256,6 +258,40 @@ export default function IntegratedPayrollAdmin() {
     }
   };
 
+  const confirmSheet = () => {
+    if (!discoveryData || !discoveryData.sheets[selectedSheetIndex]) return;
+    const sheet = discoveryData.sheets[selectedSheetIndex];
+    const rawHeaders = sheet.preview[sheet.suggestedHeaderIndex] || [];
+    
+    setAvailableHeaders(rawHeaders.map((h: any, i: number) => ({ 
+      name: String(h || `Column ${i + 1}`), 
+      index: i 
+    })));
+    setHeaderRowIndex(sheet.suggestedHeaderIndex);
+    
+    // Improved Autonomous Mapping Logic for Wizard
+    const newMapping: Record<string, number> = {};
+    const rules: Record<string, string[]> = {
+      sys_id: ['sys id', 'employee id', 'id', 'emp id', 'employee no'],
+      full_name: ['full name', 'employee name', 'emp name', 'name'],
+      basic_pay: ['basic pay', 'monthly rate', 'daily rate'],
+      gross_pay: ['gross pay', 'total earnings'],
+      net_pay: ['net pay', 'take home pay'],
+      total_deductions: ['total deductions']
+    };
+
+    rawHeaders.forEach((h: any, i: number) => {
+      const name = String(h || '').toLowerCase();
+      Object.entries(rules).forEach(([key, keywords]) => {
+        if (keywords.some(k => name.includes(k))) {
+          newMapping[key] = i;
+        }
+      });
+    });
+
+    setFieldMapping(newMapping);
+    setWizardStep('mapping');
+  };
 
   const saveFormat = async () => {
     if (!newFormatName) {
@@ -283,7 +319,7 @@ export default function IntegratedPayrollAdmin() {
       if (res.ok) {
         setStatus({ type: 'success', message: 'Format saved successfully.' });
         fetchFormats();
-        setShowMappingUI(false);
+        setWizardStep('upload');
         setNewFormatName('');
         setFieldMapping({});
       } else {
@@ -621,7 +657,7 @@ export default function IntegratedPayrollAdmin() {
             className="grid grid-cols-1 lg:grid-cols-3 gap-8"
           >
             <div className="lg:col-span-2 space-y-8">
-              {!showMappingUI ? (
+              {wizardStep === 'upload' ? (
                 <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-sm p-10 flex flex-col items-center justify-center min-h-[400px] text-center">
                   <div className="h-20 w-20 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-6">
                     <LayoutTemplate className="h-10 w-10" />
@@ -645,14 +681,84 @@ export default function IntegratedPayrollAdmin() {
                     />
                   </label>
                 </div>
+              ) : wizardStep === 'sheets' ? (
+                <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-sm overflow-hidden animate-in zoom-in-95 duration-300">
+                  <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                    <div>
+                      <h4 className="text-sm font-black uppercase tracking-widest text-gray-900">Step 1: Select Data Sheet</h4>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">Found {discoveryData?.sheets.length} sheets. Choose the one containing payroll records.</p>
+                    </div>
+                    <button onClick={() => setWizardStep('upload')} className="text-gray-400 hover:text-gray-600 text-xs font-bold">Cancel</button>
+                  </div>
+
+                  <div className="p-8 space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {discoveryData?.sheets.map((sheet, idx) => (
+                        <button 
+                          key={sheet.name}
+                          onClick={() => setSelectedSheetIndex(idx)}
+                          className={`p-6 rounded-[2rem] border text-left transition-all ${
+                            selectedSheetIndex === idx 
+                              ? 'border-purple-500 bg-purple-50 ring-4 ring-purple-500/10' 
+                              : 'border-gray-100 bg-gray-50/50 hover:bg-white hover:border-purple-200'
+                          }`}
+                        >
+                          <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${selectedSheetIndex === idx ? 'text-purple-600' : 'text-gray-400'}`}>
+                            {sheet.rowCount} Records
+                          </p>
+                          <h5 className="text-sm font-black text-gray-900 truncate">{sheet.name}</h5>
+                          <div className={`mt-4 h-1 w-8 rounded-full ${selectedSheetIndex === idx ? 'bg-purple-500' : 'bg-gray-200'}`}></div>
+                        </button>
+                      ))}
+                    </div>
+
+                    {discoveryData?.sheets[selectedSheetIndex] && (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h5 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Data Preview (First 10 rows)</h5>
+                          <span className="text-[10px] font-bold text-purple-600 bg-purple-100 px-2 py-1 rounded-md">
+                            Selected: {discoveryData.sheets[selectedSheetIndex].name}
+                          </span>
+                        </div>
+                        <div className="border border-gray-100 rounded-2xl overflow-hidden bg-gray-50">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-[10px] font-medium text-gray-500">
+                              <tbody className="divide-y divide-gray-200">
+                                {discoveryData.sheets[selectedSheetIndex].preview.slice(0, 10).map((row, rIdx) => (
+                                  <tr key={rIdx} className={rIdx === discoveryData.sheets[selectedSheetIndex].suggestedHeaderIndex ? 'bg-purple-100/50' : ''}>
+                                    {row.map((cell, cIdx) => (
+                                      <td key={cIdx} className="px-3 py-2 whitespace-nowrap border-r border-gray-100 last:border-0">
+                                        {String(cell || '')}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="pt-6 border-t border-gray-100 flex justify-end">
+                      <button 
+                        onClick={confirmSheet}
+                        className="bg-purple-600 text-white px-10 py-4 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-purple-600/20 transition-all active:scale-95 flex items-center gap-3"
+                      >
+                        Next: Map Columns
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               ) : (
                 <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-sm overflow-hidden animate-in zoom-in-95 duration-300">
                   <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
                     <div>
-                      <h4 className="text-sm font-black uppercase tracking-widest text-gray-900">Field Mapping Configuration</h4>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">Define which Excel columns match our system fields</p>
+                      <h4 className="text-sm font-black uppercase tracking-widest text-gray-900">Step 2: Map Columns</h4>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">Sheet: {discoveryData?.sheets[selectedSheetIndex].name}</p>
                     </div>
-                    <button onClick={() => setShowMappingUI(false)} className="text-gray-400 hover:text-gray-600 text-xs font-bold">Cancel</button>
+                    <button onClick={() => setWizardStep('sheets')} className="text-gray-400 hover:text-gray-600 text-xs font-bold">Back</button>
                   </div>
                   
                   <div className="p-8 space-y-6">
@@ -663,27 +769,27 @@ export default function IntegratedPayrollAdmin() {
                         placeholder="e.g. GAISANO"
                         value={newFormatName}
                         onChange={(e) => setNewFormatName(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 font-bold"
                       />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {systemFields.map((field) => (
-                        <div key={field.key} className="space-y-1.5">
-                          <label className="flex items-center gap-2 text-[10px] font-bold text-gray-500 uppercase tracking-tight">
+                        <div key={field.key} className="space-y-1.5 p-4 rounded-2xl bg-gray-50 border border-gray-100">
+                          <label className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest">
                             {field.label}
                             {field.required && <span className="text-red-500">*</span>}
                           </label>
-       <select 
-                         value={fieldMapping[field.key] ?? ''}
-                         onChange={(e) => setFieldMapping({...fieldMapping, [field.key]: parseInt(e.target.value)})}
-                         className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary/20 outline-none"
-                       >
-                         <option value="">Select Column...</option>
-                         {(availableHeaders || []).filter((h: any) => h != null).map((h: any) => (
-                           <option key={h.index} value={h.index}>{h.name}</option>
-                         ))}
-                       </select>
+                          <select 
+                            value={fieldMapping[field.key] ?? ''}
+                            onChange={(e) => setFieldMapping({...fieldMapping, [field.key]: parseInt(e.target.value)})}
+                            className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary/20 outline-none font-bold text-gray-700"
+                          >
+                            <option value="">Select Column...</option>
+                            {(availableHeaders || []).map((h: any) => (
+                              <option key={h.index} value={h.index}>{h.name}</option>
+                            ))}
+                          </select>
                         </div>
                       ))}
                     </div>
@@ -691,10 +797,10 @@ export default function IntegratedPayrollAdmin() {
                     <div className="pt-6 border-t border-gray-100 flex justify-end">
                       <button 
                         onClick={saveFormat}
-                        className="bg-primary text-white px-8 py-3 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-primary-dark transition-all shadow-lg shadow-primary/10"
+                        className="bg-primary text-white px-10 py-4 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-primary/20 transition-all active:scale-95 flex items-center gap-3"
                       >
                         <Save className="h-4 w-4" />
-                        Save Configuration
+                        Complete Setup
                       </button>
                     </div>
                   </div>
