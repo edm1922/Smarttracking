@@ -360,10 +360,10 @@ export default function IntegratedPayrollAdmin() {
                             <select 
                               value={fieldMapping[field.key] ?? ''}
                               onChange={(e) => setFieldMapping({...fieldMapping, [field.key]: parseInt(e.target.value)})}
-                              className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold appearance-none"
+                              className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold appearance-none outline-none focus:ring-2 focus:ring-primary/20"
                             >
                               <option value="">Select Column...</option>
-                              {discoveryData.sheets[selectedSheetIndex].headers.map((h: any) => (
+                              {(availableHeaders || []).map((h: any) => (
                                 <option key={h.index} value={h.index}>[{h.letter}] {h.name}</option>
                               ))}
                             </select>
