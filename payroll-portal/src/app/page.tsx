@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,16 +19,26 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      // Allow entering just the username (e.g. maguale_ed)
-      const lowercaseEmail = email.toLowerCase();
-      const finalEmail = lowercaseEmail.includes('@') ? lowercaseEmail : `${lowercaseEmail}@gaisano.com`;
+      // Query the public User table for matching credentials
+      const { data: user, error: dbError } = await supabase
+        .from('User')
+        .select('*')
+        .eq('username', username.toLowerCase().trim())
+        .eq('password', password.trim())
+        .single();
 
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email: finalEmail,
-        password,
-      });
+      if (dbError || !user) {
+        throw new Error('Invalid username or password.');
+      }
 
-      if (authError) throw authError;
+      // Store user data in localStorage for session management
+      localStorage.setItem('portalUser', JSON.stringify({
+        id: user.id,
+        sys_id: user.sys_id,
+        fullName: user.fullName,
+        username: user.username,
+        role: user.role
+      }));
 
       // Successful login
       router.push('/dashboard');
@@ -41,7 +51,6 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[#020617]">
-      {/* Background Decorative Elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/10 blur-[120px] rounded-full"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-600/10 blur-[120px] rounded-full"></div>
 
@@ -76,17 +85,17 @@ export default function LoginPage() {
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Corporate Email / ID</label>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Portal Username</label>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <User className="h-4 w-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
                   </div>
                   <input
-                    type="email"
+                    type="text"
                     required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="maguale_ed"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="e.g. venturaca"
                     className="w-full bg-slate-900/50 border border-slate-800 text-white text-sm rounded-2xl pl-11 pr-4 py-3.5 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 outline-none transition-all placeholder:text-slate-600"
                   />
                 </div>
@@ -94,7 +103,7 @@ export default function LoginPage() {
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between ml-1">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Temporary Password</label>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Portal Password</label>
                 </div>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -105,7 +114,7 @@ export default function LoginPage() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder="e.g. CSC-2026-2268"
                     className="w-full bg-slate-900/50 border border-slate-800 text-white text-sm rounded-2xl pl-11 pr-4 py-3.5 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 outline-none transition-all placeholder:text-slate-600"
                   />
                 </div>
@@ -127,18 +136,6 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-        </div>
-
-        <div className="mt-8 text-center space-y-4">
-          <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">
-            Protected by Advanced Identity Security
-          </p>
-          <div className="flex items-center justify-center gap-6 grayscale opacity-30 hover:grayscale-0 hover:opacity-100 transition-all duration-500">
-             <div className="flex items-center gap-2">
-               <ShieldCheck className="h-4 w-4 text-emerald-400" />
-               <span className="text-[9px] font-black text-white uppercase tracking-tighter">Verified</span>
-             </div>
-          </div>
         </div>
       </motion.div>
     </main>

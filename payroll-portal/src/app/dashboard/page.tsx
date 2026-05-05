@@ -36,10 +36,17 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function fetchData() {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
+      const storedUser = localStorage.getItem('portalUser');
+      if (!storedUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      const portalUser = JSON.parse(storedUser);
+      setUser(portalUser);
 
-      if (user) {
+      if (portalUser) {
+        // Query payroll entries linked to this sys_id (compatibility mode)
         const { data: entries, error } = await supabase
           .from('payroll_entries')
           .select(`
@@ -52,6 +59,7 @@ export default function Dashboard() {
               payroll_date
             )
           `)
+          .eq('sys_id', portalUser.sys_id) // Match by sys_id
           .order('created_at', { ascending: false });
 
         if (entries) setSlips(entries);
@@ -62,7 +70,7 @@ export default function Dashboard() {
   }, []);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    localStorage.removeItem('portalUser');
     window.location.href = '/';
   };
 
@@ -91,8 +99,8 @@ export default function Dashboard() {
 
           <div className="flex items-center gap-6">
             <div className="hidden md:flex flex-col items-end">
-              <span className="text-xs font-black text-white">{user?.user_metadata?.full_name || 'Employee'}</span>
-              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-tighter">{user?.user_metadata?.sys_id}</span>
+              <span className="text-xs font-black text-white">{user?.fullName || 'Employee'}</span>
+              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-tighter">{user?.sys_id}</span>
             </div>
             <button 
               onClick={handleLogout}
@@ -137,8 +145,8 @@ export default function Dashboard() {
               </h4>
               <div className="space-y-4">
                 {[
-                  { label: 'Department', value: user?.user_metadata?.department || 'N/A' },
-                  { label: 'Employee ID', value: user?.user_metadata?.sys_id },
+                  { label: 'Department', value: 'PAYROLL' },
+                  { label: 'Employee ID', value: user?.sys_id },
                   { label: 'Portal Status', value: 'Verified', color: 'emerald' },
                 ].map((item, i) => (
                   <div key={i} className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,7 +23,6 @@ export async function POST(req: NextRequest) {
         const fullName = match[2].trim();
         
         // --- 1. GENERATE USERNAME & PASSWORD ---
-        // Format: VENTURA, CARL VENCENT DAISOG -> venturaca
         const nameParts = fullName.split(',').map((p: string) => p.trim());
         const lastName = nameParts[0] || '';
         const firstName = nameParts[1] || '';
@@ -32,57 +30,18 @@ export async function POST(req: NextRequest) {
         const cleanFirstTwo = firstName.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 2);
         
         const username = `${cleanLast}${cleanFirstTwo}`;
-        const email = `${username}@gaisano.com`;
-        const password = sys_id; // Password is their System ID
+        const password = sys_id;
 
         try {
-          // --- 2. UPSERT INTO SUPABASE AUTH (Credential Management) ---
-          // Check if user already exists in Auth
-          const { data: { users: existingUsers }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-          const existingUser = existingUsers.find(u => u.email === email);
-
-          let authId;
-
-          if (existingUser) {
-            authId = existingUser.id;
-            // Update metadata and password if needed
-            await supabaseAdmin.auth.admin.updateUserById(authId, {
-              password: password,
-              user_metadata: { 
-                full_name: fullName, 
-                sys_id: sys_id,
-                department: 'PAYROLL' // Default or extracted
-              }
-            });
-          } else {
-            // Create new Auth user
-            const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-              email,
-              password,
-              email_confirm: true,
-              user_metadata: { 
-                full_name: fullName, 
-                sys_id: sys_id,
-                department: 'PAYROLL'
-              }
-            });
-
-            if (createError) throw createError;
-            authId = newUser.user.id;
-          }
-
-          // --- 3. SYNC TO PUBLIC SCHEMA (Relational Management) ---
-          // We use authId to link them to the Auth system
+          // --- 2. UPSERT INTO PUBLIC SCHEMA ONLY ---
           await prisma.user.upsert({
             where: { sys_id },
             update: { 
               fullName, 
               username, 
-              password, // Storing password in public.User for easy admin viewing (per user request)
-              id: authId // Ensure the public ID matches the Auth ID
+              password
             },
             create: {
-              id: authId,
               sys_id,
               fullName,
               username,
@@ -91,15 +50,14 @@ export async function POST(req: NextRequest) {
             }
           });
 
-          // Also update the profiles table if it exists
+          // Sync profiles for compatibility
           await prisma.profiles.upsert({
             where: { sys_id },
             update: { 
-              full_name: fullName,
-              id: authId
+              full_name: fullName
             },
             create: {
-              id: authId,
+              id: crypto.randomUUID(), // New UUID since we aren't using Auth IDs
               sys_id,
               full_name: fullName,
               role: 'employee'
@@ -118,7 +76,7 @@ export async function POST(req: NextRequest) {
       success: true,
       count,
       errors: errors.length > 0 ? errors : undefined,
-      message: `Successfully provisioned ${count} accounts for the Payroll Portal.`
+      message: `Successfully provisioned ${count} accounts in the User table.`
     });
 
   } catch (error: any) {
