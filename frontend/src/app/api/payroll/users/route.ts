@@ -1,83 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Supabase credentials missing (URL or Service Key)');
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
+    const users = await prisma.user.findMany({
+      where: {
+        role: 'EMPLOYEE'
+      },
+      include: {
+        documents: {
+          select: {
+            batch_id: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
       }
     });
-    // Fetch all users with 'staff' role in metadata
-    const { data, error } = await supabaseAdmin.auth.admin.listUsers({
-      perPage: 1000
-    });
-    
-    if (error) throw error;
-    const users = data?.users || [];
 
-    const staffUsers = users.filter((user: any) => user.user_metadata?.role === 'staff');
-
-    // Fetch run associations for these users
-    const sysIds = staffUsers.map((u: any) => u.user_metadata?.sys_id).filter(Boolean);
-    const { data: entries } = await supabaseAdmin
-      .from('payroll_entries')
-      .select('sys_id, payroll_run_id')
-      .in('sys_id', sysIds);
-
-    const userRunMap = new Map();
-    entries?.forEach((e: any) => {
-      if (!userRunMap.has(e.sys_id)) userRunMap.set(e.sys_id, new Set());
-      userRunMap.get(e.sys_id).add(e.payroll_run_id);
-    });
-
-    return NextResponse.json(staffUsers.map((user: any) => {
-      const sysId = user.user_metadata?.sys_id;
-      return {
-        id: user.id,
-        email: user.email,
-        username: user.email?.split('@')[0],
-        fullName: user.user_metadata?.full_name,
-        sys_id: sysId,
-        password: user.user_metadata?.temp_password || sysId,
-        run_ids: Array.from(userRunMap.get(sysId) || []),
-        createdAt: user.created_at,
-        lastSignIn: user.last_sign_in_at
-      };
-    }));
+    return NextResponse.json(users.map(user => ({
+      id: user.id,
+      username: user.username,
+      fullName: user.fullName,
+      sys_id: user.sys_id,
+      password: user.password,
+      run_ids: user.documents.map(d => d.batch_id), // Map documents to "runs" for frontend compatibility
+      createdAt: user.createdAt,
+    })));
   } catch (error: any) {
+    console.error('Fetch Users Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function DELETE(req: NextRequest) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Supabase credentials missing (URL or Service Key)');
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
     const { id } = await req.json();
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
-    if (error) throw error;
+    if (!id) return NextResponse.json({ error: 'Missing user ID' }, { status: 400 });
+
+    await prisma.user.delete({
+      where: { id }
+    });
+
     return NextResponse.json({ success: true });
   } catch (error: any) {
+    console.error('Delete User Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

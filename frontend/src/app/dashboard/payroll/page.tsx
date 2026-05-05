@@ -21,13 +21,14 @@ import {
   Save,
   ChevronDown,
   X,
-  Table as TableIcon
+  Table as TableIcon,
+  LayoutTemplate
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export default function IntegratedPayrollAdmin() {
-  const [activeTab, setActiveTab] = useState<'records' | 'credentials'>('records');
+  const [activeTab, setActiveTab] = useState<'storage' | 'credentials' | 'sync'>('storage');
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   
@@ -43,38 +44,14 @@ export default function IntegratedPayrollAdmin() {
   const [loadingRuns, setLoadingRuns] = useState(false);
   const [periodStart, setPeriodStart] = useState('');
   const [periodEnd, setPeriodEnd] = useState('');
-  const [payrollDate, setPayrollDate] = useState('');
-
-  // Interactive Import State
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [wizardStep, setWizardStep] = useState<'sheets' | 'mapping'>('sheets');
-  const [discoveryData, setDiscoveryData] = useState<any>(null);
-  const [selectedSheetIndex, setSelectedSheetIndex] = useState<number>(0);
-  const [headerRowIndex, setHeaderRowIndex] = useState(0);
-  const [fieldMapping, setFieldMapping] = useState<Record<string, number>>({});
   const [clientLabel, setClientLabel] = useState('');
-  const [parsingHeaders, setParsingHeaders] = useState(false);
-  const [availableHeaders, setAvailableHeaders] = useState<any[]>([]);
 
-  const systemFields = [
-    { key: 'sys_id', label: 'Employee ID', required: true },
-    { key: 'full_name', label: 'Full Name', required: true },
-    { key: 'basic_pay', label: 'Basic Pay', required: true },
-    { key: 'gross_pay', label: 'Gross Pay', required: false },
-    { key: 'net_pay', label: 'Net Pay', required: true },
-    { key: 'total_deductions', label: 'Total Deductions', required: true },
-  ];
+  // Storage UI State
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
-  const getColLetter = (index: number) => {
-    let letter = "";
-    let i = index;
-    while (i >= 0) {
-      letter = String.fromCharCode((i % 26) + 65) + letter;
-      i = Math.floor(i / 26) - 1;
-    }
-    return letter;
-  };
+  // Magic Sync State
+  const [syncText, setSyncText] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const fetchRuns = async () => {
     setLoadingRuns(true);
@@ -118,135 +95,44 @@ export default function IntegratedPayrollAdmin() {
     if (activeTab === 'credentials') fetchUsers();
   }, [activeTab]);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!periodStart || !periodEnd) {
-      setStatus({ type: 'error', message: 'Please provide the payroll period dates first.' });
-      e.target.value = '';
+  const handleBulkSync = async () => {
+    if (!syncText.trim()) {
+      setStatus({ type: 'error', message: 'Please paste the employee list first.' });
       return;
     }
 
-    setParsingHeaders(true);
-    setSelectedFile(file);
+    setIsSyncing(true);
     setStatus(null);
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
-      const res = await fetch('/api/payroll/formats/parse-headers', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (res.ok && data) {
-        setDiscoveryData(data);
-        setWizardStep('sheets');
-        const bestIdx = (data.sheets || []).reduce((best: number, curr: any, idx: number) => 
-          curr.rowCount > (data.sheets[best]?.rowCount || 0) ? idx : best, 0);
-        setSelectedSheetIndex(bestIdx);
-        setIsImportModalOpen(true);
-      } else {
-        throw new Error(data?.error || 'Failed to analyze payroll file');
-      }
-    } catch (err: any) {
-      setStatus({ type: 'error', message: err.message });
-    } finally {
-      setParsingHeaders(false);
-      e.target.value = '';
-    }
-  };
-
-  const confirmSheet = () => {
-    if (!discoveryData || !discoveryData.sheets[selectedSheetIndex]) return;
-    const sheet = discoveryData.sheets[selectedSheetIndex];
-    
-    // Extract headers from the row the user manually selected
-    const rawHeaders = sheet.preview[headerRowIndex] || [];
-    const processedHeaders = rawHeaders.map((h: any, idx: number) => ({
-      index: idx,
-      name: String(h || `Column ${idx + 1}`).trim(),
-      letter: getColLetter(idx)
-    }));
-
-    setAvailableHeaders(processedHeaders);
-    
-    // Auto-map based on these new headers
-    const newMapping: Record<string, number> = {};
-    const rules: Record<string, string[]> = {
-      sys_id: ['sys id', 'employee id', 'id', 'emp id', 'employee no'],
-      full_name: ['full name', 'employee name', 'emp name', 'name'],
-      basic_pay: ['basic pay', 'monthly rate', 'daily rate'],
-      gross_pay: ['gross pay', 'total earnings'],
-      net_pay: ['net pay', 'take home pay'],
-      total_deductions: ['total deductions']
-    };
-
-    processedHeaders.forEach((h: any) => {
-      const name = String(h.name || '').toLowerCase();
-      Object.entries(rules).forEach(([key, keywords]) => {
-        if (keywords.some(k => name.includes(k))) {
-          newMapping[key] = h.index;
-        }
+      const res = await fetch('/api/payroll/sync-bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: syncText }),
       });
-    });
+      const data = await res.json();
 
-    setFieldMapping(newMapping);
-    setWizardStep('mapping');
-  };
-
-  const processImport = async () => {
-    if (!selectedFile || !discoveryData) return;
-    const sheet = discoveryData.sheets[selectedSheetIndex];
-    
-    setUploading(true);
-    setIsImportModalOpen(false);
-
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-    formData.append('sheetName', sheet.name);
-    formData.append('headerRowIndex', String(headerRowIndex));
-    formData.append('mapping', JSON.stringify(fieldMapping));
-    formData.append('label', clientLabel || 'Payroll Run');
-    formData.append('periodStart', periodStart);
-    formData.append('periodEnd', periodEnd);
-    formData.append('payrollDate', payrollDate || new Date().toISOString());
-
-    try {
-      const response = await fetch('/api/payroll/upload', { method: 'POST', body: formData });
-      const result = await response.json();
-
-      if (response.ok) {
-        setStatus({ type: 'success', message: `Success! Processed ${result.count} records from ${sheet.name}.` });
-        fetchLatestRun();
-        fetchRuns();
+      if (res.ok) {
+        setStatus({ type: 'success', message: `Successfully provisioned ${data.count} accounts!` });
+        setSyncText('');
+        fetchUsers();
       } else {
-        throw new Error(result.error || 'Failed to process payroll');
+        throw new Error(data.error || 'Failed to sync employees');
       }
     } catch (err: any) {
       setStatus({ type: 'error', message: err.message });
     } finally {
-      setUploading(false);
-      setSelectedFile(null);
+      setIsSyncing(false);
     }
   };
 
   const handleSync = async () => {
-    if (!latestRun?.id) return setStatus({ type: 'error', message: 'No payroll run found to sync.' });
     setLoadingUsers(true);
     setStatus(null);
     try {
-      const response = await fetch('/api/payroll/sync-accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ runId: latestRun.id }),
-      });
-      const result = await response.json();
-      if (response.ok) {
-        setStatus({ type: 'success', message: result.summary });
-        fetchUsers();
-      } else {
-        throw new Error(result.error || 'Failed to sync accounts');
-      }
+      await fetchUsers();
+      await fetchRuns();
+      setStatus({ type: 'success', message: 'Data refreshed successfully!' });
     } catch (err: any) {
       setStatus({ type: 'error', message: err.message });
     } finally {
@@ -270,120 +156,65 @@ export default function IntegratedPayrollAdmin() {
     <ErrorBoundary>
       <div className="space-y-8 animate-in fade-in duration-500 relative">
         
-        {/* Interactive Import Modal */}
+        {/* Document Upload Modal */}
         <AnimatePresence>
-          {isImportModalOpen && discoveryData && (
+          {isImportModalOpen && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-black/40 backdrop-blur-sm overflow-y-auto">
               <motion.div 
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col"
+                className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col"
               >
                 <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
                   <div>
-                    <h2 className="text-xl font-black text-gray-900 tracking-tight">Interactive Import: {selectedFile?.name}</h2>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
-                      Step {wizardStep === 'sheets' ? '1' : '2'} of 2: {wizardStep === 'sheets' ? 'Select Data Sheet' : 'Verify Column Mapping'}
-                    </p>
+                    <h2 className="text-xl font-black text-gray-900 tracking-tight">Upload Documents</h2>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Smart Storage Batch</p>
                   </div>
                   <button onClick={() => setIsImportModalOpen(false)} className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-red-50 hover:text-red-500 transition-all">
                     <X className="h-5 w-5" />
                   </button>
                 </div>
 
-                <div className="p-8 overflow-y-auto max-h-[70vh]">
-                  {wizardStep === 'sheets' ? (
-                    <div className="space-y-8">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {discoveryData.sheets.map((sheet: any, idx: number) => (
-                          <button 
-                            key={sheet.name}
-                            onClick={() => setSelectedSheetIndex(idx)}
-                            className={`p-6 rounded-[2rem] border text-left transition-all ${
-                              selectedSheetIndex === idx ? 'border-purple-500 bg-purple-50 ring-4 ring-purple-500/10' : 'border-gray-100 bg-gray-50/50'
-                            }`}
-                          >
-                            <p className="text-[10px] font-black uppercase text-gray-400 mb-1">{sheet.rowCount} Records</p>
-                            <h5 className="text-sm font-black text-gray-900 truncate">{sheet.name}</h5>
-                          </button>
-                        ))}
+                <div className="p-8 space-y-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Client / Company Name</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. GAISANO" 
+                        value={clientLabel} 
+                        onChange={(e) => setClientLabel(e.target.value)} 
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20" 
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Period Start</label>
+                        <input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold" />
                       </div>
-
-                      <div className="space-y-4">
-                        <h5 className="text-[10px] font-black uppercase text-gray-400">Sheet Preview & Header Picker</h5>
-                        <div className="border border-gray-100 rounded-2xl overflow-hidden bg-gray-50">
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-[10px] font-medium text-gray-500">
-                              <tbody>
-                                {discoveryData.sheets[selectedSheetIndex].preview.slice(0, 15).map((row: any[], rIdx: number) => (
-                                  <tr 
-                                    key={rIdx} 
-                                    onClick={() => {
-                                      const sd = {...discoveryData};
-                                      sd.sheets[selectedSheetIndex].suggestedHeaderIndex = rIdx;
-                                      setDiscoveryData(sd);
-                                      setHeaderRowIndex(rIdx);
-                                    }}
-                                    className={`cursor-pointer ${rIdx === discoveryData.sheets[selectedSheetIndex].suggestedHeaderIndex ? 'bg-purple-100 ring-2 ring-purple-500 z-10 relative' : 'hover:bg-gray-100'}`}
-                                  >
-                                    <td className="px-2 py-1 bg-gray-100 text-center font-bold border-r border-gray-200">{rIdx + 1}</td>
-                                    {row.map((cell, cIdx) => (
-                                      <td key={cIdx} className="px-3 py-2 whitespace-nowrap border-r border-gray-100 last:border-0">{String(cell || '')}</td>
-                                    ))}
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                        <p className="text-[10px] font-bold text-gray-400 italic">Click the row that contains the column headers (Name, ID, etc.).</p>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Period End</label>
+                        <input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold" />
                       </div>
                     </div>
-                  ) : (
-                    <div className="space-y-8">
-                      <div className="max-w-md">
-                        <label className="block text-[10px] font-black text-primary uppercase tracking-widest mb-2">Client Reference Label</label>
-                        <input 
-                          type="text"
-                          placeholder="e.g. GAISANO"
-                          value={clientLabel}
-                          onChange={(e) => setClientLabel(e.target.value)}
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold"
-                        />
-                      </div>
+                  </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {systemFields.map((field) => (
-                          <div key={field.key} className="p-4 rounded-2xl bg-gray-50 border border-gray-100 space-y-2">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{field.label}{field.required && '*'}</label>
-                            <select 
-                              value={fieldMapping[field.key] ?? ''}
-                              onChange={(e) => setFieldMapping({...fieldMapping, [field.key]: parseInt(e.target.value)})}
-                              className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold appearance-none outline-none focus:ring-2 focus:ring-primary/20"
-                            >
-                              <option value="">Select Column...</option>
-                              {(availableHeaders || []).map((h: any) => (
-                                <option key={h.index} value={h.index}>[{h.letter}] {h.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <div className="border-2 border-dashed border-gray-200 rounded-[2rem] p-12 text-center hover:border-primary/40 transition-colors cursor-pointer bg-gray-50/50">
+                    <Upload className="h-10 w-10 text-gray-300 mx-auto mb-4" />
+                    <p className="text-sm font-bold text-gray-500">Drop PDF files here or click to browse</p>
+                    <p className="text-[10px] font-bold text-gray-400 mt-2">Files should be named with Employee ID (e.g. CSC-1001.pdf)</p>
+                    <input type="file" multiple className="hidden" accept=".pdf" />
+                  </div>
                 </div>
 
-                <div className="p-8 border-t border-gray-100 flex justify-between bg-gray-50/30">
-                  <button onClick={() => wizardStep === 'mapping' ? setWizardStep('sheets') : setIsImportModalOpen(false)} className="px-6 py-3 font-bold text-gray-500 hover:text-gray-700">
-                    {wizardStep === 'mapping' ? 'Back' : 'Cancel'}
-                  </button>
+                <div className="p-8 border-t border-gray-100 flex justify-end gap-4 bg-gray-50/30">
+                  <button onClick={() => setIsImportModalOpen(false)} className="px-6 py-3 font-bold text-gray-500 hover:text-gray-700">Cancel</button>
                   <button 
-                    onClick={wizardStep === 'sheets' ? confirmSheet : processImport}
-                    className="bg-primary text-white px-10 py-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 flex items-center gap-3"
+                    disabled={!clientLabel || !periodStart || !periodEnd}
+                    className="bg-primary text-white px-10 py-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 disabled:opacity-50"
                   >
-                    {wizardStep === 'sheets' ? 'Next: Map Columns' : 'Import Payroll Now'}
-                    <ChevronRight className="h-4 w-4" />
+                    Start Upload
                   </button>
                 </div>
               </motion.div>
@@ -391,26 +222,35 @@ export default function IntegratedPayrollAdmin() {
           )}
         </AnimatePresence>
 
-        {/* Main Interface */}
+        {/* Main Interface Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
             <div className="flex items-center gap-2 text-primary mb-1">
               <Database className="h-4 w-4" />
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Financial Operations</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Financial Documents</span>
             </div>
-            <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Payroll Hub</h1>
+            <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Smart Storage Hub</h1>
           </div>
 
           <div className="bg-gray-100 p-1 rounded-2xl flex items-center">
-            {['records', 'credentials'].map(tab => (
-              <button 
-                key={tab}
-                onClick={() => setActiveTab(tab as any)}
-                className={`px-6 py-2.5 rounded-xl font-bold text-xs capitalize transition-all ${activeTab === tab ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                {tab === 'records' ? 'Master Records' : 'Portal Access'}
-              </button>
-            ))}
+            <button 
+              onClick={() => setActiveTab('storage')}
+              className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all ${activeTab === 'storage' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Storage Hub
+            </button>
+            <button 
+              onClick={() => setActiveTab('sync')}
+              className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all ${activeTab === 'sync' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Account Sync
+            </button>
+            <button 
+              onClick={() => setActiveTab('credentials')}
+              className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all ${activeTab === 'credentials' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Portal Access
+            </button>
           </div>
         </div>
 
@@ -428,55 +268,44 @@ export default function IntegratedPayrollAdmin() {
             </motion.div>
           )}
 
-          {activeTab === 'records' && (
+          {activeTab === 'storage' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2 space-y-8">
-                {/* Simplified Upload Card */}
+                {/* Upload Card */}
                 <div className="bg-white rounded-[3rem] border border-gray-200 shadow-sm p-10 flex flex-col items-center justify-center text-center">
                   <div className="h-16 w-16 rounded-2xl bg-blue-50 text-primary flex items-center justify-center mb-6">
-                    <Upload className="h-8 w-8" />
+                    <LayoutTemplate className="h-8 w-8" />
                   </div>
-                  <h3 className="text-xl font-black text-gray-900 mb-2">Import Payroll Records</h3>
-                  <p className="text-gray-500 text-xs max-w-sm mb-8">Select the dates and upload your Excel file to begin the interactive import.</p>
+                  <h3 className="text-xl font-black text-gray-900 mb-2">Upload Files to Storage</h3>
+                  <p className="text-gray-500 text-xs max-w-sm mb-8">Securely distribute PDF documents to your employees using smart filename matching.</p>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-md mb-8 text-left">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Period Start</label>
-                      <input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Period End</label>
-                      <input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold" />
-                    </div>
-                  </div>
-
-                  <label className={`relative group cursor-pointer ${(!periodStart || !periodEnd) ? 'opacity-50 grayscale' : ''}`}>
-                    <div className="bg-primary hover:bg-black text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 transition-all flex items-center gap-3">
-                      {parsingHeaders ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                      {parsingHeaders ? 'Scanning File...' : 'Choose Excel File'}
-                    </div>
-                    <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleFileUpload} disabled={parsingHeaders || !periodStart || !periodEnd} />
-                  </label>
+                  <button 
+                    onClick={() => setIsImportModalOpen(true)}
+                    className="bg-primary hover:bg-black text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 transition-all flex items-center gap-3"
+                  >
+                    <Plus className="h-4 w-4" />
+                    New Storage Batch
+                  </button>
                 </div>
 
                 {/* History Table */}
                 <div className="bg-white rounded-[3rem] border border-gray-200 shadow-sm overflow-hidden">
                   <div className="p-8 border-b border-gray-100 flex items-center justify-between">
-                    <h4 className="text-sm font-black uppercase tracking-widest text-gray-900">Recent Import History</h4>
+                    <h4 className="text-sm font-black uppercase tracking-widest text-gray-900">Storage History</h4>
                     <button onClick={fetchRuns} className="text-primary p-2 hover:bg-blue-50 rounded-lg"><RefreshCw className={`h-4 w-4 ${loadingRuns ? 'animate-spin' : ''}`} /></button>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left">
                       <thead>
                         <tr className="bg-gray-50/50">
-                          <th className="px-8 py-4 text-[10px] font-black uppercase text-gray-400">Reference / Label</th>
-                          <th className="px-8 py-4 text-[10px] font-black uppercase text-gray-400">Date Range</th>
-                          <th className="px-8 py-4 text-[10px] font-black uppercase text-gray-400 text-right">Records</th>
+                          <th className="px-8 py-4 text-[10px] font-black uppercase text-gray-400">Company / Batch</th>
+                          <th className="px-8 py-4 text-[10px] font-black uppercase text-gray-400">Period</th>
+                          <th className="px-8 py-4 text-[10px] font-black uppercase text-gray-400 text-right">Files</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {runs.length === 0 ? (
-                          <tr><td colSpan={3} className="px-8 py-10 text-center text-gray-400 text-xs">No payroll runs found.</td></tr>
+                          <tr><td colSpan={3} className="px-8 py-10 text-center text-gray-400 text-xs">No storage batches found.</td></tr>
                         ) : (
                           runs.map((run) => (
                             <tr key={run.id} className="hover:bg-gray-50/50 transition-colors">
@@ -504,13 +333,48 @@ export default function IntegratedPayrollAdmin() {
               <div className="space-y-6">
                 <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden">
                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
-                   <h4 className="text-lg font-black mb-2 relative z-10">Employee Sync</h4>
-                   <p className="text-gray-400 text-xs leading-relaxed mb-8 relative z-10">After importing, ensure you sync credentials to allow employees to see their payslips.</p>
-                   <button onClick={() => setActiveTab('credentials')} className="w-full bg-white text-gray-900 py-4 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3">
-                     <Users className="h-4 w-4" /> Manage Access
+                   <h4 className="text-lg font-black mb-2 relative z-10">Smart Sync</h4>
+                   <p className="text-gray-400 text-xs leading-relaxed mb-8 relative z-10">Paste your employee list to instantly provision their personal document vaults.</p>
+                   <button onClick={() => setActiveTab('sync')} className="w-full bg-white text-gray-900 py-4 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3">
+                     <Plus className="h-4 w-4" /> Go to Account Sync
                    </button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'sync' && (
+            <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+               <div className="bg-white rounded-[3rem] border border-gray-200 shadow-sm p-10 space-y-8">
+                  <div>
+                    <h3 className="text-xl font-black text-gray-900 tracking-tight">Magic Account Sync</h3>
+                    <p className="text-gray-500 text-sm mt-1">Paste your employee list below to instantly create portal accounts.</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Paste List (Format: ID Name)</label>
+                      <span className="text-[10px] font-bold text-primary bg-blue-50 px-2 py-1 rounded-md">Example: CSC-101 Juan Dela Cruz</span>
+                    </div>
+                    <textarea 
+                      placeholder="CSC-1001 Juan Dela Cruz&#10;CSC-1002 Maria Santos..."
+                      value={syncText}
+                      onChange={(e) => setSyncText(e.target.value)}
+                      className="w-full h-80 bg-gray-50 border border-gray-200 rounded-[2rem] p-8 text-sm font-bold focus:ring-4 focus:ring-primary/10 outline-none transition-all"
+                    />
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button 
+                      onClick={handleBulkSync}
+                      disabled={isSyncing || !syncText.trim()}
+                      className="bg-primary text-white px-12 py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 flex items-center gap-3 hover:bg-black transition-all disabled:opacity-50"
+                    >
+                      {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                      Sync Accounts Now
+                    </button>
+                  </div>
+               </div>
             </div>
           )}
 

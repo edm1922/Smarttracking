@@ -1,66 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_KEY;
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Supabase credentials missing (URL or Anon Key)');
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
+    const batches = await prisma.storageBatch.findMany({
+      include: {
+        _count: {
+          select: { documents: true }
+        }
+      },
+      orderBy: {
+        created_at: 'desc'
       }
     });
-    const { data: runs, error } = await supabase
-      .from('payroll_runs')
-      .select(`
-        *,
-        payroll_entries (count)
-      `)
-      .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    // Transform to match the frontend expectations if needed
+    const formattedBatches = batches.map(batch => ({
+      ...batch,
+      payroll_entries: [{ count: batch._count.documents }] // Compatibility with existing frontend
+    }));
 
-    return NextResponse.json(runs);
+    return NextResponse.json(formattedBatches);
   } catch (error: any) {
+    console.error('Fetch Batches Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function DELETE(req: NextRequest) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_KEY;
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Supabase credentials missing (URL or Anon Key)');
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
     const { id } = await req.json();
-    if (!id) return NextResponse.json({ error: 'Missing run ID' }, { status: 400 });
+    if (!id) return NextResponse.json({ error: 'Missing batch ID' }, { status: 400 });
 
-    const { error } = await supabase
-      .from('payroll_runs')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
+    await prisma.storageBatch.delete({
+      where: { id }
+    });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
+    console.error('Delete Batch Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
