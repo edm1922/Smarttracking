@@ -4,6 +4,23 @@ import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { PDFDocument } from 'pdf-lib';
 
+// Import pdfreader (Pure JS)
+const { PdfReader } = require("pdfreader");
+
+/**
+ * Extracts text from a single-page PDF buffer
+ */
+async function getPageText(buffer: Buffer): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let text = '';
+    new PdfReader().parseBuffer(buffer, (err: any, item: any) => {
+      if (err) reject(err);
+      else if (!item) resolve(text);
+      else if (item.text) text += item.text + ' ';
+    });
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -15,9 +32,6 @@ export async function POST(req: NextRequest) {
     if (!clientLabel || !files.length) {
       return NextResponse.json({ error: 'Missing client label or files' }, { status: 400 });
     }
-
-    // Load pdfjs-dist dynamically at runtime to avoid build errors
-    const pdfjs = require('pdfjs-dist/legacy/build/pdf');
 
     // 1. Create the Storage Batch
     const batch = await prisma.storageBatch.create({
@@ -45,29 +59,26 @@ export async function POST(req: NextRequest) {
         const mainPdfDoc = await PDFDocument.load(bytes);
         const pageCount = mainPdfDoc.getPageCount();
 
-        // Use pdfjs-dist for text extraction
-        const loadingTask = pdfjs.getDocument({
-          data: new Uint8Array(bytes),
-          useSystemFonts: true,
-          disableFontFace: true,
-        });
-        const doc = await loadingTask.promise;
-
         // Map to hold [sys_id] -> [array of page indices]
         const employeePages: Record<string, number[]> = {};
 
         // SCAN PAGES TO IDENTIFY EMPLOYEES
-        for (let i = 1; i <= pageCount; i++) {
-          const page = await doc.getPage(i);
-          const textContent = await page.getTextContent();
-          const text = textContent.items.map((item: any) => item.str).join(' ');
+        for (let i = 0; i < pageCount; i++) {
+          // Create a single-page PDF to extract text from
+          const subDoc = await PDFDocument.create();
+          const [page] = await subDoc.copyPages(mainPdfDoc, [i]);
+          subDoc.addPage(page);
+          const subBytes = await subDoc.save();
+          
+          // Get text using pdfreader (Pure JS)
+          const text = await getPageText(Buffer.from(subBytes));
 
           // Find CSC- ID
           const idMatch = text.match(/CSC-[\d-]+/i);
           const sys_id = idMatch ? idMatch[0].toUpperCase() : 'UNKNOWN';
 
           if (!employeePages[sys_id]) employeePages[sys_id] = [];
-          employeePages[sys_id].push(i - 1); // pdf-lib uses 0-based indices
+          employeePages[sys_id].push(i);
         }
 
         // GENERATE PDFs FOR EACH EMPLOYEE
