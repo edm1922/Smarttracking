@@ -898,6 +898,7 @@ export default function IntegratedPayrollAdmin() {
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 }
