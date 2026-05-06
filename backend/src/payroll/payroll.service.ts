@@ -455,12 +455,6 @@ export class PayrollService {
     });
   }
 
-  async deleteEmployee(id: string) {
-    return this.prisma.user.delete({
-      where: { id }
-    });
-  }
-
   async getSignedUploadUrl(fileName: string) {
     const filePath = `temp-uploads/${Date.now()}-${fileName}`;
     const { data, error } = await this.supabaseAdmin
