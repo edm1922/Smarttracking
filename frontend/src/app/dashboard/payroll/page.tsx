@@ -505,37 +505,67 @@ export default function IntegratedPayrollAdmin() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Period Start</label>
-                        <input
-                          type="date"
-                          lang="en-US"
-                          disabled={!clientLabel}
-                          value={periodStart}
-                          onChange={(e) => setPeriodStart(e.target.value)}
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-50"
-                        />
+                        <div className="relative">
+                          <input
+                            type="text"
+                            readOnly
+                            placeholder="MM/DD/YYYY"
+                            value={periodStart ? `${periodStart.split('-')[1]}/${periodStart.split('-')[2]}/${periodStart.split('-')[0]}` : ''}
+                            onClick={(e) => !(!clientLabel) && (e.currentTarget.nextElementSibling as HTMLInputElement).showPicker()}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-50 cursor-pointer"
+                            disabled={!clientLabel}
+                          />
+                          <input 
+                            type="date"
+                            className="absolute inset-0 opacity-0 pointer-events-none"
+                            value={periodStart}
+                            onChange={(e) => setPeriodStart(e.target.value)}
+                          />
+                          <Calendar className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Period End</label>
-                        <input
-                          type="date"
-                          lang="en-US"
-                          disabled={!clientLabel}
-                          value={periodEnd}
-                          onChange={(e) => setPeriodEnd(e.target.value)}
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-50"
-                        />
+                        <div className="relative">
+                          <input
+                            type="text"
+                            readOnly
+                            placeholder="MM/DD/YYYY"
+                            value={periodEnd ? `${periodEnd.split('-')[1]}/${periodEnd.split('-')[2]}/${periodEnd.split('-')[0]}` : ''}
+                            onClick={(e) => !(!clientLabel) && (e.currentTarget.nextElementSibling as HTMLInputElement).showPicker()}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-50 cursor-pointer"
+                            disabled={!clientLabel}
+                          />
+                          <input 
+                            type="date"
+                            className="absolute inset-0 opacity-0 pointer-events-none"
+                            value={periodEnd}
+                            onChange={(e) => setPeriodEnd(e.target.value)}
+                          />
+                          <Calendar className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                        </div>
                       </div>
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Release Date</label>
-                      <input
-                        type="date"
-                        lang="en-US"
-                        disabled={!clientLabel}
-                        value={releaseDate}
-                        onChange={(e) => setReleaseDate(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
-                      />
+                      <div className="relative">
+                        <input
+                          type="text"
+                          readOnly
+                          placeholder="MM/DD/YYYY"
+                          value={releaseDate ? `${releaseDate.split('-')[1]}/${releaseDate.split('-')[2]}/${releaseDate.split('-')[0]}` : ''}
+                          onClick={(e) => !(!clientLabel) && (e.currentTarget.nextElementSibling as HTMLInputElement).showPicker()}
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 cursor-pointer"
+                          disabled={!clientLabel}
+                        />
+                        <input 
+                          type="date"
+                          className="absolute inset-0 opacity-0 pointer-events-none"
+                          value={releaseDate}
+                          onChange={(e) => setReleaseDate(e.target.value)}
+                        />
+                        <Calendar className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Remark / Note (Optional)</label>
@@ -715,19 +745,39 @@ export default function IntegratedPayrollAdmin() {
 
                       <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl px-2 py-1.5">
                         <Calendar className="h-3.5 w-3.5 text-gray-400 ml-1" />
-                        <input
-                          type="date"
-                          value={historyStart}
-                          onChange={(e) => setHistoryStart(e.target.value)}
-                          className="bg-transparent border-none text-[10px] font-bold text-gray-600 focus:outline-none w-[90px]"
-                        />
+                        <div className="relative flex items-center">
+                          <input
+                            type="text"
+                            readOnly
+                            placeholder="MM/DD/YYYY"
+                            value={historyStart ? `${historyStart.split('-')[1]}/${historyStart.split('-')[2]}/${historyStart.split('-')[0]}` : ''}
+                            onClick={(e) => (e.currentTarget.nextElementSibling as HTMLInputElement).showPicker()}
+                            className="bg-transparent border-none text-[10px] font-bold text-gray-600 focus:outline-none w-[80px] cursor-pointer"
+                          />
+                          <input
+                            type="date"
+                            className="absolute inset-0 opacity-0 pointer-events-none"
+                            value={historyStart}
+                            onChange={(e) => setHistoryStart(e.target.value)}
+                          />
+                        </div>
                         <span className="text-gray-300">-</span>
-                        <input
-                          type="date"
-                          value={historyEnd}
-                          onChange={(e) => setHistoryEnd(e.target.value)}
-                          className="bg-transparent border-none text-[10px] font-bold text-gray-600 focus:outline-none w-[90px]"
-                        />
+                        <div className="relative flex items-center">
+                          <input
+                            type="text"
+                            readOnly
+                            placeholder="MM/DD/YYYY"
+                            value={historyEnd ? `${historyEnd.split('-')[1]}/${historyEnd.split('-')[2]}/${historyEnd.split('-')[0]}` : ''}
+                            onClick={(e) => (e.currentTarget.nextElementSibling as HTMLInputElement).showPicker()}
+                            className="bg-transparent border-none text-[10px] font-bold text-gray-600 focus:outline-none w-[80px] cursor-pointer"
+                          />
+                          <input
+                            type="date"
+                            className="absolute inset-0 opacity-0 pointer-events-none"
+                            value={historyEnd}
+                            onChange={(e) => setHistoryEnd(e.target.value)}
+                          />
+                        </div>
                       </div>
 
                       <div className="relative">
