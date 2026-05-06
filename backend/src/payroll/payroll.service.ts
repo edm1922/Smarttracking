@@ -20,11 +20,9 @@ export class PayrollService {
     this.supabaseAdmin = createClient(supabaseUrl || '', supabaseKey || '');
   }
 
-  async processMasterPdf(file: Express.Multer.File, batchData: any) {
+  async processMasterPdf(pdfBuffer: Buffer, batchData: any) {
     const { clientName, periodStart, periodEnd, label, remark, releaseDate } = batchData;
     this.logger.log(`Starting precision 1-page splitting for ${clientName}`);
-
-    const pdfBuffer = file.buffer;
     
     // Create the batch record
     const batch = await this.prisma.storageBatch.create({
@@ -429,6 +427,58 @@ export class PayrollService {
       },
       orderBy: { created_at: 'desc' }
     });
+  }
+
+  async getSignedUploadUrl(fileName: string) {
+    const filePath = `temp-uploads/${Date.now()}-${fileName}`;
+    const { data, error } = await this.supabaseAdmin
+      .storage
+      .from('payroll-documents')
+      .createSignedUploadUrl(filePath);
+
+    if (error) throw error;
+
+    return {
+      signedUrl: data.signedUrl,
+      token: data.token,
+      filePath: filePath
+    };
+  }
+
+  async processRemoteMasterPdf(remotePath: string, batchData: any) {
+    this.logger.log(`Downloading remote PDF from Supabase: ${remotePath}`);
+    const { data, error: downloadError } = await this.supabaseAdmin
+      .storage
+      .from('payroll-documents')
+      .download(remotePath);
+
+    if (downloadError) {
+      this.logger.error(`Failed to download remote PDF: ${downloadError.message}`);
+      throw downloadError;
+    }
+
+    const buffer = Buffer.from(await data.arrayBuffer());
+    
+    try {
+      const result = await this.processMasterPdf(buffer, batchData);
+      
+      // Clean up temp file
+      this.logger.log(`Cleaning up remote PDF: ${remotePath}`);
+      await this.supabaseAdmin
+        .storage
+        .from('payroll-documents')
+        .remove([remotePath]);
+        
+      return result;
+    } catch (err) {
+      this.logger.error(`Error processing remote PDF: ${err.message}`);
+      // Also cleanup on error
+      await this.supabaseAdmin
+        .storage
+        .from('payroll-documents')
+        .remove([remotePath]);
+      throw err;
+    }
   }
 
   private async scanSinglePageForIds(buffer: Buffer): Promise<string[]> {

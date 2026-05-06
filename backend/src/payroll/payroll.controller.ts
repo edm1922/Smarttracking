@@ -39,7 +39,7 @@ export class PayrollController {
         remark: body.remark
       };
 
-      const result = await this.payrollService.processMasterPdf(files[0], batchData);
+      const result = await this.payrollService.processMasterPdf(files[0].buffer, batchData);
       return result;
     } catch (error) {
       console.error('Payroll Upload Error:', error);
@@ -96,6 +96,27 @@ export class PayrollController {
   @Get('my-payslips/:sysId')
   async getMyPayslips(@Param('sysId') sysId: string) {
     return this.payrollService.getEmployeePayslips(sysId);
+  }
+
+  @Post('get-upload-url')
+  async getUploadUrl(@Body() body: { fileName: string }) {
+    return this.payrollService.getSignedUploadUrl(body.fileName);
+  }
+
+  @Post('process-uploaded')
+  async processUploaded(@Body() body: any) {
+    const { filePath, ...batchDataRaw } = body;
+    
+    const batchData = {
+      clientName: batchDataRaw.client_name,
+      periodStart: batchDataRaw.period_start,
+      periodEnd: batchDataRaw.period_end,
+      releaseDate: batchDataRaw.release_date,
+      label: batchDataRaw.label || batchDataRaw.client_name,
+      remark: batchDataRaw.remark
+    };
+
+    return this.payrollService.processRemoteMasterPdf(filePath, batchData);
   }
 
   @Get('all-payslips')

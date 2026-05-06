@@ -81,27 +81,44 @@ export default function IntegratedPayrollAdmin() {
     setStatus(null);
     
     try {
-      const formData = new FormData();
-      formData.append('client_name', clientLabel);
-      formData.append('period_start', periodStart);
-      formData.append('period_end', periodEnd);
-      formData.append('release_date', releaseDate);
-      formData.append('remark', remark);
-      
-      selectedFiles.forEach(file => {
-        formData.append('files', file);
-      });
-
+      const file = selectedFiles[0];
       const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
-      const res = await fetch(`${apiUrl}/payroll/upload`, {
+
+      // 1. Get signed upload URL from backend
+      const urlRes = await fetch(`${apiUrl}/payroll/get-upload-url`, {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name })
+      });
+      const { signedUrl, filePath } = await urlRes.json();
+      if (!urlRes.ok) throw new Error('Failed to get secure upload slot');
+
+      // 2. Upload directly to Supabase via signed URL
+      const uploadRes = await fetch(signedUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type }
+      });
+      if (!uploadRes.ok) throw new Error('Secure file upload failed');
+
+      // 3. Tell backend to process the uploaded file
+      const res = await fetch(`${apiUrl}/payroll/process-uploaded`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filePath,
+          client_name: clientLabel,
+          period_start: periodStart,
+          period_end: periodEnd,
+          release_date: releaseDate,
+          remark: remark
+        }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      if (!res.ok) throw new Error(data.error || 'Processing failed');
 
-      setStatus({ type: 'success', message: `Successfully uploaded ${data.count} documents!` });
+      setStatus({ type: 'success', message: `Successfully processed ${data.details?.length || 0} documents!` });
       setIsImportModalOpen(false);
       setSelectedFiles([]);
       setRemark(''); // Clear remark after success
