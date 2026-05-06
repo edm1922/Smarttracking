@@ -858,6 +858,7 @@ model TrafficLog {
 model User {
   id                 String               @id @default(uuid())
   sys_id             String?              @unique
+  company_label      String?
   fullName           String?
   username           String               @unique
   password           String
@@ -881,6 +882,8 @@ model StorageBatch {
   period_start    DateTime?  @db.Date
   period_end      DateTime?  @db.Date
   label           String?
+  remark          String?
+  release_date    DateTime?  @db.Date
   created_at      DateTime   @default(now())
   documents       Document[]
 
@@ -895,6 +898,7 @@ model Document {
   file_name      String
   storage_path   String
   file_type      String       @default("PDF")
+  remark         String?
   created_at     DateTime     @default(now())
   batch          StorageBatch @relation(fields: [batch_id], references: [id], onDelete: Cascade)
   user           User?        @relation(fields: [user_id], references: [id], onDelete: NoAction)

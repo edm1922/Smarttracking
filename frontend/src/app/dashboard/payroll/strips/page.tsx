@@ -6,68 +6,23 @@ import StripsControls from './StripsControls';
 export const revalidate = 0;
 
 export default async function CredentialStripsPage() {
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  let users: any[] = [];
+  try {
+    const res = await fetch(`${apiUrl}/payroll/users`, { cache: 'no-store' });
+    if (res.ok) {
+      users = await res.json();
     }
-  );
-
-  const { data: latestRun } = await supabaseAdmin
-    .from('payroll_runs')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-
-  let stripsData: { sys_id: string, name: string, username: string, password: string }[] = [];
-
-  if (latestRun) {
-    // 1. Fetch entries for this run
-    const { data: entries } = await supabaseAdmin
-      .from('payroll_entries')
-      .select('sys_id, raw_data')
-      .eq('payroll_run_id', latestRun.id);
-
-    // 2. Fetch all staff users to get their passwords (with high limit for 273+ employees)
-    const { data, error: usersError } = await supabaseAdmin.auth.admin.listUsers({
-      perPage: 1000
-    });
-    const users = data?.users || [];
-    const userMap = new Map();
-    users.forEach(u => {
-      if (u.user_metadata?.sys_id) {
-        userMap.set(u.user_metadata.sys_id, {
-          username: u.email?.split('@')[0],
-          password: u.user_metadata.temp_password || u.user_metadata.sys_id
-        });
-      }
-    });
-
-    if (entries) {
-      const empMap = new Map();
-      entries.forEach((entry: any) => {
-        if (!empMap.has(entry.sys_id)) {
-          const fullName = entry.raw_data?.full_name || '';
-          const userData = userMap.get(entry.sys_id);
-          
-          if (userData) {
-            empMap.set(entry.sys_id, {
-              sys_id: entry.sys_id,
-              name: fullName || 'Unknown Employee',
-              username: userData.username,
-              password: userData.password
-            });
-          }
-        }
-      });
-      stripsData = Array.from(empMap.values());
-    }
+  } catch (err) {
+    console.error('Failed to fetch users for strips', err);
   }
+
+  const stripsData = users.map(u => ({
+    sys_id: u.sys_id,
+    name: u.fullName || 'Unknown Employee',
+    username: u.username,
+    password: u.password
+  }));
 
   return (
     <div className="bg-white min-h-screen text-black p-8 print:p-0">

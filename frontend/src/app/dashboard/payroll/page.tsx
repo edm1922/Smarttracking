@@ -24,6 +24,7 @@ import {
   Table as TableIcon,
   LayoutTemplate
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
@@ -44,17 +45,26 @@ export default function IntegratedPayrollAdmin() {
   const [loadingRuns, setLoadingRuns] = useState(false);
   const [periodStart, setPeriodStart] = useState('');
   const [periodEnd, setPeriodEnd] = useState('');
+  const [releaseDate, setReleaseDate] = useState('');
   const [clientLabel, setClientLabel] = useState('');
+  
+  // History Filters
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyStart, setHistoryStart] = useState('');
+  const [historyEnd, setHistoryEnd] = useState('');
 
   // Storage UI State
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // Magic Sync State
   const [syncText, setSyncText] = useState('');
+  const [syncLabel, setSyncLabel] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState({ current: 0, total: 0 });
 
   // Storage Handlers
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [remark, setRemark] = useState('');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,6 +75,7 @@ export default function IntegratedPayrollAdmin() {
 
   const handleUpload = async () => {
     if (selectedFiles.length === 0 || !clientLabel || !periodStart || !periodEnd) return;
+    if (!window.confirm("Are you sure you want to start this upload?")) return;
     
     setUploading(true);
     setStatus(null);
@@ -74,6 +85,8 @@ export default function IntegratedPayrollAdmin() {
       formData.append('client_name', clientLabel);
       formData.append('period_start', periodStart);
       formData.append('period_end', periodEnd);
+      formData.append('release_date', releaseDate);
+      formData.append('remark', remark);
       
       selectedFiles.forEach(file => {
         formData.append('files', file);
@@ -91,6 +104,8 @@ export default function IntegratedPayrollAdmin() {
       setStatus({ type: 'success', message: `Successfully uploaded ${data.count} documents!` });
       setIsImportModalOpen(false);
       setSelectedFiles([]);
+      setRemark(''); // Clear remark after success
+      setReleaseDate(''); // Clear release date
       fetchRuns();
     } catch (err: any) {
       setStatus({ type: 'error', message: err.message });
@@ -111,6 +126,27 @@ export default function IntegratedPayrollAdmin() {
       console.error('Failed to fetch runs:', err);
     } finally {
       setLoadingRuns(false);
+    }
+  };
+
+  const handleDeleteBatch = async (batchId: string) => {
+    if (!window.confirm("Are you sure you want to revoke and delete this entire batch? This action cannot be undone and will remove all associated documents from the database and storage.")) {
+      return;
+    }
+    
+    setStatus(null);
+    try {
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${apiUrl}/payroll/batch/${batchId}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to delete batch');
+      
+      setStatus({ type: 'success', message: 'Batch successfully revoked and deleted.' });
+      fetchRuns();
+    } catch (err: any) {
+      setStatus({ type: 'error', message: err.message });
     }
   };
 
@@ -147,35 +183,63 @@ export default function IntegratedPayrollAdmin() {
     if (activeTab === 'credentials') fetchUsers();
   }, [activeTab]);
 
+  // Poll for upload progress
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (uploading) {
+      interval = setInterval(() => {
+        fetchRuns();
+      }, 2000);
+    }
+    return () => clearInterval(interval);
+  }, [uploading]);
+
   const handleBulkSync = async () => {
     if (!syncText.trim()) {
       setStatus({ type: 'error', message: 'Please paste the employee list first.' });
       return;
     }
+    if (!window.confirm("Are you sure you want to start syncing these accounts?")) return;
 
     setIsSyncing(true);
     setStatus(null);
+    setSyncProgress({ current: 0, total: 0 });
 
     try {
       const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
-      const res = await fetch(`${apiUrl}/payroll/sync-bulk`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: syncText }),
-      });
-      const data = await res.json();
+      const lines = syncText.split('\n').filter(l => l.trim().length > 0);
+      const totalLines = lines.length;
+      let processedCount = 0;
+      
+      setSyncProgress({ current: 0, total: totalLines });
 
-      if (res.ok) {
-        setStatus({ type: 'success', message: `Successfully provisioned ${data.count} accounts!` });
-        setSyncText('');
-        fetchUsers();
-      } else {
-        throw new Error(data.error || 'Failed to sync employees');
+      const chunkSize = 50;
+      for (let i = 0; i < totalLines; i += chunkSize) {
+        const chunk = lines.slice(i, i + chunkSize).join('\n');
+        const res = await fetch(`${apiUrl}/payroll/sync-bulk`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: chunk, label: syncLabel }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to sync employees chunk');
+        }
+
+        processedCount += data.count || 0;
+        setSyncProgress({ current: Math.min(i + chunkSize, totalLines), total: totalLines });
       }
+
+      setStatus({ type: 'success', message: `Successfully provisioned ${processedCount} accounts!` });
+      setSyncText('');
+      setSyncLabel('');
+      fetchUsers();
     } catch (err: any) {
       setStatus({ type: 'error', message: err.message });
     } finally {
       setIsSyncing(false);
+      setTimeout(() => setSyncProgress({ current: 0, total: 0 }), 3000);
     }
   };
 
@@ -201,13 +265,37 @@ export default function IntegratedPayrollAdmin() {
       user.username?.toLowerCase().includes(search)
     );
     if (selectedCredentialLabel === 'all') return matchesSearch;
-    const runIdsWithLabel = runs.filter(r => (r?.label || 'General') === selectedCredentialLabel).map(r => r.id);
-    return matchesSearch && user.run_ids?.some((runId: any) => runIdsWithLabel.includes(runId));
+    return matchesSearch && user.company_label === selectedCredentialLabel;
   });
+
+  const filteredHistoryRuns = runs.filter(run => {
+    let matches = true;
+    if (historySearch) {
+      const label = (run.label || 'Standard Run').toLowerCase();
+      matches = matches && label.includes(historySearch.toLowerCase());
+    }
+    if (historyStart) {
+      matches = matches && new Date(run.period_start) >= new Date(historyStart);
+    }
+    if (historyEnd) {
+      matches = matches && new Date(run.period_end) <= new Date(historyEnd);
+    }
+    return matches;
+  });
+
+  const uniqueLabels = Array.from(new Set([
+    ...(users || []).map(u => u.company_label),
+    ...(runs || []).map(r => r.label)
+  ].filter(Boolean)));
 
   return (
     <ErrorBoundary>
       <div className="space-y-8 animate-in fade-in duration-500 relative">
+        <datalist id="existing-labels">
+          {uniqueLabels.map((label: any) => (
+            <option key={label} value={label} />
+          ))}
+        </datalist>
         
         {/* Document Upload Modal */}
         <AnimatePresence>
@@ -235,6 +323,7 @@ export default function IntegratedPayrollAdmin() {
                       <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Client / Company Name</label>
                       <input 
                         type="text" 
+                        list="existing-labels"
                         placeholder="e.g. GAISANO" 
                         value={clientLabel} 
                         onChange={(e) => setClientLabel(e.target.value)} 
@@ -250,6 +339,25 @@ export default function IntegratedPayrollAdmin() {
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Period End</label>
                         <input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold" />
                       </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Release Date</label>
+                      <input 
+                        type="date" 
+                        value={releaseDate} 
+                        onChange={(e) => setReleaseDate(e.target.value)} 
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Remark / Note (Optional)</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. Regular Payroll, Adjusted OT, etc." 
+                        value={remark} 
+                        onChange={(e) => setRemark(e.target.value)} 
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20" 
+                      />
                     </div>
                   </div>
 
@@ -291,7 +399,18 @@ export default function IntegratedPayrollAdmin() {
                 </div>
 
                 <div className="p-8 border-t border-gray-100 flex justify-end gap-4 bg-gray-50/30">
-                  <button onClick={() => setIsImportModalOpen(false)} className="px-6 py-3 font-bold text-gray-500 hover:text-gray-700">Cancel</button>
+                  {uploading && runs.length > 0 && (
+                    <div className="flex-1 flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center">
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-900">Processing pages...</p>
+                        <p className="text-[10px] font-black text-primary uppercase tracking-widest">{runs[0]?._count?.documents || 0} pages uploaded</p>
+                      </div>
+                    </div>
+                  )}
+                  <button onClick={() => setIsImportModalOpen(false)} disabled={uploading} className="px-6 py-3 font-bold text-gray-500 hover:text-gray-700 disabled:opacity-50">Cancel</button>
                   <button 
                     onClick={handleUpload}
                     disabled={uploading || selectedFiles.length === 0 || !clientLabel || !periodStart || !periodEnd}
@@ -307,7 +426,7 @@ export default function IntegratedPayrollAdmin() {
         </AnimatePresence>
 
         {/* Main Interface Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 print:hidden">
           <div>
             <div className="flex items-center gap-2 text-primary mb-1">
               <Database className="h-4 w-4" />
@@ -374,9 +493,40 @@ export default function IntegratedPayrollAdmin() {
 
                 {/* History Table */}
                 <div className="bg-white rounded-[3rem] border border-gray-200 shadow-sm overflow-hidden">
-                  <div className="p-8 border-b border-gray-100 flex items-center justify-between">
+                  <div className="p-8 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <h4 className="text-sm font-black uppercase tracking-widest text-gray-900">Storage History</h4>
-                    <button onClick={fetchRuns} className="text-primary p-2 hover:bg-blue-50 rounded-lg"><RefreshCw className={`h-4 w-4 ${loadingRuns ? 'animate-spin' : ''}`} /></button>
+                    
+                    <div className="flex items-center gap-3">
+                      <div className="relative group">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 group-focus-within:text-primary transition-colors" />
+                        <input 
+                          type="text"
+                          placeholder="Search Label..."
+                          value={historySearch}
+                          onChange={(e) => setHistorySearch(e.target.value)}
+                          className="pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all w-36"
+                        />
+                      </div>
+                      
+                      <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl px-2 py-1.5">
+                        <Calendar className="h-3.5 w-3.5 text-gray-400 ml-1" />
+                        <input 
+                          type="date"
+                          value={historyStart}
+                          onChange={(e) => setHistoryStart(e.target.value)}
+                          className="bg-transparent border-none text-[10px] font-bold text-gray-600 focus:outline-none w-[90px]"
+                        />
+                        <span className="text-gray-300">-</span>
+                        <input 
+                          type="date"
+                          value={historyEnd}
+                          onChange={(e) => setHistoryEnd(e.target.value)}
+                          className="bg-transparent border-none text-[10px] font-bold text-gray-600 focus:outline-none w-[90px]"
+                        />
+                      </div>
+
+                      <button onClick={fetchRuns} className="text-primary p-2 hover:bg-blue-50 rounded-lg"><RefreshCw className={`h-4 w-4 ${loadingRuns ? 'animate-spin' : ''}`} /></button>
+                    </div>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left">
@@ -388,22 +538,22 @@ export default function IntegratedPayrollAdmin() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
-                        {runs.length === 0 ? (
+                        {filteredHistoryRuns.length === 0 ? (
                           <tr><td colSpan={3} className="px-8 py-10 text-center text-gray-400 text-xs">No storage batches found.</td></tr>
                         ) : (
-                          runs.map((run) => (
-                            <tr key={run.id} className="hover:bg-gray-50/50 transition-colors">
+                          filteredHistoryRuns.map((run) => (
+                            <tr key={run.id} onDoubleClick={() => handleDeleteBatch(run.id)} className="hover:bg-gray-50/50 transition-colors cursor-pointer group relative" title="Double click to revoke and delete batch">
                               <td className="px-8 py-5">
                                 <p className="text-xs font-black text-gray-900">{run.label || 'Standard Run'}</p>
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Imported {new Date(run.created_at).toLocaleDateString()}</p>
                               </td>
                               <td className="px-8 py-5">
                                 <p className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-md inline-block">
-                                  {run.period_start} → {run.period_end}
+                                  {new Date(run.period_start).toLocaleDateString()} → {new Date(run.period_end).toLocaleDateString()}
                                 </p>
                               </td>
                               <td className="px-8 py-5 text-right">
-                                <span className="text-xs font-black text-primary">{run.payroll_entries?.[0]?.count || 0}</span>
+                                <span className="text-xs font-black text-primary">{run._count?.documents || 0}</span>
                               </td>
                             </tr>
                           ))
@@ -436,6 +586,17 @@ export default function IntegratedPayrollAdmin() {
                   </div>
 
                   <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Company Label (Matches Storage Label)</label>
+                      <input 
+                        type="text" 
+                        list="existing-labels"
+                        placeholder="e.g. GAISANO" 
+                        value={syncLabel} 
+                        onChange={(e) => setSyncLabel(e.target.value)} 
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20" 
+                      />
+                    </div>
                     <div className="flex items-center justify-between">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Paste List (Format: ID Name)</label>
                       <span className="text-[10px] font-bold text-primary bg-blue-50 px-2 py-1 rounded-md">Example: CSC-101 Juan Dela Cruz</span>
@@ -448,7 +609,17 @@ export default function IntegratedPayrollAdmin() {
                     />
                   </div>
 
-                  <div className="flex justify-end">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      {isSyncing && syncProgress.total > 0 && (
+                        <div className="flex items-center gap-3">
+                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                          <span className="text-xs font-black text-primary uppercase tracking-widest">
+                            Syncing: {syncProgress.current} / {syncProgress.total} lines
+                          </span>
+                        </div>
+                      )}
+                    </div>
                     <button 
                       onClick={handleBulkSync}
                       disabled={isSyncing || !syncText.trim()}
@@ -463,51 +634,83 @@ export default function IntegratedPayrollAdmin() {
           )}
 
           {activeTab === 'credentials' && (
-            <div className="bg-white rounded-[3rem] border border-gray-200 shadow-sm overflow-hidden">
-              <div className="p-8 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="bg-white rounded-[3rem] border border-gray-200 shadow-sm overflow-hidden print:overflow-visible print:border-none print:shadow-none print:rounded-none">
+              <div className="p-8 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
                 <div className="flex items-center gap-3 flex-1">
                   <div className="relative flex-1 max-w-md">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <input type="text" placeholder="Search employee..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-11 pr-4 py-3 text-sm font-bold" />
                   </div>
+                  <div className="relative">
+                    <select 
+                      value={selectedCredentialLabel} 
+                      onChange={(e) => setSelectedCredentialLabel(e.target.value)}
+                      className="appearance-none bg-gray-50 border border-gray-200 rounded-xl pl-4 pr-10 py-3 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-primary/20"
+                    >
+                      <option value="all">All Labels</option>
+                      {uniqueLabels.map((label: any) => (
+                        <option key={label} value={label}>{label}</option>
+                      ))}
+                    </select>
+                    <Filter className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
+                  <div className="flex flex-col items-end mr-4 hidden md:flex">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Employees</span>
+                    <span className="text-xl font-black text-primary leading-none">{filteredUsers.length}</span>
+                  </div>
+                  <button onClick={() => window.print()} className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 transition-colors">
+                    <Printer className="h-4 w-4" /> Print
+                  </button>
                   <button onClick={handleSync} disabled={loadingUsers || !latestRun} className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center gap-2">
                     {loadingUsers ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Sync Portal
                   </button>
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="bg-gray-50/50">
-                      <th className="px-8 py-5 text-[10px] font-black uppercase text-gray-400">Employee</th>
-                      <th className="px-8 py-5 text-[10px] font-black uppercase text-gray-400">Username</th>
-                      <th className="px-8 py-5 text-[10px] font-black uppercase text-gray-400">Password</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {loadingUsers && users.length === 0 ? (
-                      <tr><td colSpan={3} className="px-8 py-20 text-center"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /></td></tr>
-                    ) : filteredUsers.length === 0 ? (
-                      <tr><td colSpan={3} className="px-8 py-20 text-center text-gray-400">No employees found.</td></tr>
-                    ) : (
-                      filteredUsers.map((user) => (
-                        <tr key={user.id} className="hover:bg-gray-50/50 transition-colors">
-                          <td className="px-8 py-6">
-                            <div className="flex items-center gap-3">
-                              <div className="h-10 w-10 rounded-xl bg-blue-50 text-primary flex items-center justify-center font-black text-xs uppercase">{user.fullName?.substring(0, 2)}</div>
-                              <div><p className="text-sm font-black text-gray-900">{user.fullName}</p><p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">ID: {user.sys_id}</p></div>
-                            </div>
-                          </td>
-                          <td className="px-8 py-6"><code className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-bold">{user.username}</code></td>
-                          <td className="px-8 py-6 text-sm font-mono text-gray-600">{user.password}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+              <div className="hidden print:block p-8 border-b border-gray-200">
+                <h2 className="text-2xl font-black text-gray-900">Portal Credentials</h2>
+                <div className="flex justify-between items-center mt-2">
+                  <p className="text-sm text-gray-500 font-bold">Filtered by: {selectedCredentialLabel === 'all' ? 'All Employees' : selectedCredentialLabel}</p>
+                  <p className="text-sm text-gray-900 font-black">Total: {filteredUsers.length} employees</p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto print:overflow-visible">
+                {loadingUsers && users.length === 0 ? (
+                  <div className="p-20 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+                ) : filteredUsers.length === 0 ? (
+                  <div className="p-20 text-center text-gray-400">No employees found.</div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-8 print:grid-cols-2 print:gap-4 print:p-0 print:mt-4">
+                    {filteredUsers.map((user) => (
+                      <div key={user.id} className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col items-center text-center print:break-inside-avoid print:shadow-none print:border-gray-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50/50 rounded-full -mr-12 -mt-12 blur-xl pointer-events-none"></div>
+                        
+                        <div className="bg-white p-2 rounded-2xl border border-gray-100 shadow-sm mb-4">
+                          <QRCodeSVG value={`${typeof window !== 'undefined' ? window.location.origin : ''}`} size={80} level="H" className="text-gray-900" />
+                        </div>
+                        
+                        <h3 className="font-black text-gray-900 text-sm mb-0.5 leading-tight">{user.fullName}</h3>
+                        <p className="text-[9px] font-black text-primary uppercase tracking-widest mb-4 bg-blue-50 px-2 py-0.5 rounded-full">{user.company_label || 'Company'} / {user.sys_id}</p>
+                        
+                        <div className="w-full bg-gray-50 rounded-2xl p-4 text-left border border-gray-100/50 space-y-3">
+                           <div className="flex justify-between items-center">
+                              <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Username</span>
+                              <code className="text-xs font-bold text-gray-900 bg-white px-2 py-1 rounded-md border border-gray-200">{user.username}</code>
+                           </div>
+                           <div className="flex justify-between items-center">
+                              <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Password</span>
+                              <code className="text-xs font-mono font-bold text-gray-600 bg-white px-2 py-1 rounded-md border border-gray-200">{user.password}</code>
+                           </div>
+                        </div>
+                        
+                        <p className="text-[8px] font-bold text-gray-400 mt-4 tracking-widest uppercase">{typeof window !== 'undefined' ? window.location.origin : 'Smart Tracking Portal'}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

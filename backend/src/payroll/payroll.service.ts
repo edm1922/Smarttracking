@@ -21,7 +21,7 @@ export class PayrollService {
   }
 
   async processMasterPdf(file: Express.Multer.File, batchData: any) {
-    const { clientName, periodStart, periodEnd, label } = batchData;
+    const { clientName, periodStart, periodEnd, label, remark, releaseDate } = batchData;
     this.logger.log(`Starting precision 1-page splitting for ${clientName}`);
 
     const pdfBuffer = file.buffer;
@@ -32,7 +32,9 @@ export class PayrollService {
         client_name: clientName,
         period_start: periodStart ? new Date(periodStart) : null,
         period_end: periodEnd ? new Date(periodEnd) : null,
+        release_date: releaseDate ? new Date(releaseDate) : null,
         label: label,
+        remark: remark || null,
       },
     });
 
@@ -61,7 +63,7 @@ export class PayrollService {
         // For each ID found on this page, upload/map it
         for (const employeeId of idsOnPage) {
           const fileName = `${employeeId}_p${pageNumber}_${Date.now()}.pdf`;
-          const filePath = `${batch.id}/${fileName}`;
+          const filePath = `documents/${batch.id}/${fileName}`;
 
           // Upload to Supabase
           const { error: uploadError } = await this.supabaseAdmin
@@ -80,7 +82,10 @@ export class PayrollService {
             .getPublicUrl(filePath);
 
           const employee = await this.prisma.user.findFirst({
-            where: { sys_id: employeeId }
+            where: { 
+              sys_id: employeeId,
+              ...(label ? { company_label: label } : {})
+            }
           });
 
           await this.prisma.document.create({
@@ -91,6 +96,7 @@ export class PayrollService {
               storage_path: publicUrl,
               file_name: fileName,
               file_type: 'PAYSLIP_PAGE',
+              remark: remark || null,
             },
           });
           
@@ -99,6 +105,12 @@ export class PayrollService {
       } catch (err) {
         this.logger.error(`Error processing page ${pageNumber}: ${err.message}`);
         results.push({ page: pageNumber, status: 'error', error: err.message });
+        
+        // If the batch was deleted mid-processing, stop to prevent orphaned files
+        if (err.message && err.message.includes('Foreign key constraint') && err.message.includes('batch_id')) {
+          this.logger.warn(`Batch ${batch.id} was deleted mid-processing. Aborting remaining pages.`);
+          break;
+        }
       }
     }
 
@@ -108,6 +120,74 @@ export class PayrollService {
       processed: results.length,
       details: results
     };
+  }
+
+  async reviseDocuments(batchId: string, selectedSysIds: string[], remark: string, fileBuffer: Buffer) {
+    const batch = await this.prisma.storageBatch.findUnique({ where: { id: batchId } });
+    if (!batch) throw new Error('Batch not found');
+
+    const pdfDoc = await PDFDocument.load(fileBuffer);
+    const numPages = pdfDoc.getPageCount();
+    let revisedCount = 0;
+
+    for (let i = 0; i < numPages; i++) {
+      try {
+        const singlePageDoc = await PDFDocument.create();
+        const [copiedPage] = await singlePageDoc.copyPages(pdfDoc, [i]);
+        singlePageDoc.addPage(copiedPage);
+        const singlePageBytes = await singlePageDoc.save();
+
+        const ids = await this.scanSinglePageForIds(Buffer.from(singlePageBytes));
+        const targetSysId = ids.find(id => selectedSysIds.includes(id));
+
+        if (targetSysId) {
+          const fileName = `${targetSysId}_revised_${Date.now()}.pdf`;
+          const storagePath = `documents/${batchId}/${fileName}`;
+          
+          const { error } = await this.supabaseAdmin.storage
+            .from('payroll-documents')
+            .upload(storagePath, singlePageBytes, { contentType: 'application/pdf', upsert: true });
+
+          if (error) throw new Error(`Supabase upload failed: ${error.message}`);
+
+          const publicUrl = this.supabaseAdmin.storage.from('payroll-documents').getPublicUrl(storagePath).data.publicUrl;
+
+          const existingDocs = await this.prisma.document.findMany({
+            where: { batch_id: batchId, sys_id: targetSysId }
+          });
+          
+          if (existingDocs.length > 0) {
+            await this.prisma.document.updateMany({
+              where: { batch_id: batchId, sys_id: targetSysId },
+              data: {
+                storage_path: publicUrl,
+                file_name: fileName,
+                remark: remark || 'Revised Document',
+                created_at: new Date()
+              }
+            });
+          } else {
+             const employee = await this.prisma.user.findUnique({ where: { sys_id: targetSysId } });
+             await this.prisma.document.create({
+                data: {
+                  batch_id: batchId,
+                  user_id: employee?.id || null,
+                  sys_id: targetSysId,
+                  storage_path: publicUrl,
+                  file_name: fileName,
+                  file_type: 'PAYSLIP_PAGE',
+                  remark: remark || 'Revised Document'
+                }
+             });
+          }
+          revisedCount++;
+        }
+      } catch (err) {
+         this.logger.error(`Error processing revision page ${i}: ${err.message}`);
+      }
+    }
+
+    return { success: true, count: revisedCount };
   }
 
   async getEmployees() {
@@ -130,12 +210,113 @@ export class PayrollService {
       role: user.role,
       run_ids: user.documents.map(d => d.batch_id),
       createdAt: user.createdAt,
+      company_label: user.company_label,
     }));
+  }
+
+  async portalLogin(username: string, pass: string) {
+    const cleanUsername = username.toLowerCase().trim();
+    const cleanPass = pass.trim();
+
+    console.log(`[Portal Login] Attempt: username='${cleanUsername}', pass='${cleanPass}'`);
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: cleanUsername },
+          { sys_id: { equals: cleanUsername, mode: 'insensitive' } }
+        ],
+        role: 'EMPLOYEE'
+      }
+    });
+
+    if (!user) {
+      console.log(`[Portal Login] User not found for username/sys_id: ${cleanUsername}`);
+      throw new HttpException('Invalid username or password.', HttpStatus.UNAUTHORIZED);
+    }
+
+    if (user.password.trim().toLowerCase() !== cleanPass.toLowerCase()) {
+      console.log(`[Portal Login] Password mismatch for ${cleanUsername}. DB password: '${user.password}'`);
+      throw new HttpException('Invalid username or password.', HttpStatus.UNAUTHORIZED);
+    }
+
+    console.log(`[Portal Login] Success for user: ${user.sys_id}`);
+
+    return {
+      id: user.id,
+      sys_id: user.sys_id,
+      fullName: user.fullName,
+      username: user.username,
+      role: user.role
+    };
+  }
+
+  async deleteBatch(batchId: string) {
+    const batch = await this.prisma.storageBatch.findUnique({
+      where: { id: batchId }
+    });
+
+    if (!batch) {
+      throw new HttpException('Batch not found', HttpStatus.NOT_FOUND);
+    }
+
+    const folderPath = `documents/${batchId}`;
+    let hasMore = true;
+    const limit = 500;
+
+    while (hasMore) {
+      const { data: filesList, error: listError } = await this.supabaseAdmin
+        .storage
+        .from('payroll-documents')
+        .list(folderPath, { limit, offset: 0 });
+
+      if (listError || !filesList || filesList.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      const validFiles = filesList.filter(f => f.name !== '.emptyFolderPlaceholder');
+      if (validFiles.length > 0) {
+        const filePaths = validFiles.map(f => `${folderPath}/${f.name}`);
+        const chunkSize = 100;
+        for (let i = 0; i < filePaths.length; i += chunkSize) {
+          const chunk = filePaths.slice(i, i + chunkSize);
+          const { error } = await this.supabaseAdmin
+            .storage
+            .from('payroll-documents')
+            .remove(chunk);
+            
+          if (error) {
+             this.logger.error(`Error deleting chunk from storage: ${error.message}`);
+          }
+        }
+      }
+
+      // If we only got empty placeholders or nothing valid left, we break
+      if (validFiles.length === 0) {
+        hasMore = false;
+      }
+    }
+
+    await this.prisma.document.deleteMany({
+      where: { batch_id: batchId }
+    });
+
+    await this.prisma.storageBatch.delete({
+      where: { id: batchId }
+    });
+
+    return { success: true, message: `Batch ${batchId} deleted successfully.` };
   }
 
   async getBatches() {
     return this.prisma.storageBatch.findMany({
-      orderBy: { created_at: 'desc' }
+      orderBy: { created_at: 'desc' },
+      include: {
+        _count: {
+          select: { documents: true }
+        }
+      }
     });
   }
 
@@ -152,7 +333,7 @@ export class PayrollService {
     });
   }
 
-  async syncBulkEmployees(text: string) {
+  async syncBulkEmployees(text: string, label?: string) {
     if (!text) throw new HttpException('No text provided', HttpStatus.BAD_REQUEST);
 
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -183,38 +364,50 @@ export class PayrollService {
     }
 
     let successCount = 0;
-    const batchSize = 50;
-    
-    for (let i = 0; i < validEntries.length; i += batchSize) {
-      const batch = validEntries.slice(i, i + batchSize);
-      
-      await this.prisma.$transaction(
-        batch.map(entry => 
-          this.prisma.user.upsert({
+    let newCount = 0;
+    let updateCount = 0;
+
+    for (const entry of validEntries) {
+      try {
+        const existing = await this.prisma.user.findUnique({
+          where: { sys_id: entry.sys_id }
+        });
+
+        if (existing) {
+          await this.prisma.user.update({
             where: { sys_id: entry.sys_id },
-            update: { 
+            data: { 
               fullName: entry.fullName, 
               username: entry.username, 
-              password: entry.password 
-            },
-            create: {
+              password: entry.password,
+              company_label: label,
+            }
+          });
+          updateCount++;
+        } else {
+          await this.prisma.user.create({
+            data: {
               sys_id: entry.sys_id,
               fullName: entry.fullName,
               username: entry.username,
               password: entry.password,
-              role: 'EMPLOYEE'
+              role: 'EMPLOYEE',
+              company_label: label,
             }
-          })
-        )
-      );
-      
-      successCount += batch.length;
+          });
+          newCount++;
+        }
+        successCount++;
+      } catch (err) {
+        console.error('Failed to sync user', entry.sys_id, err);
+      }
     }
 
     return {
       success: true,
       count: successCount,
-      message: `Successfully provisioned ${successCount} accounts.`
+      newCount,
+      message: `Successfully provisioned ${successCount} accounts. ${newCount > 0 ? `New: ${newCount}.` : ''}`
     };
   }
 
@@ -223,6 +416,16 @@ export class PayrollService {
       where: { sys_id: sysId },
       include: {
         batch: true
+      },
+      orderBy: { created_at: 'desc' }
+    });
+  }
+
+  async getAllPayslips() {
+    return this.prisma.document.findMany({
+      include: {
+        batch: true,
+        user: true
       },
       orderBy: { created_at: 'desc' }
     });

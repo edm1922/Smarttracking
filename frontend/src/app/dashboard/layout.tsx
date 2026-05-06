@@ -135,7 +135,7 @@ useEffect(() => {
   const payrollItems = [
     { name: 'Payroll Admin', href: '/dashboard/payroll', icon: FileText },
     { 
-      name: role === 'payroll_admin' ? 'Payroll Records' : 'My Payslips', 
+      name: role === 'payroll_admin' ? 'Manage Payslips' : 'My Payslips', 
       href: '/dashboard/payroll/my-payslips', 
       icon: role === 'payroll_admin' ? Users : Wallet 
     },
@@ -146,7 +146,7 @@ useEffect(() => {
   ]; */
 
   return (
-    <div className="flex min-h-screen bg-[#e2e8f0]">
+    <div className="flex min-h-screen bg-[#e2e8f0] print:block print:bg-white">
       {/* Sidebar */}
       <aside className="fixed inset-y-0 left-0 w-64 border-r border-gray-200 bg-white no-print flex flex-col z-[40]">
         <div className="flex h-16 items-center border-b border-gray-200 px-6 shrink-0 justify-between">
@@ -414,8 +414,8 @@ useEffect(() => {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 pl-64 print:pl-0">
-        <div className="mx-auto max-w-7xl p-8 print:max-w-none print:p-0 print:m-0 w-full">{children}</div>
+      <main className="flex-1 pl-64 print:pl-0 print:block">
+        <div className="mx-auto max-w-7xl p-8 print:max-w-none print:p-0 print:m-0 w-full print:block">{children}</div>
       </main>
 
       {/* Dev Notice Modal */}

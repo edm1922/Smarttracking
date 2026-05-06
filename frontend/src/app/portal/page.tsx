@@ -19,16 +19,19 @@ export default function EmployeeLoginPage() {
     setError(null);
 
     try {
-      const { data: user, error: dbError } = await supabase
-        .from('User')
-        .select('*')
-        .eq('username', email.toLowerCase().trim())
-        .eq('password', password.trim())
-        .single();
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${apiUrl}/payroll/portal-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: email, password })
+      });
 
-      if (dbError || !user) {
-        throw new Error('Invalid username or password.');
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Invalid username or password.');
       }
+
+      const user = await res.json();
 
       // Store user data in localStorage for session management
       localStorage.setItem('portalUser', JSON.stringify({

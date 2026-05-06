@@ -34,7 +34,9 @@ export class PayrollController {
         clientName: body.client_name,
         periodStart: body.period_start,
         periodEnd: body.period_end,
-        label: body.label || body.client_name
+        releaseDate: body.release_date,
+        label: body.label || body.client_name,
+        remark: body.remark
       };
 
       const result = await this.payrollService.processMasterPdf(files[0], batchData);
@@ -63,14 +65,42 @@ export class PayrollController {
     return this.payrollService.getLatestBatch();
   }
 
+  @Delete('batch/:id')
+  async deleteBatch(@Param('id') id: string) {
+    return this.payrollService.deleteBatch(id);
+  }
+
   @Post('sync-bulk')
-  async syncBulk(@Body('text') text: string) {
-    return this.payrollService.syncBulkEmployees(text);
+  async syncBulk(@Body() body: { text: string; label?: string }) {
+    return this.payrollService.syncBulkEmployees(body.text, body.label);
+  }
+
+  @Post('portal-login')
+  async portalLogin(@Body() body: any) {
+    return this.payrollService.portalLogin(body.username, body.password);
+  }
+
+  @Post('revise')
+  @UseInterceptors(FilesInterceptor('file'))
+  async reviseDocuments(
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body() body: { batchId: string; selectedSysIds: string; remark?: string }
+  ) {
+    if (!files || files.length === 0) {
+      throw new HttpException('No file uploaded', HttpStatus.BAD_REQUEST);
+    }
+    const sysIds = JSON.parse(body.selectedSysIds || '[]');
+    return this.payrollService.reviseDocuments(body.batchId, sysIds, body.remark || '', files[0].buffer);
   }
 
   @Get('my-payslips/:sysId')
   async getMyPayslips(@Param('sysId') sysId: string) {
     return this.payrollService.getEmployeePayslips(sysId);
+  }
+
+  @Get('all-payslips')
+  async getAllPayslips() {
+    return this.payrollService.getAllPayslips();
   }
 
   @Delete('users/:id')

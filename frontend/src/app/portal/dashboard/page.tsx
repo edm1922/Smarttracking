@@ -110,21 +110,21 @@ export default function EmployeeDashboard() {
           
           {/* Left Column */}
           <div className="space-y-8">
-            <div className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm relative overflow-hidden group">
+             <div className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm relative overflow-hidden group">
                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
                <div className="relative z-10">
-                 <p className="text-gray-400 text-[10px] font-bold uppercase tracking-[0.2em] mb-4">Latest Take Home</p>
+                 <p className="text-gray-400 text-[10px] font-bold uppercase tracking-[0.2em] mb-4">Total Documents</p>
                  <h3 className="text-4xl font-black text-gray-900 mb-1">
-                   ₱{slips[0]?.net_pay?.toLocaleString() || '0.00'}
+                   {slips.length}
                  </h3>
-                 <p className="text-gray-400 text-xs font-medium">Released: {slips[0]?.batch?.created_at ? new Date(slips[0].batch.created_at).toLocaleDateString() : 'N/A'}</p>
+                 <p className="text-gray-400 text-xs font-medium">Latest: {slips[0]?.batch?.created_at ? new Date(slips[0].batch.created_at).toLocaleDateString() : 'N/A'}</p>
                  
                  <div className="mt-8 pt-8 border-t border-gray-50 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                        <div className="h-10 w-10 rounded-full bg-emerald-50 flex items-center justify-center">
                          <TrendingUp className="h-5 w-5 text-emerald-500" />
                        </div>
-                       <span className="text-xs font-bold text-gray-600">Earnings Synced</span>
+                       <span className="text-xs font-bold text-gray-600">Files Synced</span>
                     </div>
                     <ChevronRight className="h-4 w-4 text-gray-300" />
                  </div>
