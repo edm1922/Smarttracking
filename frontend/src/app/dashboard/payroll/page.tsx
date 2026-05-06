@@ -689,7 +689,7 @@ export default function IntegratedPayrollAdmin() {
                         <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50/50 rounded-full -mr-12 -mt-12 blur-xl pointer-events-none"></div>
                         
                         <div className="bg-white p-2 rounded-2xl border border-gray-100 shadow-sm mb-4">
-                          <QRCodeSVG value={`${typeof window !== 'undefined' ? window.location.origin : ''}`} size={80} level="H" className="text-gray-900" />
+                          <QRCodeSVG value="https://smarttracking-frontend.vercel.app/portal" size={80} level="H" className="text-gray-900" />
                         </div>
                         
                         <h3 className="font-black text-gray-900 text-sm mb-0.5 leading-tight">{user.fullName}</h3>
@@ -706,7 +706,7 @@ export default function IntegratedPayrollAdmin() {
                            </div>
                         </div>
                         
-                        <p className="text-[8px] font-bold text-gray-400 mt-4 tracking-widest uppercase">{typeof window !== 'undefined' ? window.location.origin : 'Smart Tracking Portal'}</p>
+                        <p className="text-[8px] font-bold text-gray-400 mt-4 tracking-widest uppercase">https://smarttracking-frontend.vercel.app/portal</p>
                       </div>
                     ))}
                   </div>
