@@ -453,48 +453,76 @@ export default function IntegratedPayrollAdmin() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Period Start</label>
-                        <input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold" />
+                        <input 
+                          type="date" 
+                          disabled={!clientLabel}
+                          value={periodStart} 
+                          onChange={(e) => setPeriodStart(e.target.value)} 
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-50" 
+                        />
                       </div>
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Period End</label>
-                        <input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold" />
+                        <input 
+                          type="date" 
+                          disabled={!clientLabel}
+                          value={periodEnd} 
+                          onChange={(e) => setPeriodEnd(e.target.value)} 
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-50" 
+                        />
                       </div>
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Release Date</label>
                       <input 
                         type="date" 
+                        disabled={!clientLabel}
                         value={releaseDate} 
                         onChange={(e) => setReleaseDate(e.target.value)} 
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20" 
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50" 
                       />
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Remark / Note (Optional)</label>
                       <input 
                         type="text" 
+                        disabled={!clientLabel}
                         placeholder="e.g. Regular Payroll, Adjusted OT, etc." 
                         value={remark} 
                         onChange={(e) => setRemark(e.target.value)} 
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20" 
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50" 
                       />
                     </div>
                   </div>
 
                   <div 
-                    onClick={() => fileInputRef.current?.click()}
-                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-primary'); }}
-                    onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove('border-primary'); }}
+                    onClick={() => clientLabel && fileInputRef.current?.click()}
+                    onDragOver={(e) => { 
+                      if (!clientLabel) return;
+                      e.preventDefault(); 
+                      e.currentTarget.classList.add('border-primary'); 
+                    }}
+                    onDragLeave={(e) => { 
+                      if (!clientLabel) return;
+                      e.preventDefault(); 
+                      e.currentTarget.classList.remove('border-primary'); 
+                    }}
                     onDrop={(e) => {
+                      if (!clientLabel) return;
                       e.preventDefault();
                       e.currentTarget.classList.remove('border-primary');
                       if (e.dataTransfer.files) {
                         setSelectedFiles(Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.pdf')));
                       }
                     }}
-                    className="border-2 border-dashed border-gray-200 rounded-[2rem] p-12 text-center hover:border-primary/40 transition-colors cursor-pointer bg-gray-50/50"
+                    className={`border-2 border-dashed border-gray-200 rounded-[2rem] p-12 text-center transition-all bg-gray-50/50 ${!clientLabel ? 'opacity-30 cursor-not-allowed' : 'hover:border-primary/40 cursor-pointer'}`}
                   >
-                    {selectedFiles.length > 0 ? (
+                    {!clientLabel ? (
+                      <div className="space-y-2">
+                        <ShieldAlert className="h-10 w-10 text-gray-300 mx-auto mb-4" />
+                        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Select Client First</p>
+                      </div>
+                    ) : selectedFiles.length > 0 ? (
                       <div className="space-y-2">
                         <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto mb-2" />
                         <p className="text-sm font-black text-gray-900">{selectedFiles.length} files selected</p>
