@@ -51,6 +51,20 @@ export class PayrollService {
     const totalPages = sourcePdfDoc.getPageCount();
     const results = [];
 
+    // Pre-fetch existing documents in this batch if resuming
+    const existingSysIds = new Set<string>();
+    if (resumeBatchId) {
+      const existingDocs = await this.prisma.document.findMany({
+        where: { batch_id: batch.id },
+        select: { sys_id: true }
+      });
+      existingDocs.forEach(d => existingSysIds.add(d.sys_id));
+      this.logger.log(`Pre-fetched ${existingSysIds.size} existing document IDs for resume logic.`);
+    }
+
+    // Cache for user lookups to avoid redundant DB calls
+    const userCache = new Map<string, any>();
+
     // Process each page individually
     for (let i = 0; i < totalPages; i++) {
       const pageNumber = i + 1;
@@ -71,19 +85,10 @@ export class PayrollService {
 
         // For each ID found on this page, upload/map it
         for (const employeeId of idsOnPage) {
-          if (resumeBatchId) {
-            const existingDoc = await this.prisma.document.findFirst({
-              where: {
-                batch_id: batch.id,
-                sys_id: employeeId
-              }
-            });
-
-            if (existingDoc) {
-              this.logger.log(`Page ${pageNumber}: ID ${employeeId} already exists in batch ${batch.id}. Skipping.`);
-              results.push({ page: pageNumber, id: employeeId, status: 'skipped' });
-              continue;
-            }
+          if (resumeBatchId && existingSysIds.has(employeeId)) {
+            this.logger.log(`Page ${pageNumber}: ID ${employeeId} already exists in batch ${batch.id}. Skipping.`);
+            results.push({ page: pageNumber, id: employeeId, status: 'skipped' });
+            continue;
           }
 
           const fileName = `${employeeId}_p${pageNumber}_${Date.now()}.pdf`;
@@ -105,12 +110,19 @@ export class PayrollService {
             .from('payroll-documents')
             .getPublicUrl(filePath);
 
-          const employee = await this.prisma.user.findFirst({
-            where: { 
-              sys_id: employeeId,
-              ...(label ? { company_label: label } : {})
-            }
-          });
+          // Get employee from cache or DB
+          const cacheKey = `${employeeId}_${label || ''}`;
+          let employee = userCache.get(cacheKey);
+          
+          if (!employee && !userCache.has(cacheKey)) {
+            employee = await this.prisma.user.findFirst({
+              where: { 
+                sys_id: employeeId,
+                ...(label ? { company_label: label } : {})
+              }
+            });
+            userCache.set(cacheKey, employee || null); // Cache null if not found to avoid re-searching
+          }
 
           await this.prisma.document.create({
             data: {
@@ -123,6 +135,9 @@ export class PayrollService {
               remark: remark || null,
             },
           });
+          
+          // Add to existingSysIds in case there are duplicates within the same PDF
+          existingSysIds.add(employeeId);
           
           results.push({ page: pageNumber, id: employeeId, status: 'success' });
         }
