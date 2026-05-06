@@ -67,6 +67,13 @@ export default function AnalyticsPage() {
 
   const COLORS = ['#6366f1', '#a855f7', '#ec4899', '#f43f5e', '#f97316', '#eab308'];
 
+  const colorClasses: Record<string, { bg: string; text: string; border: string }> = {
+    indigo: { bg: 'bg-indigo-500/10', text: 'text-indigo-400', border: 'border-indigo-500/20' },
+    purple: { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/20' },
+    emerald: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' },
+    amber: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20' },
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       <div className="flex items-center justify-between">
@@ -95,24 +102,27 @@ export default function AnalyticsPage() {
           { name: 'Active Users', value: usageData?.totalUsers || 0, icon: Users, color: 'purple', label: 'Registered Identities' },
           { name: 'Audit Events', value: usageData?.totalActivityLogs || 0, icon: ShieldCheck, color: 'emerald', label: 'Security Log' },
           { name: 'Uptime Record', value: usageData?.uptimeDays || 0, icon: Server, color: 'amber', label: 'System Health', suffix: ' Days' },
-        ].map((stat) => (
-          <div key={stat.name} className="bg-[#1e293b] p-6 rounded-3xl border border-slate-700/50 relative overflow-hidden group hover:border-indigo-500/50 transition-all duration-300">
-            <div className={`absolute -right-4 -top-4 h-24 w-24 bg-${stat.color}-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700`}></div>
-            <div className="flex items-center justify-between mb-4 relative z-10">
-              <div className={`p-3 rounded-2xl bg-${stat.color}-500/10 text-${stat.color}-400 border border-${stat.color}-500/20`}>
-                <stat.icon className="h-6 w-6" />
+        ].map((stat) => {
+          const colors = colorClasses[stat.color];
+          return (
+            <div key={stat.name} className="bg-[#1e293b] p-6 rounded-3xl border border-slate-700/50 relative overflow-hidden group hover:border-indigo-500/50 transition-all duration-300">
+              <div className={`absolute -right-4 -top-4 h-24 w-24 ${colors.bg} rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700`}></div>
+              <div className="flex items-center justify-between mb-4 relative z-10">
+                <div className={`p-3 rounded-2xl ${colors.bg} ${colors.text} border ${colors.border}`}>
+                  <stat.icon className="h-6 w-6" />
+                </div>
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{stat.label}</span>
               </div>
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{stat.label}</span>
+              <div className="relative z-10">
+                <h3 className="text-3xl font-black text-white mb-1">
+                  {stat.value.toLocaleString()}
+                  {stat.suffix && <span className="text-sm font-bold text-slate-500 ml-1">{stat.suffix}</span>}
+                </h3>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-tight">{stat.name}</p>
+              </div>
             </div>
-            <div className="relative z-10">
-              <h3 className="text-3xl font-black text-white mb-1">
-                {stat.value.toLocaleString()}
-                {stat.suffix && <span className="text-sm font-bold text-slate-500 ml-1">{stat.suffix}</span>}
-              </h3>
-              <p className="text-slate-400 text-xs font-bold uppercase tracking-tight">{stat.name}</p>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

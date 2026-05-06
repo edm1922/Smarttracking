@@ -65,9 +65,15 @@ export default function SystemUsersPage() {
     e.preventDefault();
     try {
       const res = await api.post('/users', formData);
+      const newUser: UserData = {
+        id: res.data.id,
+        username: res.data.username,
+        role: res.data.role,
+        createdAt: new Date().toISOString(),
+      };
+      setUsers(prev => [newUser, ...prev]);
       setGeneratedUser(res.data);
       setFormData({ username: '', role: 'inventory' });
-      fetchUsers();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to create user');
     }
@@ -77,7 +83,7 @@ export default function SystemUsersPage() {
     if (!confirm('Are you sure you want to delete this user? They will lose all access immediately.')) return;
     try {
       await api.delete(`/users/${id}`);
-      fetchUsers();
+      setUsers(prev => prev.filter(u => u.id !== id));
     } catch (err) {
       alert('Failed to delete user');
     }
@@ -304,10 +310,10 @@ export default function SystemUsersPage() {
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Authorization Tier</label>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       {[
-                        { id: 'inventory', name: 'Staff', icon: User, color: 'slate' },
-                        { id: 'admin', name: 'Manager', icon: Shield, color: 'indigo' },
-                        { id: 'payroll_admin', name: 'Payroll', icon: CreditCard, color: 'emerald' },
-                        { id: 'super_admin', name: 'SysAdmin', icon: ShieldAlert, color: 'amber' }
+                        { id: 'inventory', name: 'Staff', icon: User, activeClass: 'bg-slate-500/10 border-slate-500/50 text-slate-400 shadow-lg shadow-slate-500/10' },
+                        { id: 'admin', name: 'Manager', icon: Shield, activeClass: 'bg-indigo-500/10 border-indigo-500/50 text-indigo-400 shadow-lg shadow-indigo-500/10' },
+                        { id: 'payroll_admin', name: 'Payroll', icon: CreditCard, activeClass: 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400 shadow-lg shadow-emerald-500/10' },
+                        { id: 'super_admin', name: 'SysAdmin', icon: ShieldAlert, activeClass: 'bg-amber-500/10 border-amber-500/50 text-amber-400 shadow-lg shadow-amber-500/10' }
                       ].map((role) => (
                         <button
                           key={role.id}
@@ -315,7 +321,7 @@ export default function SystemUsersPage() {
                           onClick={() => setFormData({...formData, role: role.id as any})}
                           className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all group ${
                             formData.role === role.id 
-                              ? `bg-${role.color}-500/10 border-${role.color}-500/50 text-${role.color}-400 shadow-lg shadow-${role.color}-500/10` 
+                              ? role.activeClass
                               : 'bg-slate-800/30 border-slate-700/50 text-slate-500 hover:border-slate-600 hover:text-slate-400'
                           }`}
                         >

@@ -21,25 +21,29 @@ async function bootstrap() {
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ limit: '50mb', extended: true }));
 
-  if (process.env.NODE_ENV !== 'production') {
-    await app.listen(process.env.PORT ?? 3001);
+  // Listen on port if NOT running as a Vercel serverless function
+  if (!process.env.VERCEL) {
+    const port = process.env.PORT || 3001;
+    await app.listen(port);
+    console.log(`Backend is running on port ${port}`);
+  } else {
+    await app.init();
   }
-
-  await app.init();
+  
   return app;
 }
 
 // For Vercel serverless deployment
-let app: any;
+let cachedApp: any;
 export default async (req: any, res: any) => {
-  if (!app) {
-    app = await bootstrap();
+  if (!cachedApp) {
+    cachedApp = await bootstrap();
   }
-  const instance = app.getHttpAdapter().getInstance();
+  const instance = cachedApp.getHttpAdapter().getInstance();
   instance(req, res);
 };
 
-// For local development
-if (process.env.NODE_ENV !== 'production') {
+// Start the app if running directly (e.g. on your Ryzen PC)
+if (!process.env.VERCEL) {
   bootstrap();
 }
