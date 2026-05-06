@@ -62,9 +62,16 @@ export default function IntegratedPayrollAdmin() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState({ current: 0, total: 0 });
 
+  // Company management state
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [newCompanyName, setNewCompanyName] = useState('');
+  const [isSavingCompany, setIsSavingCompany] = useState(false);
+  const [selectedCompanyFilter, setSelectedCompanyFilter] = useState('all');
+
   // Storage Handlers
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [remark, setRemark] = useState('');
+  const [resumableBatchId, setResumableBatchId] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,7 +118,8 @@ export default function IntegratedPayrollAdmin() {
           period_start: periodStart,
           period_end: periodEnd,
           release_date: releaseDate,
-          remark: remark
+          remark: remark,
+          resumeBatchId: resumableBatchId
         }),
       });
 
@@ -123,8 +131,38 @@ export default function IntegratedPayrollAdmin() {
       setSelectedFiles([]);
       setRemark(''); // Clear remark after success
       setReleaseDate(''); // Clear release date
+      setResumableBatchId(null); // Clear resumable state
       fetchRuns();
     } catch (err: any) {
+      console.error('Upload error:', err);
+      
+      // Check if we can resume by looking at the latest run
+      try {
+        const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+        const latestRes = await fetch(`${apiUrl}/payroll/latest-run`);
+        const latest = await latestRes.json();
+        
+        // Match criteria: label/clientName and periods must match
+        const formLabel = clientLabel || '';
+        const batchLabel = latest?.label || latest?.client_name || '';
+        
+        if (latest && 
+            batchLabel === formLabel && 
+            latest.period_start && new Date(latest.period_start).toISOString().split('T')[0] === periodStart &&
+            latest.period_end && new Date(latest.period_end).toISOString().split('T')[0] === periodEnd) {
+          
+          setResumableBatchId(latest.id);
+          setStatus({ 
+            type: 'error', 
+            message: "System limit reached. Kindly upload again to continue where you left off." 
+          });
+          setUploading(false);
+          return;
+        }
+      } catch (checkErr) {
+        console.error('Failed to check for resumable batch:', checkErr);
+      }
+
       setStatus({ type: 'error', message: err.message });
     } finally {
       setUploading(false);
@@ -194,9 +232,45 @@ export default function IntegratedPayrollAdmin() {
     }
   };
 
+  const fetchCompanies = async () => {
+    try {
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${apiUrl}/payroll/companies`);
+      if (res.ok) {
+        const data = await res.json();
+        setCompanies(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch companies:', err);
+    }
+  };
+
+  const handleSaveCompany = async () => {
+    if (!newCompanyName.trim()) return;
+    setIsSavingCompany(true);
+    try {
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${apiUrl}/payroll/companies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newCompanyName }),
+      });
+      if (res.ok) {
+        setNewCompanyName('');
+        await fetchCompanies();
+        setStatus({ type: 'success', message: 'Company label saved successfully!' });
+      }
+    } catch (err: any) {
+      setStatus({ type: 'error', message: err.message });
+    } finally {
+      setIsSavingCompany(false);
+    }
+  };
+
   useEffect(() => {
     fetchLatestRun();
     fetchRuns();
+    fetchCompanies();
     if (activeTab === 'credentials') fetchUsers();
   }, [activeTab]);
 
@@ -297,6 +371,9 @@ export default function IntegratedPayrollAdmin() {
     if (historyEnd) {
       matches = matches && new Date(run.period_end) <= new Date(historyEnd);
     }
+    if (selectedCompanyFilter !== 'all') {
+      matches = matches && (run.label === selectedCompanyFilter || run.client_name === selectedCompanyFilter);
+    }
     return matches;
   });
 
@@ -336,16 +413,42 @@ export default function IntegratedPayrollAdmin() {
 
                 <div className="p-8 space-y-6">
                   <div className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Client / Company Name</label>
-                      <input 
-                        type="text" 
-                        list="existing-labels"
-                        placeholder="e.g. GAISANO" 
-                        value={clientLabel} 
-                        onChange={(e) => setClientLabel(e.target.value)} 
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20" 
-                      />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">New Client / Company</label>
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            placeholder="Type new name..." 
+                            value={newCompanyName} 
+                            onChange={(e) => setNewCompanyName(e.target.value)} 
+                            className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20" 
+                          />
+                          <button 
+                            onClick={handleSaveCompany}
+                            disabled={isSavingCompany || !newCompanyName.trim()}
+                            className="bg-gray-900 text-white p-3 rounded-xl disabled:opacity-50 hover:bg-black transition-colors"
+                          >
+                            {isSavingCompany ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Select Existing Client</label>
+                        <div className="relative">
+                          <select 
+                            value={clientLabel} 
+                            onChange={(e) => setClientLabel(e.target.value)}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold appearance-none outline-none focus:ring-2 focus:ring-primary/20"
+                          >
+                            <option value="">-- Choose Client --</option>
+                            {companies.map(c => (
+                              <option key={c.id} value={c.name}>{c.name}</option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                        </div>
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -461,7 +564,9 @@ export default function IntegratedPayrollAdmin() {
             </button>
             <button 
               onClick={() => setActiveTab('sync')}
-              className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all ${activeTab === 'sync' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              disabled={runs.length === 0}
+              className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all ${activeTab === 'sync' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'} ${runs.length === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
+              title={runs.length === 0 ? "Upload a PDF first to enable account sync" : ""}
             >
               Account Sync
             </button>
@@ -542,6 +647,20 @@ export default function IntegratedPayrollAdmin() {
                         />
                       </div>
 
+                      <div className="relative">
+                        <select 
+                          value={selectedCompanyFilter} 
+                          onChange={(e) => setSelectedCompanyFilter(e.target.value)}
+                          className="appearance-none bg-gray-50 border border-gray-200 rounded-xl pl-4 pr-10 py-2 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-primary/20"
+                        >
+                          <option value="all">All Clients</option>
+                          {companies.map(c => (
+                            <option key={c.id} value={c.name}>{c.name}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
+                      </div>
+
                       <button onClick={fetchRuns} className="text-primary p-2 hover:bg-blue-50 rounded-lg"><RefreshCw className={`h-4 w-4 ${loadingRuns ? 'animate-spin' : ''}`} /></button>
                     </div>
                   </div>
@@ -605,14 +724,19 @@ export default function IntegratedPayrollAdmin() {
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Company Label (Matches Storage Label)</label>
-                      <input 
-                        type="text" 
-                        list="existing-labels"
-                        placeholder="e.g. GAISANO" 
-                        value={syncLabel} 
-                        onChange={(e) => setSyncLabel(e.target.value)} 
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20" 
-                      />
+                      <div className="relative">
+                        <select 
+                          value={syncLabel} 
+                          onChange={(e) => setSyncLabel(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold appearance-none outline-none focus:ring-2 focus:ring-primary/20 text-gray-700"
+                        >
+                          <option value="">-- Choose Client --</option>
+                          {companies.map(c => (
+                            <option key={c.id} value={c.name}>{c.name}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                      </div>
                     </div>
                     <div className="flex items-center justify-between">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Paste List (Format: ID Name)</label>

@@ -21,20 +21,31 @@ export class PayrollService {
   }
 
   async processMasterPdf(pdfBuffer: Buffer, batchData: any) {
-    const { clientName, periodStart, periodEnd, label, remark, releaseDate } = batchData;
-    this.logger.log(`Starting precision 1-page splitting for ${clientName}`);
+    const { clientName, periodStart, periodEnd, label, remark, releaseDate, resumeBatchId } = batchData;
+    this.logger.log(`Starting precision 1-page splitting for ${clientName}${resumeBatchId ? ` (RESUMING batch: ${resumeBatchId})` : ''}`);
     
-    // Create the batch record
-    const batch = await this.prisma.storageBatch.create({
-      data: {
-        client_name: clientName,
-        period_start: periodStart ? new Date(periodStart) : null,
-        period_end: periodEnd ? new Date(periodEnd) : null,
-        release_date: releaseDate ? new Date(releaseDate) : null,
-        label: label,
-        remark: remark || null,
-      },
-    });
+    let batch;
+    if (resumeBatchId) {
+      batch = await this.prisma.storageBatch.findUnique({
+        where: { id: resumeBatchId }
+      });
+      if (!batch) {
+        throw new HttpException('Batch to resume not found', HttpStatus.NOT_FOUND);
+      }
+      this.logger.log(`Resuming batch ${batch.id}. Will skip already processed documents.`);
+    } else {
+      // Create the batch record
+      batch = await this.prisma.storageBatch.create({
+        data: {
+          client_name: clientName,
+          period_start: periodStart ? new Date(periodStart) : null,
+          period_end: periodEnd ? new Date(periodEnd) : null,
+          release_date: releaseDate ? new Date(releaseDate) : null,
+          label: label,
+          remark: remark || null,
+        },
+      });
+    }
 
     const sourcePdfDoc = await PDFDocument.load(pdfBuffer);
     const totalPages = sourcePdfDoc.getPageCount();
@@ -60,6 +71,21 @@ export class PayrollService {
 
         // For each ID found on this page, upload/map it
         for (const employeeId of idsOnPage) {
+          if (resumeBatchId) {
+            const existingDoc = await this.prisma.document.findFirst({
+              where: {
+                batch_id: batch.id,
+                sys_id: employeeId
+              }
+            });
+
+            if (existingDoc) {
+              this.logger.log(`Page ${pageNumber}: ID ${employeeId} already exists in batch ${batch.id}. Skipping.`);
+              results.push({ page: pageNumber, id: employeeId, status: 'skipped' });
+              continue;
+            }
+          }
+
           const fileName = `${employeeId}_p${pageNumber}_${Date.now()}.pdf`;
           const filePath = `documents/${batch.id}/${fileName}`;
 
@@ -496,6 +522,29 @@ export class PayrollService {
           }
         }
       });
+    });
+  }
+
+  async saveCompany(name: string) {
+    if (!name) throw new HttpException('Company name is required', HttpStatus.BAD_REQUEST);
+    const cleanName = name.trim().toUpperCase();
+    
+    return this.prisma.company.upsert({
+      where: { name: cleanName },
+      update: {},
+      create: { name: cleanName }
+    });
+  }
+
+  async getCompanies() {
+    return this.prisma.company.findMany({
+      orderBy: { name: 'asc' }
+    });
+  }
+
+  async deleteCompany(id: string) {
+    return this.prisma.company.delete({
+      where: { id }
     });
   }
 }

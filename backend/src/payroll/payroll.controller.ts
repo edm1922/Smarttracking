@@ -105,7 +105,7 @@ export class PayrollController {
 
   @Post('process-uploaded')
   async processUploaded(@Body() body: any) {
-    const { filePath, ...batchDataRaw } = body;
+    const { filePath, resumeBatchId, ...batchDataRaw } = body;
     
     const batchData = {
       clientName: batchDataRaw.client_name,
@@ -113,7 +113,8 @@ export class PayrollController {
       periodEnd: batchDataRaw.period_end,
       releaseDate: batchDataRaw.release_date,
       label: batchDataRaw.label || batchDataRaw.client_name,
-      remark: batchDataRaw.remark
+      remark: batchDataRaw.remark,
+      resumeBatchId: resumeBatchId
     };
 
     return this.payrollService.processRemoteMasterPdf(filePath, batchData);
@@ -127,5 +128,20 @@ export class PayrollController {
   @Delete('users/:id')
   async deleteUser(@Param('id') id: string) {
     return this.payrollService.deleteEmployee(id);
+  }
+
+  @Get('companies')
+  async getCompanies() {
+    return this.payrollService.getCompanies();
+  }
+
+  @Post('companies')
+  async saveCompany(@Body() body: { name: string }) {
+    return this.payrollService.saveCompany(body.name);
+  }
+
+  @Delete('companies/:id')
+  async deleteCompany(@Param('id') id: string) {
+    return this.payrollService.deleteCompany(id);
   }
 }
