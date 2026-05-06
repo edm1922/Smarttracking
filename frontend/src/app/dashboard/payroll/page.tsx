@@ -650,7 +650,7 @@ export default function IntegratedPayrollAdmin() {
                     className="bg-primary text-white px-10 py-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center gap-2"
                   >
                     {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                    {uploading ? 'Uploading...' : 'Start Upload'}
+                    {uploading ? 'Uploading...' : (resumableBatchId ? 'Resume Upload' : 'Start Upload')}
                   </button>
                 </div>
               </motion.div>
