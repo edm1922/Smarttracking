@@ -205,6 +205,27 @@ export default function IntegratedPayrollAdmin() {
     }
   };
 
+  const handleDeleteEmployee = async (userId: string) => {
+    if (!window.confirm("Are you sure you want to delete this employee portal access?")) {
+      return;
+    }
+
+    setStatus(null);
+    try {
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${apiUrl}/payroll/users/${userId}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to delete employee');
+
+      setStatus({ type: 'success', message: 'Employee successfully deleted.' });
+      fetchUsers();
+    } catch (err: any) {
+      setStatus({ type: 'error', message: err.message });
+    }
+  };
+
   const fetchLatestRun = async () => {
     try {
       const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
@@ -855,6 +876,13 @@ export default function IntegratedPayrollAdmin() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-8 print:grid-cols-2 print:gap-4 print:p-0 print:mt-4">
                     {filteredUsers.map((user) => (
                       <div key={user.id} className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col items-center text-center print:break-inside-avoid print:shadow-none print:border-gray-300 relative overflow-hidden group">
+                        <button 
+                          onClick={() => handleDeleteEmployee(user.id)}
+                          className="absolute top-4 left-4 p-2 bg-red-50 text-red-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white z-10 print:hidden"
+                          title="Delete Employee Access"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                         <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50/50 rounded-full -mr-12 -mt-12 blur-xl pointer-events-none"></div>
 
                         <div className="bg-white p-2 rounded-2xl border border-gray-100 shadow-sm mb-4">
