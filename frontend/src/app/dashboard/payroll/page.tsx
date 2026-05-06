@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Upload, 
-  FileText, 
-  AlertCircle, 
-  CheckCircle2, 
+import {
+  Upload,
+  FileText,
+  AlertCircle,
+  CheckCircle2,
   Loader2,
   Printer,
   ChevronRight,
@@ -32,7 +32,7 @@ export default function IntegratedPayrollAdmin() {
   const [activeTab, setActiveTab] = useState<'storage' | 'credentials' | 'sync'>('storage');
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
-  
+
   // Credentials state
   const [users, setUsers] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,7 +47,7 @@ export default function IntegratedPayrollAdmin() {
   const [periodEnd, setPeriodEnd] = useState('');
   const [releaseDate, setReleaseDate] = useState('');
   const [clientLabel, setClientLabel] = useState('');
-  
+
   // History Filters
   const [historySearch, setHistorySearch] = useState('');
   const [historyStart, setHistoryStart] = useState('');
@@ -83,10 +83,10 @@ export default function IntegratedPayrollAdmin() {
   const handleUpload = async () => {
     if (selectedFiles.length === 0 || !clientLabel || !periodStart || !periodEnd) return;
     if (!window.confirm("Are you sure you want to start this upload?")) return;
-    
+
     setUploading(true);
     setStatus(null);
-    
+
     try {
       const file = selectedFiles[0];
       const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
@@ -135,26 +135,26 @@ export default function IntegratedPayrollAdmin() {
       fetchRuns();
     } catch (err: any) {
       console.error('Upload error:', err);
-      
+
       // Check if we can resume by looking at the latest run
       try {
         const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
         const latestRes = await fetch(`${apiUrl}/payroll/latest-run`);
         const latest = await latestRes.json();
-        
+
         // Match criteria: label/clientName and periods must match
         const formLabel = clientLabel || '';
         const batchLabel = latest?.label || latest?.client_name || '';
-        
-        if (latest && 
-            batchLabel === formLabel && 
-            latest.period_start && new Date(latest.period_start).toISOString().split('T')[0] === periodStart &&
-            latest.period_end && new Date(latest.period_end).toISOString().split('T')[0] === periodEnd) {
-          
+
+        if (latest &&
+          batchLabel === formLabel &&
+          latest.period_start && new Date(latest.period_start).toISOString().split('T')[0] === periodStart &&
+          latest.period_end && new Date(latest.period_end).toISOString().split('T')[0] === periodEnd) {
+
           setResumableBatchId(latest.id);
-          setStatus({ 
-            type: 'error', 
-            message: "System limit reached. Kindly upload again to continue where you left off." 
+          setStatus({
+            type: 'error',
+            message: "System limit reached. Kindly upload again to continue where you left off."
           });
           setUploading(false);
           return;
@@ -188,7 +188,7 @@ export default function IntegratedPayrollAdmin() {
     if (!window.confirm("Are you sure you want to revoke and delete this entire batch? This action cannot be undone and will remove all associated documents from the database and storage.")) {
       return;
     }
-    
+
     setStatus(null);
     try {
       const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
@@ -197,7 +197,7 @@ export default function IntegratedPayrollAdmin() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to delete batch');
-      
+
       setStatus({ type: 'success', message: 'Batch successfully revoked and deleted.' });
       fetchRuns();
     } catch (err: any) {
@@ -301,7 +301,7 @@ export default function IntegratedPayrollAdmin() {
       const lines = syncText.split('\n').filter(l => l.trim().length > 0);
       const totalLines = lines.length;
       let processedCount = 0;
-      
+
       setSyncProgress({ current: 0, total: totalLines });
 
       const chunkSize = 50;
@@ -390,12 +390,12 @@ export default function IntegratedPayrollAdmin() {
             <option key={label} value={label} />
           ))}
         </datalist>
-        
+
         {/* Document Upload Modal */}
         <AnimatePresence>
           {isImportModalOpen && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-black/40 backdrop-blur-sm overflow-y-auto">
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -417,14 +417,14 @@ export default function IntegratedPayrollAdmin() {
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">New Client / Company</label>
                         <div className="flex gap-2">
-                          <input 
-                            type="text" 
-                            placeholder="Type new name..." 
-                            value={newCompanyName} 
-                            onChange={(e) => setNewCompanyName(e.target.value)} 
-                            className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20" 
+                          <input
+                            type="text"
+                            placeholder="Type new name..."
+                            value={newCompanyName}
+                            onChange={(e) => setNewCompanyName(e.target.value)}
+                            className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20"
                           />
-                          <button 
+                          <button
                             onClick={handleSaveCompany}
                             disabled={isSavingCompany || !newCompanyName.trim()}
                             className="bg-gray-900 text-white p-3 rounded-xl disabled:opacity-50 hover:bg-black transition-colors"
@@ -436,8 +436,8 @@ export default function IntegratedPayrollAdmin() {
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Select Existing Client</label>
                         <div className="relative">
-                          <select 
-                            value={clientLabel} 
+                          <select
+                            value={clientLabel}
                             onChange={(e) => setClientLabel(e.target.value)}
                             className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold appearance-none outline-none focus:ring-2 focus:ring-primary/20"
                           >
@@ -453,59 +453,59 @@ export default function IntegratedPayrollAdmin() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Period Start</label>
-                        <input 
-                          type="date" 
+                        <input
+                          type="date"
                           disabled={!clientLabel}
-                          value={periodStart} 
-                          onChange={(e) => setPeriodStart(e.target.value)} 
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-50" 
+                          value={periodStart}
+                          onChange={(e) => setPeriodStart(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-50"
                         />
                       </div>
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Period End</label>
-                        <input 
-                          type="date" 
+                        <input
+                          type="date"
                           disabled={!clientLabel}
-                          value={periodEnd} 
-                          onChange={(e) => setPeriodEnd(e.target.value)} 
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-50" 
+                          value={periodEnd}
+                          onChange={(e) => setPeriodEnd(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-50"
                         />
                       </div>
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Release Date</label>
-                      <input 
-                        type="date" 
+                      <input
+                        type="date"
                         disabled={!clientLabel}
-                        value={releaseDate} 
-                        onChange={(e) => setReleaseDate(e.target.value)} 
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50" 
+                        value={releaseDate}
+                        onChange={(e) => setReleaseDate(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
                       />
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Remark / Note (Optional)</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         disabled={!clientLabel}
-                        placeholder="e.g. Regular Payroll, Adjusted OT, etc." 
-                        value={remark} 
-                        onChange={(e) => setRemark(e.target.value)} 
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50" 
+                        placeholder="e.g. Regular Payroll, Adjusted OT, etc."
+                        value={remark}
+                        onChange={(e) => setRemark(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
                       />
                     </div>
                   </div>
 
-                  <div 
+                  <div
                     onClick={() => clientLabel && fileInputRef.current?.click()}
-                    onDragOver={(e) => { 
+                    onDragOver={(e) => {
                       if (!clientLabel) return;
-                      e.preventDefault(); 
-                      e.currentTarget.classList.add('border-primary'); 
+                      e.preventDefault();
+                      e.currentTarget.classList.add('border-primary');
                     }}
-                    onDragLeave={(e) => { 
+                    onDragLeave={(e) => {
                       if (!clientLabel) return;
-                      e.preventDefault(); 
-                      e.currentTarget.classList.remove('border-primary'); 
+                      e.preventDefault();
+                      e.currentTarget.classList.remove('border-primary');
                     }}
                     onDrop={(e) => {
                       if (!clientLabel) return;
@@ -535,11 +535,11 @@ export default function IntegratedPayrollAdmin() {
                         <p className="text-[10px] font-bold text-gray-400 mt-2">Files should be named with Employee ID (e.g. CSC-1001.pdf)</p>
                       </>
                     )}
-                    <input 
-                      type="file" 
-                      multiple 
-                      className="hidden" 
-                      accept=".pdf" 
+                    <input
+                      type="file"
+                      multiple
+                      className="hidden"
+                      accept=".pdf"
                       ref={fileInputRef}
                       onChange={handleFileSelect}
                     />
@@ -559,7 +559,7 @@ export default function IntegratedPayrollAdmin() {
                     </div>
                   )}
                   <button onClick={() => setIsImportModalOpen(false)} disabled={uploading} className="px-6 py-3 font-bold text-gray-500 hover:text-gray-700 disabled:opacity-50">Cancel</button>
-                  <button 
+                  <button
                     onClick={handleUpload}
                     disabled={uploading || selectedFiles.length === 0 || !clientLabel || !periodStart || !periodEnd}
                     className="bg-primary text-white px-10 py-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center gap-2"
@@ -584,13 +584,13 @@ export default function IntegratedPayrollAdmin() {
           </div>
 
           <div className="bg-gray-100 p-1 rounded-2xl flex items-center">
-            <button 
+            <button
               onClick={() => setActiveTab('storage')}
               className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all ${activeTab === 'storage' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
             >
               Storage Hub
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('sync')}
               disabled={runs.length === 0}
               className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all ${activeTab === 'sync' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'} ${runs.length === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
@@ -598,7 +598,7 @@ export default function IntegratedPayrollAdmin() {
             >
               Account Sync
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('credentials')}
               className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all ${activeTab === 'credentials' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
             >
@@ -609,7 +609,7 @@ export default function IntegratedPayrollAdmin() {
 
         <div className="max-w-7xl mx-auto">
           {status && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
               className={`p-4 rounded-[2rem] border mb-8 flex items-center gap-4 shadow-xl ${status.type === 'success' ? 'bg-green-50 border-green-100 text-green-700' : 'bg-red-50 border-red-100 text-red-700'}`}
             >
@@ -632,7 +632,7 @@ export default function IntegratedPayrollAdmin() {
                   <h3 className="text-xl font-black text-gray-900 mb-2">Upload Files to Storage</h3>
                   <p className="text-gray-500 text-xs max-w-sm mb-8">Securely distribute PDF documents to your employees using smart filename matching.</p>
 
-                  <button 
+                  <button
                     onClick={() => setIsImportModalOpen(true)}
                     className="bg-primary hover:bg-black text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 transition-all flex items-center gap-3"
                   >
@@ -645,11 +645,11 @@ export default function IntegratedPayrollAdmin() {
                 <div className="bg-white rounded-[3rem] border border-gray-200 shadow-sm overflow-hidden">
                   <div className="p-8 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <h4 className="text-sm font-black uppercase tracking-widest text-gray-900">Storage History</h4>
-                    
+
                     <div className="flex items-center gap-3">
                       <div className="relative group">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 group-focus-within:text-primary transition-colors" />
-                        <input 
+                        <input
                           type="text"
                           placeholder="Search Label..."
                           value={historySearch}
@@ -657,17 +657,17 @@ export default function IntegratedPayrollAdmin() {
                           className="pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all w-36"
                         />
                       </div>
-                      
+
                       <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl px-2 py-1.5">
                         <Calendar className="h-3.5 w-3.5 text-gray-400 ml-1" />
-                        <input 
+                        <input
                           type="date"
                           value={historyStart}
                           onChange={(e) => setHistoryStart(e.target.value)}
                           className="bg-transparent border-none text-[10px] font-bold text-gray-600 focus:outline-none w-[90px]"
                         />
                         <span className="text-gray-300">-</span>
-                        <input 
+                        <input
                           type="date"
                           value={historyEnd}
                           onChange={(e) => setHistoryEnd(e.target.value)}
@@ -676,8 +676,8 @@ export default function IntegratedPayrollAdmin() {
                       </div>
 
                       <div className="relative">
-                        <select 
-                          value={selectedCompanyFilter} 
+                        <select
+                          value={selectedCompanyFilter}
                           onChange={(e) => setSelectedCompanyFilter(e.target.value)}
                           className="appearance-none bg-gray-50 border border-gray-200 rounded-xl pl-4 pr-10 py-2 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-primary/20"
                         >
@@ -730,12 +730,12 @@ export default function IntegratedPayrollAdmin() {
 
               <div className="space-y-6">
                 <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden">
-                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
-                   <h4 className="text-lg font-black mb-2 relative z-10">Smart Sync</h4>
-                   <p className="text-gray-400 text-xs leading-relaxed mb-8 relative z-10">Paste your employee list to instantly provision their personal document vaults.</p>
-                   <button onClick={() => setActiveTab('sync')} className="w-full bg-white text-gray-900 py-4 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3">
-                     <Plus className="h-4 w-4" /> Go to Account Sync
-                   </button>
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+                  <h4 className="text-lg font-black mb-2 relative z-10">Smart Sync</h4>
+                  <p className="text-gray-400 text-xs leading-relaxed mb-8 relative z-10">Paste your employee list to instantly provision their personal document vaults.</p>
+                  <button onClick={() => setActiveTab('sync')} className="w-full bg-white text-gray-900 py-4 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3">
+                    <Plus className="h-4 w-4" /> Go to Account Sync
+                  </button>
                 </div>
               </div>
             </div>
@@ -743,62 +743,62 @@ export default function IntegratedPayrollAdmin() {
 
           {activeTab === 'sync' && (
             <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-               <div className="bg-white rounded-[3rem] border border-gray-200 shadow-sm p-10 space-y-8">
-                  <div>
-                    <h3 className="text-xl font-black text-gray-900 tracking-tight">Magic Account Sync</h3>
-                    <p className="text-gray-500 text-sm mt-1">Paste your employee list below to instantly create portal accounts.</p>
-                  </div>
+              <div className="bg-white rounded-[3rem] border border-gray-200 shadow-sm p-10 space-y-8">
+                <div>
+                  <h3 className="text-xl font-black text-gray-900 tracking-tight">Account Sync</h3>
+                  <p className="text-gray-500 text-sm mt-1">Paste your employee list below to instantly create portal accounts.</p>
+                </div>
 
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Company Label (Matches Storage Label)</label>
-                      <div className="relative">
-                        <select 
-                          value={syncLabel} 
-                          onChange={(e) => setSyncLabel(e.target.value)}
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold appearance-none outline-none focus:ring-2 focus:ring-primary/20 text-gray-700"
-                        >
-                          <option value="">-- Choose Client --</option>
-                          {companies.map(c => (
-                            <option key={c.id} value={c.name}>{c.name}</option>
-                          ))}
-                        </select>
-                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                      </div>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Company Label (Matches Storage Label)</label>
+                    <div className="relative">
+                      <select
+                        value={syncLabel}
+                        onChange={(e) => setSyncLabel(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold appearance-none outline-none focus:ring-2 focus:ring-primary/20 text-gray-700"
+                      >
+                        <option value="">-- Choose Client --</option>
+                        {companies.map(c => (
+                          <option key={c.id} value={c.name}>{c.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
                     </div>
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Paste List (Format: ID Name)</label>
-                      <span className="text-[10px] font-bold text-primary bg-blue-50 px-2 py-1 rounded-md">Example: CSC-101 Juan Dela Cruz</span>
-                    </div>
-                    <textarea 
-                      placeholder="CSC-1001 Juan Dela Cruz&#10;CSC-1002 Maria Santos..."
-                      value={syncText}
-                      onChange={(e) => setSyncText(e.target.value)}
-                      className="w-full h-80 bg-gray-50 border border-gray-200 rounded-[2rem] p-8 text-sm font-bold focus:ring-4 focus:ring-primary/10 outline-none transition-all"
-                    />
                   </div>
-
                   <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      {isSyncing && syncProgress.total > 0 && (
-                        <div className="flex items-center gap-3">
-                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                          <span className="text-xs font-black text-primary uppercase tracking-widest">
-                            Syncing: {syncProgress.current} / {syncProgress.total} lines
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <button 
-                      onClick={handleBulkSync}
-                      disabled={isSyncing || !syncText.trim()}
-                      className="bg-primary text-white px-12 py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 flex items-center gap-3 hover:bg-black transition-all disabled:opacity-50"
-                    >
-                      {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                      Sync Accounts Now
-                    </button>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Paste List (Format: ID Name)</label>
+                    <span className="text-[10px] font-bold text-primary bg-blue-50 px-2 py-1 rounded-md">Example: CSC-101 Juan Dela Cruz</span>
                   </div>
-               </div>
+                  <textarea
+                    placeholder="CSC-1001 Juan Dela Cruz&#10;CSC-1002 Maria Santos..."
+                    value={syncText}
+                    onChange={(e) => setSyncText(e.target.value)}
+                    className="w-full h-80 bg-gray-50 border border-gray-200 rounded-[2rem] p-8 text-sm font-bold focus:ring-4 focus:ring-primary/10 outline-none transition-all"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    {isSyncing && syncProgress.total > 0 && (
+                      <div className="flex items-center gap-3">
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        <span className="text-xs font-black text-primary uppercase tracking-widest">
+                          Syncing: {syncProgress.current} / {syncProgress.total} lines
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleBulkSync}
+                    disabled={isSyncing || !syncText.trim()}
+                    className="bg-primary text-white px-12 py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 flex items-center gap-3 hover:bg-black transition-all disabled:opacity-50"
+                  >
+                    {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Sync Accounts Now
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -811,8 +811,8 @@ export default function IntegratedPayrollAdmin() {
                     <input type="text" placeholder="Search employee..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-11 pr-4 py-3 text-sm font-bold" />
                   </div>
                   <div className="relative">
-                    <select 
-                      value={selectedCredentialLabel} 
+                    <select
+                      value={selectedCredentialLabel}
                       onChange={(e) => setSelectedCredentialLabel(e.target.value)}
                       className="appearance-none bg-gray-50 border border-gray-200 rounded-xl pl-4 pr-10 py-3 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-primary/20"
                     >
@@ -856,25 +856,25 @@ export default function IntegratedPayrollAdmin() {
                     {filteredUsers.map((user) => (
                       <div key={user.id} className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col items-center text-center print:break-inside-avoid print:shadow-none print:border-gray-300 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50/50 rounded-full -mr-12 -mt-12 blur-xl pointer-events-none"></div>
-                        
+
                         <div className="bg-white p-2 rounded-2xl border border-gray-100 shadow-sm mb-4">
                           <QRCodeSVG value="https://smarttracking-frontend.vercel.app/portal" size={80} level="H" className="text-gray-900" />
                         </div>
-                        
+
                         <h3 className="font-black text-gray-900 text-sm mb-0.5 leading-tight">{user.fullName}</h3>
                         <p className="text-[9px] font-black text-primary uppercase tracking-widest mb-4 bg-blue-50 px-2 py-0.5 rounded-full">{user.company_label || 'Company'} / {user.sys_id}</p>
-                        
+
                         <div className="w-full bg-gray-50 rounded-2xl p-4 text-left border border-gray-100/50 space-y-3">
-                           <div className="flex justify-between items-center">
-                              <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Username</span>
-                              <code className="text-xs font-bold text-gray-900 bg-white px-2 py-1 rounded-md border border-gray-200">{user.username}</code>
-                           </div>
-                           <div className="flex justify-between items-center">
-                              <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Password</span>
-                              <code className="text-xs font-mono font-bold text-gray-600 bg-white px-2 py-1 rounded-md border border-gray-200">{user.password}</code>
-                           </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Username</span>
+                            <code className="text-xs font-bold text-gray-900 bg-white px-2 py-1 rounded-md border border-gray-200">{user.username}</code>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Password</span>
+                            <code className="text-xs font-mono font-bold text-gray-600 bg-white px-2 py-1 rounded-md border border-gray-200">{user.password}</code>
+                          </div>
                         </div>
-                        
+
                         <p className="text-[8px] font-bold text-gray-400 mt-4 tracking-widest uppercase">https://smarttracking-frontend.vercel.app/portal</p>
                       </div>
                     ))}
