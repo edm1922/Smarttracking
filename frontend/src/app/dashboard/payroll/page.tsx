@@ -507,6 +507,7 @@ export default function IntegratedPayrollAdmin() {
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Period Start</label>
                         <input
                           type="date"
+                          lang="en-US"
                           disabled={!clientLabel}
                           value={periodStart}
                           onChange={(e) => setPeriodStart(e.target.value)}
@@ -517,6 +518,7 @@ export default function IntegratedPayrollAdmin() {
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Period End</label>
                         <input
                           type="date"
+                          lang="en-US"
                           disabled={!clientLabel}
                           value={periodEnd}
                           onChange={(e) => setPeriodEnd(e.target.value)}
@@ -528,6 +530,7 @@ export default function IntegratedPayrollAdmin() {
                       <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Release Date</label>
                       <input
                         type="date"
+                        lang="en-US"
                         disabled={!clientLabel}
                         value={releaseDate}
                         onChange={(e) => setReleaseDate(e.target.value)}
