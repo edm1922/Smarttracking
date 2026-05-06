@@ -184,6 +184,23 @@ export default function IntegratedPayrollAdmin() {
     }
   };
 
+  const handleRowDoubleClick = (run: any) => {
+    const choice = window.prompt(`Select Action for Batch:\n"${run.label || 'Standard Run'}"\n\nType '1' to RESUME (Continue uploading files to this batch)\nType '2' to REVOKE (Delete this batch and all its records)`, '1');
+    
+    if (choice === '1') {
+      // Setup resume state
+      setClientLabel(run.label || run.client_name || '');
+      setPeriodStart(run.period_start ? new Date(run.period_start).toISOString().split('T')[0] : '');
+      setPeriodEnd(run.period_end ? new Date(run.period_end).toISOString().split('T')[0] : '');
+      setReleaseDate(run.release_date ? new Date(run.release_date).toISOString().split('T')[0] : '');
+      setResumableBatchId(run.id);
+      setIsImportModalOpen(true);
+      setStatus({ type: 'success', message: `Resume mode activated for batch: ${run.label || run.client_name}` });
+    } else if (choice === '2') {
+      handleDeleteBatch(run.id);
+    }
+  };
+
   const handleDeleteBatch = async (batchId: string) => {
     if (!window.confirm("Are you sure you want to revoke and delete this entire batch? This action cannot be undone and will remove all associated documents from the database and storage.")) {
       return;
@@ -811,7 +828,12 @@ export default function IntegratedPayrollAdmin() {
                           <tr><td colSpan={3} className="px-8 py-10 text-center text-gray-400 text-xs">No storage batches found.</td></tr>
                         ) : (
                           filteredHistoryRuns.map((run) => (
-                            <tr key={run.id} onDoubleClick={() => handleDeleteBatch(run.id)} className="hover:bg-gray-50/50 transition-colors cursor-pointer group relative" title="Double click to revoke and delete batch">
+                            <tr 
+                              key={run.id} 
+                              onDoubleClick={() => handleRowDoubleClick(run)} 
+                              className="hover:bg-gray-50/50 transition-colors cursor-pointer group relative" 
+                              title="Double click for options (Resume or Revoke)"
+                            >
                               <td className="px-8 py-5">
                                 <p className="text-xs font-black text-gray-900">{run.label || 'Standard Run'}</p>
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Imported {new Date(run.created_at).toLocaleDateString()}</p>
