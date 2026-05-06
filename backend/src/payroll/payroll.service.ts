@@ -357,6 +357,14 @@ export class PayrollService {
     });
   }
 
+  async bulkDeleteEmployees(ids: string[]) {
+    return this.prisma.user.deleteMany({
+      where: {
+        id: { in: ids }
+      }
+    });
+  }
+
   async syncBulkEmployees(text: string, label?: string) {
     if (!text) throw new HttpException('No text provided', HttpStatus.BAD_REQUEST);
 

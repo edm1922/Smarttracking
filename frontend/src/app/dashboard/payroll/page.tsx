@@ -226,6 +226,37 @@ export default function IntegratedPayrollAdmin() {
     }
   };
 
+  const handleBulkDeleteEmployees = async () => {
+    if (filteredUsers.length === 0) return;
+    
+    const count = filteredUsers.length;
+    const labelText = selectedCredentialLabel === 'all' ? 'all employees' : `all employees under ${selectedCredentialLabel}`;
+    
+    if (!window.confirm(`Are you sure you want to delete ${count} employees (${labelText})? This action cannot be undone.`)) {
+      return;
+    }
+
+    setStatus(null);
+    try {
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const ids = filteredUsers.map(u => u.id);
+      
+      const res = await fetch(`${apiUrl}/payroll/users-bulk`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to delete employees');
+
+      setStatus({ type: 'success', message: `Successfully deleted ${count} employees.` });
+      fetchUsers();
+    } catch (err: any) {
+      setStatus({ type: 'error', message: err.message });
+    }
+  };
+
   const fetchLatestRun = async () => {
     try {
       const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
@@ -850,12 +881,28 @@ export default function IntegratedPayrollAdmin() {
                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Employees</span>
                     <span className="text-xl font-black text-primary leading-none">{filteredUsers.length}</span>
                   </div>
-                  <button onClick={() => window.print()} className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 transition-colors">
-                    <Printer className="h-4 w-4" /> Print
-                  </button>
-                  <button onClick={handleSync} disabled={loadingUsers || !latestRun} className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center gap-2">
-                    {loadingUsers ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Sync Portal
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={() => window.print()}
+                      className="bg-gray-50 text-gray-900 px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest border border-gray-200 hover:bg-gray-100 transition-all flex items-center gap-2"
+                    >
+                      <Printer className="h-4 w-4" /> Print
+                    </button>
+                    {filteredUsers.length > 0 && (
+                      <button 
+                        onClick={handleBulkDeleteEmployees}
+                        className="bg-red-50 text-red-600 px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest border border-red-100 hover:bg-red-600 hover:text-white transition-all flex items-center gap-2"
+                      >
+                        <Trash2 className="h-4 w-4" /> Bulk Delete
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => setActiveTab('sync')}
+                      className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-black transition-all flex items-center gap-2"
+                    >
+                      <RefreshCw className="h-4 w-4" /> Sync Portal
+                    </button>
+                  </div>
                 </div>
               </div>
 

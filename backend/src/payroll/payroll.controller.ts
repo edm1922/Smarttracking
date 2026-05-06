@@ -130,6 +130,11 @@ export class PayrollController {
     return this.payrollService.deleteEmployee(id);
   }
 
+  @Delete('users-bulk')
+  async bulkDeleteUsers(@Body() body: { ids: string[] }) {
+    return this.payrollService.bulkDeleteEmployees(body.ids);
+  }
+
   @Get('companies')
   async getCompanies() {
     return this.payrollService.getCompanies();
