@@ -5,9 +5,16 @@ import { json, urlencoded } from 'express';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors({
-    origin: true, // Allow all origins for now, or you can put your frontend URL here
+    origin: [
+      'https://smarttracking-frontend.vercel.app',
+      'https://smarttracking-three.vercel.app',
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:3002'
+    ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
+    allowedHeaders: 'Content-Type,Accept,Authorization',
   });
   
   // Increase body limit for base64 evidence images
