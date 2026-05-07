@@ -13,6 +13,7 @@ interface Product {
   sku: string;
   name: string;
   description: string | null;
+  unit: string;
   stocks: { quantity: number; location: { name: string } }[];
 }
 
@@ -21,6 +22,7 @@ interface TransmittalItem {
   productId: string;
   name: string;
   sku: string;
+  unit: string;
   quantity: number;
 }
 
@@ -79,6 +81,7 @@ export default function ProductTransmittalPage() {
             productId: p.id,
             name: p.name,
             sku: p.sku,
+            unit: p.unit || 'PCS',
             quantity: 1
           })));
           localStorage.removeItem('pending_transmittal');
@@ -133,6 +136,7 @@ export default function ProductTransmittalPage() {
       productId: product.id,
       name: product.name,
       sku: product.sku,
+      unit: product.unit || 'PCS',
       quantity: 1
     }]);
   };
@@ -143,6 +147,7 @@ export default function ProductTransmittalPage() {
       productId: log.product.id,
       name: log.product.name,
       sku: log.product.sku,
+      unit: log.product.unit || 'PCS',
       quantity: log.quantity
     }]);
   };
@@ -422,7 +427,7 @@ export default function ProductTransmittalPage() {
               <tr key={item.id} className="border-b border-gray-100">
                 <td className="py-2 px-4 text-[10px] font-bold">{idx + 1}</td>
                 <td className="py-2 px-4 text-[10px] font-bold">{item.name}</td>
-                <td className="py-2 px-4 text-[10px] font-black">{item.quantity} PCS</td>
+                <td className="py-2 px-4 text-[10px] font-black">{item.quantity} {item.unit || 'PCS'}</td>
                 <td className="py-2 px-4 text-[10px] font-mono">{item.sku || '-'}</td>
               </tr>
             ))}

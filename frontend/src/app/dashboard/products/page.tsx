@@ -100,11 +100,13 @@ export default function ProductsPage() {
     requestedBy: '',
     whereTo: '',
     remarks: '',
-    items: [] as { productId: string, name: string, description: string, available: number, quantity: number }[]
+    items: [] as { productId: string, name: string, description: string, unit: string, available: number, quantity: number }[]
   });
   const [clientDate, setClientDate] = useState('');
   const [isAddingCustomUnit, setIsAddingCustomUnit] = useState(false);
   const [isAddingCustomUnitEdit, setIsAddingCustomUnitEdit] = useState(false);
+
+  const standardUnits = ['PCS', 'BOX', 'SET', 'UNIT', 'REAM', 'PAD'];
 
 
   useEffect(() => {
@@ -368,6 +370,7 @@ export default function ProductsPage() {
         productId: product.id,
         name: product.name,
         description: product.description || '',
+        unit: product.unit,
         available,
         quantity: 1
       }]
@@ -819,10 +822,12 @@ export default function ProductsPage() {
                             }} 
                             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary outline-none"
                           >
-                            <option value="PCS">PCS</option>
-                            <option value="BOX">BOX</option>
-                            <option value="SET">SET</option>
-                            <option value="UNIT">UNIT</option>
+                            {standardUnits.map(u => (
+                              <option key={u} value={u}>{u}</option>
+                            ))}
+                            {productForm.unit && !standardUnits.includes(productForm.unit) && (
+                              <option value={productForm.unit}>{productForm.unit}</option>
+                            )}
                             <option value="ADD_NEW">+ Add New Unit...</option>
                           </select>
                         </div>
@@ -1290,10 +1295,12 @@ export default function ProductsPage() {
                               }} 
                               className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-5 py-4 text-sm font-bold outline-none focus:bg-white focus:border-primary appearance-none"
                             >
-                              <option value="PCS">PCS</option>
-                              <option value="BOX">BOX</option>
-                              <option value="SET">SET</option>
-                              <option value="UNIT">UNIT</option>
+                              {standardUnits.map(u => (
+                                <option key={u} value={u}>{u}</option>
+                              ))}
+                              {editingProduct.unit && !standardUnits.includes(editingProduct.unit) && (
+                                <option value={editingProduct.unit}>{editingProduct.unit}</option>
+                              )}
                               <option value="ADD_NEW">+ Add New Unit...</option>
                             </select>
                           </div>
@@ -1739,21 +1746,22 @@ export default function ProductsPage() {
                                 </span>
                               </td>
                               <td className="px-4 py-3">
-                                <div className="flex items-center justify-end">
-                                  <div className="relative group/input">
-                                    <input 
-                                      type="number" 
-                                      min="1" 
-                                      max={item.available}
-                                      value={isNaN(item.quantity) ? '' : item.quantity} 
-                                      onChange={e => updateReleaseQty(item.productId, parseInt(e.target.value) || 0)}
-                                      className="w-24 text-right bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all"
-                                    />
-                                    <div className="absolute right-2 -bottom-1 transform translate-y-full opacity-0 group-hover/input:opacity-100 transition-opacity">
-                                      <span className="text-[8px] font-bold text-primary uppercase">MAX: {item.available}</span>
+                                  <div className="flex items-center justify-end gap-2">
+                                    <div className="relative group/input">
+                                      <input 
+                                        type="number" 
+                                        min="1" 
+                                        max={item.available}
+                                        value={isNaN(item.quantity) ? '' : item.quantity} 
+                                        onChange={e => updateReleaseQty(item.productId, parseInt(e.target.value) || 0)}
+                                        className="w-24 text-right bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all"
+                                      />
+                                      <div className="absolute right-2 -bottom-1 transform translate-y-full opacity-0 group-hover/input:opacity-100 transition-opacity">
+                                        <span className="text-[8px] font-bold text-primary uppercase">MAX: {item.available}</span>
+                                      </div>
                                     </div>
+                                    <span className="text-[10px] font-black text-gray-400 uppercase w-10">{(item as any).unit || 'PCS'}</span>
                                   </div>
-                                </div>
                               </td>
                               <td className="px-4 py-3 text-center">
                                 <button onClick={() => removeReleaseItem(item.productId)} className="text-gray-300 hover:text-red-500 hover:scale-110 transition-all p-1.5"><Trash2 className="h-4 w-4" /></button>
