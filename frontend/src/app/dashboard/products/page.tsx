@@ -425,15 +425,29 @@ export default function ProductsPage() {
     }
   };
 
-  const fetchLogs = async () => {
+  const [isLogSearching, setIsLogSearching] = useState(false);
+  const debouncedLogSearch = useDebounce(logSearchTerm, 300);
+
+  const fetchLogs = async (search?: string) => {
+    setIsLogSearching(true);
     try {
-      const res = await api.get('/products/logs');
+      const res = await api.get('/products/logs', { 
+        params: { search: search || '', take: 50 } 
+      });
       setLogs(res.data.data || []);
-      setIsLogModalOpen(true);
+      if (!isLogModalOpen) setIsLogModalOpen(true);
     } catch (err) {
       alert('Failed to fetch logs');
+    } finally {
+      setIsLogSearching(false);
     }
   };
+
+  useEffect(() => {
+    if (isLogModalOpen) {
+      fetchLogs(debouncedLogSearch);
+    }
+  }, [debouncedLogSearch]);
 
   const handleLogDoubleClick = (log: any) => {
     setEditingLog({ ...log });
@@ -1027,38 +1041,55 @@ export default function ProductsPage() {
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">User / Remarks</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredLogs.map((log) => (
-                    <tr 
-                      key={log.id} 
-                      className="text-sm hover:bg-gray-50 cursor-pointer select-none transition-colors"
-                      onDoubleClick={() => handleLogDoubleClick(log)}
-                      title="Double click to edit/delete log"
-                    >
-                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{new Date(log.createdAt).toLocaleString()}</td>
-                      <td className="px-4 py-3 font-bold text-gray-900">
-                        <div>{log.product.name}</div>
-                        {log.product.description && (
-                          <div className="text-[10px] text-gray-400 italic font-medium">{log.product.description}</div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="flex items-center text-xs text-gray-600">
-                          <MapPin className="h-3 w-3 mr-1" /> {log.location.name}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${log.type === 'IN' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                          {log.type}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-bold">{log.quantity}</td>
-                      <td className="px-4 py-3">
-                        <div className="text-gray-600 text-xs font-bold">{log.user?.username}</div>
-                        <div className="text-[10px] text-gray-400 italic line-clamp-1">{log.remarks || 'No remarks'}</div>
+                <tbody className="divide-y divide-gray-100">                  {isLogSearching ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-20 text-center">
+                        <div className="flex flex-col items-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+                          <p className="text-sm text-gray-400 font-bold italic">Searching history...</p>
+                        </div>
                       </td>
                     </tr>
-                  ))}
+                  ) : filteredLogs.length > 0 ? (
+                    filteredLogs.map((log) => (
+                      <tr 
+                        key={log.id} 
+                        className="text-sm hover:bg-gray-50 cursor-pointer select-none transition-colors"
+                        onDoubleClick={() => handleLogDoubleClick(log)}
+                        title="Double click to edit/delete log"
+                      >
+                        <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{new Date(log.createdAt).toLocaleString()}</td>
+                        <td className="px-4 py-3 font-bold text-gray-900">
+                          <div>{log.product.name}</div>
+                          {log.product.description && (
+                            <div className="text-[10px] text-gray-400 italic font-medium">{log.product.description}</div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="flex items-center text-xs text-gray-600">
+                            <MapPin className="h-3 w-3 mr-1" /> {log.location.name}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${log.type === 'IN' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                            {log.type}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-bold">{log.quantity}</td>
+                        <td className="px-4 py-3">
+                          <div className="text-gray-600 text-xs font-bold">{log.user?.username}</div>
+                          <div className="text-[10px] text-gray-400 italic line-clamp-1">{log.remarks || 'No remarks'}</div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-20 text-center text-gray-400 italic">
+                        No transactions found matching "{logSearchTerm}"
+                      </td>
+                    </tr>
+                  )}
+
                 </tbody>
               </table>
             </div>
