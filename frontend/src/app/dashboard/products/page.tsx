@@ -103,6 +103,9 @@ export default function ProductsPage() {
     items: [] as { productId: string, name: string, description: string, available: number, quantity: number }[]
   });
   const [clientDate, setClientDate] = useState('');
+  const [isAddingCustomUnit, setIsAddingCustomUnit] = useState(false);
+  const [isAddingCustomUnitEdit, setIsAddingCustomUnitEdit] = useState(false);
+
 
   useEffect(() => {
     setClientDate(new Date().toLocaleDateString('en-GB'));
@@ -225,6 +228,7 @@ export default function ProductsPage() {
       };
       await api.post('/products', payload);
       setIsProductModalOpen(false);
+      setIsAddingCustomUnit(false);
       setProductForm({ 
         sku: '', name: '', description: '', unit: 'PCS', price: 0, 
         threshold: 0, initialStock: 0, initialLocationId: locations[0]?.id || '',
@@ -287,6 +291,7 @@ export default function ProductsPage() {
       }
 
       setIsEditModalOpen(false);
+      setIsAddingCustomUnitEdit(false);
       setBypassStockEdit(false); // Reset bypass
       fetchData();
     } catch (err: any) {
@@ -319,6 +324,7 @@ export default function ProductsPage() {
     try {
       await api.delete(`/products/${editingProduct.id}`);
       setIsEditModalOpen(false);
+      setIsAddingCustomUnitEdit(false);
       fetchData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to delete product');
@@ -783,7 +789,7 @@ export default function ProductsPage() {
           <div className="w-full max-w-2xl rounded-xl bg-white p-8 shadow-2xl my-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-gray-900">Add New Item</h2>
-              <button onClick={() => setIsProductModalOpen(false)} className="text-gray-400 hover:text-gray-900"><X className="h-5 w-5" /></button>
+              <button onClick={() => { setIsProductModalOpen(false); setIsAddingCustomUnit(false); }} className="text-gray-400 hover:text-gray-900"><X className="h-5 w-5" /></button>
             </div>
             <form onSubmit={handleProductSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -799,12 +805,50 @@ export default function ProductsPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Unit:</label>
-                      <select value={productForm.unit} onChange={(e) => setProductForm({...productForm, unit: e.target.value})} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary outline-none">
-                        <option value="PCS">PCS</option>
-                        <option value="BOX">BOX</option>
-                        <option value="SET">SET</option>
-                        <option value="UNIT">UNIT</option>
-                      </select>
+                      {!isAddingCustomUnit ? (
+                        <div className="relative">
+                          <select 
+                            value={productForm.unit} 
+                            onChange={(e) => {
+                              if (e.target.value === 'ADD_NEW') {
+                                setIsAddingCustomUnit(true);
+                                setProductForm({ ...productForm, unit: '' });
+                              } else {
+                                setProductForm({ ...productForm, unit: e.target.value });
+                              }
+                            }} 
+                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary outline-none"
+                          >
+                            <option value="PCS">PCS</option>
+                            <option value="BOX">BOX</option>
+                            <option value="SET">SET</option>
+                            <option value="UNIT">UNIT</option>
+                            <option value="ADD_NEW">+ Add New Unit...</option>
+                          </select>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <input 
+                            autoFocus
+                            type="text" 
+                            placeholder="Enter unit..." 
+                            value={productForm.unit} 
+                            onChange={(e) => setProductForm({...productForm, unit: e.target.value.toUpperCase()})} 
+                            className="w-full rounded-md border border-primary px-3 py-2 text-sm outline-none" 
+                          />
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              setIsAddingCustomUnit(false);
+                              setProductForm({ ...productForm, unit: 'PCS' });
+                            }}
+                            className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                            title="Back to list"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Price:</label>
@@ -869,7 +913,7 @@ export default function ProductsPage() {
               </div>
 
               <div className="flex justify-end space-x-3 pt-6 border-t border-gray-100">
-                <button type="button" onClick={() => setIsProductModalOpen(false)} className="px-6 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-900 bg-gray-50 rounded-lg">Cancel</button>
+                <button type="button" onClick={() => { setIsProductModalOpen(false); setIsAddingCustomUnit(false); }} className="px-6 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-900 bg-gray-50 rounded-lg">Cancel</button>
                 <button type="submit" className="px-10 py-2.5 text-sm font-bold text-white bg-[#50C878] hover:bg-[#45b068] rounded-lg shadow-lg transition-all active:scale-95">Save</button>
               </div>
             </form>
@@ -1132,7 +1176,7 @@ export default function ProductsPage() {
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{editingProduct.sku}</p>
                 </div>
               </div>
-              <button onClick={() => setIsEditModalOpen(false)} className="p-2 text-gray-400 hover:text-gray-900 hover:bg-white rounded-full transition-all shadow-sm">
+              <button onClick={() => { setIsEditModalOpen(false); setIsAddingCustomUnitEdit(false); }} className="p-2 text-gray-400 hover:text-gray-900 hover:bg-white rounded-full transition-all shadow-sm">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -1232,12 +1276,50 @@ export default function ProductsPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Unit</label>
-                        <select value={editingProduct.unit} onChange={(e) => setEditingProduct({...editingProduct, unit: e.target.value})} className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-5 py-4 text-sm font-bold outline-none focus:bg-white focus:border-primary appearance-none">
-                          <option value="PCS">PCS</option>
-                          <option value="BOX">BOX</option>
-                          <option value="SET">SET</option>
-                          <option value="UNIT">UNIT</option>
-                        </select>
+                        {!isAddingCustomUnitEdit ? (
+                          <div className="relative">
+                            <select 
+                              value={editingProduct.unit} 
+                              onChange={(e) => {
+                                if (e.target.value === 'ADD_NEW') {
+                                  setIsAddingCustomUnitEdit(true);
+                                  setEditingProduct({ ...editingProduct, unit: '' });
+                                } else {
+                                  setEditingProduct({ ...editingProduct, unit: e.target.value });
+                                }
+                              }} 
+                              className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-5 py-4 text-sm font-bold outline-none focus:bg-white focus:border-primary appearance-none"
+                            >
+                              <option value="PCS">PCS</option>
+                              <option value="BOX">BOX</option>
+                              <option value="SET">SET</option>
+                              <option value="UNIT">UNIT</option>
+                              <option value="ADD_NEW">+ Add New Unit...</option>
+                            </select>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <input 
+                              autoFocus
+                              type="text" 
+                              placeholder="Enter unit..." 
+                              value={editingProduct.unit} 
+                              onChange={(e) => setEditingProduct({...editingProduct, unit: e.target.value.toUpperCase()})} 
+                              className="w-full rounded-2xl border border-primary bg-white px-5 py-4 text-sm font-bold outline-none" 
+                            />
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                setIsAddingCustomUnitEdit(false);
+                                setEditingProduct({ ...editingProduct, unit: 'PCS' });
+                              }}
+                              className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                              title="Back to list"
+                            >
+                              <X className="h-5 w-5" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <div>
                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Price</label>
@@ -1389,7 +1471,7 @@ export default function ProductsPage() {
                   Delete Asset Record
                 </button>
                 <div className="flex gap-4">
-                  <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-gray-600">Cancel</button>
+                  <button type="button" onClick={() => { setIsEditModalOpen(false); setIsAddingCustomUnitEdit(false); }} className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-gray-600">Cancel</button>
                   <button type="submit" className="px-12 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all">
                     Update Details
                   </button>
