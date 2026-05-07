@@ -560,7 +560,7 @@ export default function ProductsPage() {
         </div>
         <div className="flex space-x-3">
           <button
-            onClick={fetchLogs}
+            onClick={() => fetchLogs()}
             className="inline-flex items-center rounded-md bg-white border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
           >
             <History className="mr-2 h-4 w-4" />
