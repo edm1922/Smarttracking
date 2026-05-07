@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { createClient } from '@supabase/supabase-js';
 import * as pdfReader from 'pdfreader';
 import { PDFDocument } from 'pdf-lib';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class PayrollService {
@@ -274,8 +275,9 @@ export class PayrollService {
       throw new HttpException('Invalid username or password.', HttpStatus.UNAUTHORIZED);
     }
 
-    if (user.password.trim().toLowerCase() !== cleanPass.toLowerCase()) {
-      console.log(`[Portal Login] Password mismatch for ${cleanUsername}. DB password: '${user.password}'`);
+    const isMatch = await bcrypt.compare(cleanPass, user.password);
+    if (!isMatch) {
+      console.log(`[Portal Login] Password mismatch for ${cleanUsername}.`);
       throw new HttpException('Invalid username or password.', HttpStatus.UNAUTHORIZED);
     }
 
@@ -416,6 +418,7 @@ export class PayrollService {
 
     for (const entry of validEntries) {
       try {
+        const hashedPassword = await bcrypt.hash(entry.password, 10);
         const existing = await this.prisma.user.findUnique({
           where: { sys_id: entry.sys_id }
         });
@@ -426,7 +429,7 @@ export class PayrollService {
             data: { 
               fullName: entry.fullName, 
               username: entry.username, 
-              password: entry.password,
+              password: hashedPassword,
               company_label: label,
             }
           });
@@ -437,7 +440,7 @@ export class PayrollService {
               sys_id: entry.sys_id,
               fullName: entry.fullName,
               username: entry.username,
-              password: entry.password,
+              password: hashedPassword,
               role: 'EMPLOYEE',
               company_label: label,
             }

@@ -17,7 +17,7 @@ export class UsersController {
   }
 
   @Post()
-  create(@Request() req: any, @Body() data: { username: string; role: 'admin' | 'inventory' | 'super_admin' }) {
+  create(@Request() req: any, @Body() data: { username: string; role: 'admin' | 'inventory' | 'super_admin' | 'payroll_admin' }) {
     // Only super_admins can create new users
     if (req.user.role !== 'super_admin') {
       throw new ForbiddenException('Only system admins can create users');

@@ -17,8 +17,11 @@ import {
   Upload,
   Loader2,
   RefreshCw,
-  Plus
+  Plus,
+  Users
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function IntegratedEmployeePayslips() {
   const [user, setUser] = useState<any>(null);
@@ -29,6 +32,8 @@ export default function IntegratedEmployeePayslips() {
   const [selectedLabel, setSelectedLabel] = useState<string>('all');
   const [isAdminView, setIsAdminView] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showRawIds, setShowRawIds] = useState(false);
+  const router = useRouter();
   
   // Selection State
   const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
@@ -102,6 +107,12 @@ export default function IntegratedEmployeePayslips() {
   });
 
   const uniqueLabels = Array.from(new Set(runs.map(r => r.label || 'General')));
+
+  const needsSync = isAdminView && 
+                    filteredSlips.length > 0 && 
+                    !searchTerm && 
+                    !showRawIds && 
+                    filteredSlips.every(slip => !slip.user?.fullName);
 
   const toggleDocSelection = (id: string) => {
     setSelectedDocs(prev => 
@@ -301,7 +312,38 @@ export default function IntegratedEmployeePayslips() {
         <div className="lg:col-span-3 space-y-4">
           <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="divide-y divide-gray-100">
-              {filteredSlips.length > 0 ? filteredSlips.map((slip) => (
+              {needsSync ? (
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                  className="py-20 px-8 text-center"
+                >
+                  <div className="h-24 w-24 bg-blue-50 rounded-[2rem] flex items-center justify-center mx-auto mb-8 relative">
+                    <div className="absolute inset-0 bg-blue-100 rounded-[2rem] animate-ping opacity-20"></div>
+                    <Users className="h-10 w-10 text-primary relative z-10" />
+                  </div>
+                  <h3 className="text-2xl font-black text-gray-900 mb-3 tracking-tight">Complete Your Setup</h3>
+                  <p className="text-gray-500 text-sm max-w-md mx-auto mb-10 leading-relaxed font-medium">
+                    We've found <span className="text-primary font-black">{filteredSlips.length}</span> documents, but no employee names are linked to these IDs. 
+                    Sync your employee list to enable name-based tracking and searching.
+                  </p>
+                  
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                    <Link 
+                      href="/dashboard/payroll"
+                      className="bg-primary text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:bg-black transition-all flex items-center gap-3"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Go to Account Sync
+                    </Link>
+                    <button 
+                      onClick={() => setShowRawIds(true)}
+                      className="text-gray-400 hover:text-gray-900 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-colors"
+                    >
+                      Show technical IDs anyway
+                    </button>
+                  </div>
+                </motion.div>
+              ) : filteredSlips.length > 0 ? filteredSlips.map((slip) => (
                 <div key={slip.id} className={`p-6 hover:bg-gray-50 transition-colors ${selectedDocs.includes(slip.id) ? 'bg-blue-50/50' : ''}`}>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
                     <div className="flex items-center gap-4">

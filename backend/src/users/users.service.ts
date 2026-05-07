@@ -19,8 +19,9 @@ export class UsersService {
   }
 
   async create(data: { username: string; role: 'admin' | 'inventory' | 'super_admin' | 'payroll_admin' }) {
+    const cleanUsername = data.username.trim().toLowerCase();
     const existing = await this.prisma.user.findUnique({
-      where: { username: data.username },
+      where: { username: cleanUsername },
     });
 
     if (existing) {
@@ -43,7 +44,7 @@ export class UsersService {
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
-          username: data.username,
+          username: cleanUsername,
           password: hashedPassword,
           role: data.role,
         },
@@ -58,20 +59,6 @@ export class UsersService {
             userId: user.id,
           },
         });
-      }
-
-      // If it's a payroll admin, ensure they have a profile in the payroll system
-      // We use raw SQL because 'profiles' might not be in the Prisma schema yet
-      if (data.role === 'payroll_admin') {
-        try {
-          await tx.$executeRaw`
-            INSERT INTO public.profiles (id, sys_id, full_name, role)
-            VALUES (${user.id}::uuid, ${data.username}, ${data.username}, 'payroll_admin')
-            ON CONFLICT (id) DO NOTHING
-          `;
-        } catch (err) {
-          console.error('Failed to provision payroll profile:', err);
-        }
       }
 
       return {
