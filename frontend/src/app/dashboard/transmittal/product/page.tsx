@@ -32,6 +32,8 @@ export default function ProductTransmittalPage() {
   const [logs, setLogs] = useState<any[]>([]);
   const [logFilter, setLogFilter] = useState<'IN' | 'OUT'>('OUT');
   const [searchTerm, setSearchTerm] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [isPrinting, setIsPrinting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
@@ -181,11 +183,28 @@ export default function ProductTransmittalPage() {
     p.sku.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredLogs = logs.filter(log =>
-    log.type === logFilter &&
-    (log.product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (log.remarks || '').toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredLogs = logs.filter(log => {
+    const matchesType = log.type === logFilter;
+    const matchesSearch = log.product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (log.remarks || '').toLowerCase().includes(searchTerm.toLowerCase());
+    
+    let matchesDate = true;
+    if (startDate || endDate) {
+      const logDate = new Date(log.createdAt);
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        if (logDate < start) matchesDate = false;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        if (logDate > end) matchesDate = false;
+      }
+    }
+
+    return matchesType && matchesSearch && matchesDate;
+  });
 
   return (
     <div className="space-y-8">
@@ -311,14 +330,40 @@ export default function ProductTransmittalPage() {
                   />
                 </div>
                 {selectionMode === 'LOG' && (
-                  <select value={logFilter} onChange={e => { 
-                    const val = e.target.value as 'IN' | 'OUT';
-                    setLogFilter(val);
-                    updateSubject('LOG', val);
-                  }} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-1 bg-white">
-                    <option value="OUT">Stock OUT</option>
-                    <option value="IN">Stock IN</option>
-                  </select>
+                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1">
+                      <Calendar className="h-3 w-3 text-gray-400" />
+                      <input 
+                        type="date" 
+                        value={startDate} 
+                        onChange={e => setStartDate(e.target.value)}
+                        className="rounded-lg border border-gray-200 px-2 py-1.5 text-[10px] outline-none focus:ring-1 bg-white"
+                      />
+                    </div>
+                    <span className="text-gray-400 text-[10px]">to</span>
+                    <input 
+                      type="date" 
+                      value={endDate} 
+                      onChange={e => setEndDate(e.target.value)}
+                      className="rounded-lg border border-gray-200 px-2 py-1.5 text-[10px] outline-none focus:ring-1 bg-white"
+                    />
+                    {(startDate || endDate) && (
+                      <button 
+                        onClick={() => { setStartDate(''); setEndDate(''); }}
+                        className="text-[10px] text-red-500 font-bold hover:underline px-1"
+                      >
+                        Clear
+                      </button>
+                    )}
+                    <select value={logFilter} onChange={e => { 
+                      const val = e.target.value as 'IN' | 'OUT';
+                      setLogFilter(val);
+                      updateSubject('LOG', val);
+                    }} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-1 bg-white">
+                      <option value="OUT">Stock OUT</option>
+                      <option value="IN">Stock IN</option>
+                    </select>
+                  </div>
                 )}
               </div>
 
