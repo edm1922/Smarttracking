@@ -144,6 +144,7 @@ export default function ProductTransmittalPage() {
   };
 
   const addLogItem = (log: any) => {
+    if (selectedItems.find(item => item.productId === log.product.id)) return;
     setSelectedItems([...selectedItems, {
       id: Math.random().toString(36).substr(2, 9),
       productId: log.product.id,
@@ -178,12 +179,17 @@ export default function ProductTransmittalPage() {
     alert('Header Preset Saved! This will be the default for future transmittals.');
   };
 
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.sku.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = products.filter(p => {
+    const isSelected = selectedItems.some(item => item.productId === p.id);
+    if (isSelected) return false;
+    return p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.sku.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   const filteredLogs = logs.filter(log => {
+    const isSelected = selectedItems.some(item => item.productId === log.productId);
+    if (isSelected) return false;
+
     const matchesType = log.type === logFilter;
     const matchesSearch = log.product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (log.remarks || '').toLowerCase().includes(searchTerm.toLowerCase());
