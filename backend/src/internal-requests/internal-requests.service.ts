@@ -338,13 +338,17 @@ export class InternalRequestsService {
       // Parallel processing (Promise.all) overwhelmed the connection pool.
       // We must process these SEQUENTIALLY to prevent P2028 errors.
       const results = [];
+      const errors = [];
       for (const id of ids) {
         try {
           const res = await this.updateStatus(id, status, userId, remarks);
           results.push(res);
         } catch (err) {
-          results.push({ error: true, id, message: err.message });
+          errors.push(err.message);
         }
+      }
+      if (errors.length > 0) {
+        throw new BadRequestException(`Failed to fulfill some items:\n${errors.join('\n')}`);
       }
       return results;
     }

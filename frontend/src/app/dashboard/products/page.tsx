@@ -1109,12 +1109,9 @@ export default function ProductsPage() {
               <div>
                 <h3 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Item / Product</h3>
                 <div className="text-base font-bold text-gray-900">{editingLog?.product?.name || 'Unknown Item'}</div>
-                <div className="text-[10px] font-mono text-gray-400 uppercase">{editingLog?.product?.sku}</div>
-                {editingLog?.product?.description && (
-                  <div className="mt-1 text-[10px] text-gray-500 italic bg-white/50 px-2 py-1 rounded border border-blue-50">
-                    {editingLog.product.description}
-                  </div>
-                )}
+                <div className={`text-[10px] ${editingLog?.product?.description ? 'text-gray-500 font-medium' : 'font-mono text-gray-400 uppercase'}`}>
+                  {editingLog?.product?.description || editingLog?.product?.sku}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4 pt-2 border-t border-blue-100/50">
                 <div>
