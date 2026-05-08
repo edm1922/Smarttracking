@@ -255,15 +255,15 @@ export class PayrollService {
   }
 
   async portalLogin(username: string, pass: string) {
-    const cleanUsername = username.toLowerCase().trim();
-    const cleanPass = pass.trim();
+    const cleanUsername = (username || '').toLowerCase().trim();
+    const cleanPass = (pass || '').trim();
 
-    console.log(`[Portal Login] Attempt: username='${cleanUsername}', pass='${cleanPass}'`);
+    console.log(`[Portal Login] Attempt: username='${cleanUsername}', pass='${cleanPass}' (len: ${cleanPass.length})`);
 
     const user = await this.prisma.user.findFirst({
       where: {
         OR: [
-          { username: cleanUsername },
+          { username: { equals: cleanUsername, mode: 'insensitive' } },
           { sys_id: { equals: cleanUsername, mode: 'insensitive' } }
         ],
         role: 'EMPLOYEE'
@@ -275,9 +275,22 @@ export class PayrollService {
       throw new HttpException('Invalid username or password.', HttpStatus.UNAUTHORIZED);
     }
 
-    const isMatch = await bcrypt.compare(cleanPass, user.password);
+    const dbPass = (user.password || '').trim();
+    let isMatch = false;
+
+    // Support both bcrypt hashes and legacy plain text passwords
+    if (dbPass.startsWith('$2a$') || dbPass.startsWith('$2b$')) {
+      isMatch = await bcrypt.compare(cleanPass, dbPass);
+    } else {
+      isMatch = dbPass.toLowerCase() === cleanPass.toLowerCase();
+    }
+
     if (!isMatch) {
       console.log(`[Portal Login] Password mismatch for ${cleanUsername}.`);
+      if (!dbPass.startsWith('$2a$') && !dbPass.startsWith('$2b$')) {
+        console.log(`- Input: '${cleanPass}' (len: ${cleanPass.length})`);
+        console.log(`- DB:    '${dbPass}' (len: ${dbPass.length})`);
+      }
       throw new HttpException('Invalid username or password.', HttpStatus.UNAUTHORIZED);
     }
 
