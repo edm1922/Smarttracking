@@ -20,7 +20,7 @@ interface Product {
 interface TransmittalItem {
   id: string;
   productId: string;
-  logId?: string;
+  logIds: string[];
   name: string;
   sku: string;
   unit: string;
@@ -133,10 +133,18 @@ export default function ProductTransmittalPage() {
   if (!mounted) return null;
 
   const addItem = (product: Product) => {
-    if (selectedItems.find(item => item.productId === product.id && !item.logId)) return;
+    const existing = selectedItems.find(item => item.productId === product.id);
+    if (existing) {
+      setSelectedItems(selectedItems.map(item => 
+        item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item
+      ));
+      return;
+    }
+
     setSelectedItems([...selectedItems, {
       id: Math.random().toString(36).substr(2, 9),
       productId: product.id,
+      logIds: [],
       name: product.name,
       sku: product.sku,
       unit: product.unit || 'PCS',
@@ -145,11 +153,22 @@ export default function ProductTransmittalPage() {
   };
 
   const addLogItem = (log: any) => {
-    if (selectedItems.find(item => item.logId === log.id)) return;
+    const existing = selectedItems.find(item => item.productId === log.product.id);
+    
+    if (existing) {
+      if (existing.logIds.includes(log.id)) return;
+      setSelectedItems(selectedItems.map(item => 
+        item.productId === log.product.id 
+          ? { ...item, quantity: item.quantity + log.quantity, logIds: [...item.logIds, log.id] } 
+          : item
+      ));
+      return;
+    }
+
     setSelectedItems([...selectedItems, {
       id: Math.random().toString(36).substr(2, 9),
       productId: log.product.id,
-      logId: log.id,
+      logIds: [log.id],
       name: log.product.name,
       sku: log.product.sku,
       unit: log.product.unit || 'PCS',
@@ -182,14 +201,14 @@ export default function ProductTransmittalPage() {
   };
 
   const filteredProducts = products.filter(p => {
-    const isSelectedManual = selectedItems.some(item => item.productId === p.id && !item.logId);
-    if (isSelectedManual) return false;
+    const isSelected = selectedItems.some(item => item.productId === p.id);
+    if (isSelected) return false;
     return p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.sku.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
   const filteredLogs = logs.filter(log => {
-    const isSelectedLog = selectedItems.some(item => item.logId === log.id);
+    const isSelectedLog = selectedItems.some(item => item.logIds.includes(log.id));
     if (isSelectedLog) return false;
 
     const matchesType = log.type === logFilter;
