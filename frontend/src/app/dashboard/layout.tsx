@@ -151,7 +151,7 @@ useEffect(() => {
       <aside className="fixed inset-y-0 left-0 w-64 border-r border-gray-200 bg-white no-print flex flex-col z-[40]">
         <div className="flex h-16 items-center border-b border-gray-200 px-6 shrink-0 justify-between">
           <span className="text-xl font-bold text-primary">Smart Tracking</span>
-          {!isStaff && <AdminNotifications />}
+          {!isStaff && role !== 'payroll_admin' && <AdminNotifications />}
         </div>
         <nav className="flex-1 space-y-6 p-4 overflow-y-auto custom-scrollbar">
           {!isStaff ? (
