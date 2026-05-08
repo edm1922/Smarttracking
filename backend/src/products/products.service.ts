@@ -231,7 +231,7 @@ export class ProductsService {
         },
         include: { product: true, location: true },
       });
-    });
+    }, { maxWait: 5000, timeout: 20000 });
   }
 
   async bulkRelease(data: {
@@ -287,7 +287,7 @@ export class ProductsService {
         results.push(log);
       }
       return results;
-    });
+    }, { maxWait: 5000, timeout: 30000 });
   }
 
   async findAllTransactions(params: { skip?: number; take?: number; search?: string } = {}) {
