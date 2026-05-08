@@ -34,7 +34,7 @@ interface Request {
   createdAt: string;
   location: { name: string };
   targetLocation?: { name: string } | null;
-  product: { name: string; sku: string };
+  product: { name: string; sku: string; description?: string | null };
   previousIssuancesCount?: number;
 }
 
@@ -325,7 +325,10 @@ export default function RequestsPage() {
                   <td>${r.employeeName}</td>
                   <td>${r.departmentArea}</td>
                   <td>${r.shift}</td>
-                  <td>${r.product.name}</td>
+                  <td>
+                    ${r.product.name}
+                    ${r.product.description ? `<br/><small style="color: #666; font-style: italic;">${r.product.description}</small>` : ''}
+                  </td>
                   <td>${r.quantity}</td>
                   <td>${(r.previousIssuancesCount || 0) + 1 === 1 ? 'First Issuance' : `${getOrdinal((r.previousIssuancesCount || 0) + 1)} Issuance`}</td>
                 </tr>
@@ -483,6 +486,11 @@ export default function RequestsPage() {
                             {(req.previousIssuancesCount || 0) + 1 === 1 ? '1st Issuance' : `${getOrdinal((req.previousIssuancesCount || 0) + 1)} Issuance`}
                           </span>
                         </div>
+                        {req.product.description && (
+                          <div className="text-[10px] text-gray-500 mt-1 italic leading-tight">
+                            {req.product.description}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span className="text-xs font-black text-primary">{req.quantity}</span>
@@ -606,6 +614,12 @@ export default function RequestsPage() {
                       <span className="text-xs font-bold text-gray-500">Tracking No.</span>
                       <span className="text-xs font-black text-gray-900 font-mono">{selectedRequest.product.sku}</span>
                     </div>
+                    {selectedRequest.product.description && (
+                      <div className="flex justify-between">
+                        <span className="text-xs font-bold text-gray-500">Description</span>
+                        <span className="text-xs font-medium text-gray-700 italic text-right max-w-[200px]">{selectedRequest.product.description}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-200">
                       <span className="text-xs font-black text-gray-500 uppercase">Quantity Requested</span>
                       <span className="text-lg font-black text-primary">{selectedRequest.quantity}</span>

@@ -93,7 +93,7 @@ export class InternalRequestsService {
         orderBy: { createdAt: 'desc' },
         include: {
           product: {
-            select: { id: true, name: true, sku: true },
+            select: { id: true, name: true, sku: true, description: true },
           },
           location: {
             select: { id: true, name: true },
