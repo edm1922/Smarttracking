@@ -116,13 +116,13 @@ export class ProductsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() data: any) {
-    return this.productsService.update(id, data);
+  update(@Param('id') id: string, @Body() data: any, @Request() req: any) {
+    return this.productsService.update(id, data, req.user.sub);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.productsService.remove(id);
+  remove(@Param('id') id: string, @Request() req: any) {
+    return this.productsService.remove(id, req.user.sub);
   }
 
   @Post(':id/image')

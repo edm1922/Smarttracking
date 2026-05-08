@@ -2,12 +2,14 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseService } from '../prisma/supabase.service';
+import { LogsService } from '../logs/logs.service';
 
 @Injectable()
 export class ProductsService {
   constructor(
     private prisma: PrismaService,
-    private supabaseService: SupabaseService
+    private supabaseService: SupabaseService,
+    private logsService: LogsService,
   ) {}
 
   async findAll(params: { skip?: number; take?: number; search?: string; stockFilter?: string; role?: string } = {}) {
@@ -180,6 +182,13 @@ export class ProductsService {
         });
       }
 
+      await this.logsService.create({
+        userId: data.userId || 'system',
+        productId: product.id,
+        action: 'CREATE_PRODUCT',
+        changes: { name: product.name, sku: product.sku },
+      });
+
       return product;
     });
   }
@@ -220,7 +229,7 @@ export class ProductsService {
       });
 
       // 2. Create Transaction Log
-      return tx.productTransaction.create({
+      const transaction = await tx.productTransaction.create({
         data: {
           productId,
           locationId,
@@ -231,6 +240,15 @@ export class ProductsService {
         },
         include: { product: true, location: true },
       });
+
+      await this.logsService.create({
+        userId,
+        productId,
+        action: `STOCK_${type}`,
+        changes: { quantity, remarks, location: transaction.location.name },
+      });
+
+      return transaction;
     }, { maxWait: 5000, timeout: 20000 });
   }
 
@@ -286,6 +304,17 @@ export class ProductsService {
         });
         results.push(log);
       }
+
+      await this.logsService.create({
+        userId: data.userId,
+        action: 'BULK_RELEASE',
+        changes: { 
+          itemCount: data.items.length, 
+          whereTo: data.whereTo,
+          requestedBy: data.requestedBy 
+        },
+      });
+
       return results;
     }, { maxWait: 5000, timeout: 30000 });
   }
@@ -364,7 +393,6 @@ export class ProductsService {
         update: { quantity: newTotalQuantity },
       });
 
-      // Log transaction ONLY if skipLog is false
       if (!skipLog) {
         await tx.productTransaction.create({
           data: {
@@ -375,6 +403,13 @@ export class ProductsService {
             quantity,
             remarks: `${remarks} (Previous: ${currentQty}, New: ${newTotalQuantity})`,
           },
+        });
+
+        await this.logsService.create({
+          userId,
+          productId,
+          action: 'MANUAL_ADJUSTMENT',
+          changes: { oldQty: currentQty, newQty: newTotalQuantity, remarks },
         });
       }
 
@@ -402,21 +437,44 @@ export class ProductsService {
     });
   }
 
-  update(id: string, data: any) {
+  async update(id: string, data: any, userId?: string) {
     // Ensure numbers are parsed correctly if they exist in update
     if (data.price !== undefined) data.price = Number(data.price);
     if (data.threshold !== undefined) data.threshold = Number(data.threshold);
 
-    return this.prisma.product.update({
+    const product = await this.prisma.product.update({
       where: { id },
       data,
     });
+
+    if (userId) {
+      await this.logsService.create({
+        userId,
+        productId: id,
+        action: 'UPDATE_PRODUCT',
+        changes: data,
+      });
+    }
+
+    return product;
   }
 
-  remove(id: string) {
-    return this.prisma.product.delete({
+  async remove(id: string, userId?: string) {
+    const product = await this.prisma.product.findUnique({ where: { id } });
+    
+    const result = await this.prisma.product.delete({
       where: { id },
     });
+
+    if (userId && product) {
+      await this.logsService.create({
+        userId,
+        action: 'DELETE_PRODUCT',
+        changes: { name: product.name, sku: product.sku },
+      });
+    }
+
+    return result;
   }
 
   async updateLog(id: string, data: { quantity: number; remarks?: string }) {

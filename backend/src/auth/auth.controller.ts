@@ -10,4 +10,10 @@ export class AuthController {
   signIn(@Body() signInDto: Record<string, any>) {
     return this.authService.login(signInDto.username, signInDto.password);
   }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('logout')
+  signOut(@Body('userId') userId: string) {
+    return this.authService.logout(userId);
+  }
 }

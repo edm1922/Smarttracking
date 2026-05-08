@@ -69,7 +69,11 @@ export class SystemAnalyticsService {
     const recentActivity = await this.prisma.activityLog.findMany({
       take: 20,
       orderBy: { createdAt: 'desc' },
-      include: { user: { select: { username: true } } },
+      include: { 
+        user: { select: { username: true } },
+        item: { select: { name: true, slug: true } },
+        product: { select: { name: true, sku: true } },
+      },
     });
 
     return {

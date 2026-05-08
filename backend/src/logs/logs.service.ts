@@ -57,6 +57,7 @@ export class LogsService {
         { action: { contains: search, mode: 'insensitive' } },
         { user: { username: { contains: search, mode: 'insensitive' } } },
         { item: { name: { contains: search, mode: 'insensitive' } } },
+        { product: { name: { contains: search, mode: 'insensitive' } } },
       ];
     }
 
@@ -81,6 +82,9 @@ export class LogsService {
           item: {
             select: { slug: true, name: true },
           },
+          product: {
+            select: { sku: true, name: true },
+          },
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -98,6 +102,7 @@ export class LogsService {
   async create(data: {
     userId: string;
     itemId?: string;
+    productId?: string;
     action: string;
     changes?: any;
   }) {

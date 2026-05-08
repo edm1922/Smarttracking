@@ -235,6 +235,8 @@ export default function AnalyticsPage() {
                     </div>
                     <p className="text-[11px] text-slate-400 leading-snug">
                       Executed action <span className="text-indigo-400 font-bold uppercase tracking-tighter">{log.action}</span> 
+                      {log.item && <> on <span className="text-slate-200 font-semibold">{log.item.name || log.item.slug}</span></>}
+                      {log.product && <> on <span className="text-slate-200 font-semibold">{log.product.name}</span></>}
                       {log.changes ? ' with data modifications.' : '.'}
                     </p>
                   </div>
