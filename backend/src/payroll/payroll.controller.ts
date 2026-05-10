@@ -2,6 +2,7 @@ import {
   Controller, 
   Get,
   Post, 
+  Patch,
   Delete,
   UseInterceptors, 
   UploadedFile,
