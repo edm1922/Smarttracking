@@ -35,7 +35,7 @@ export default function SystemUsersPage() {
   
   const [formData, setFormData] = useState({
     username: '',
-    role: 'inventory' as 'admin' | 'inventory' | 'super_admin' | 'payroll_admin',
+    role: 'inventory' as 'admin' | 'inventory' | 'super_admin' | 'payroll_staff' | 'payroll_admin',
   });
 
   const [generatedUser, setGeneratedUser] = useState<any | null>(null);
@@ -198,13 +198,15 @@ export default function SystemUsersPage() {
                         user.role === 'super_admin'
                           ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                           : user.role === 'payroll_admin'
-                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                            : user.role === 'admin' 
-                              ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' 
-                              : 'bg-slate-700/30 text-slate-400 border-slate-600/50'
+                            ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                            : user.role === 'payroll_staff'
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                              : user.role === 'admin' 
+                                ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' 
+                                : 'bg-slate-700/30 text-slate-400 border-slate-600/50'
                       }`}>
-                        {user.role === 'super_admin' ? <ShieldCheck className="h-3 w-3 mr-2" /> : user.role === 'payroll_admin' ? <CreditCard className="h-3 w-3 mr-2" /> : user.role === 'admin' ? <Shield className="h-3 w-3 mr-2" /> : <User className="h-3 w-3 mr-2" />}
-                        {user.role.replace('_', ' ')}
+                        {user.role === 'payroll_staff' ? <CreditCard className="h-3 w-3 mr-2" /> : user.role === 'payroll_admin' ? <ShieldAlert className="h-3 w-3 mr-2" /> : user.role === 'super_admin' ? <ShieldCheck className="h-3 w-3 mr-2" /> : user.role === 'admin' ? <Shield className="h-3 w-3 mr-2" /> : <User className="h-3 w-3 mr-2" />}
+                        {user.role === 'payroll_staff' ? 'PAYROLL STAFF' : user.role === 'payroll_admin' ? 'PAYROLL ADMIN' : user.role === 'inventory' ? 'INVENTORY STAFF' : user.role === 'admin' ? 'INVENTORY ADMIN' : user.role === 'super_admin' ? 'SYSTEM ADMIN' : user.role.replace('_', ' ')}
                       </span>
                     </td>
                     <td className="px-8 py-5">
@@ -280,7 +282,7 @@ export default function SystemUsersPage() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
-          <div className="w-full max-w-xl rounded-[2rem] bg-[#1e293b] border border-slate-700/50 p-10 shadow-2xl shadow-black/50 animate-in zoom-in duration-300">
+          <div className="w-full max-w-xl rounded-[2.5rem] bg-[#1e293b] border border-slate-700/50 p-10 shadow-2xl shadow-black/50 animate-in zoom-in duration-300 max-h-[95vh] overflow-y-auto custom-scrollbar relative">
             {!generatedUser ? (
               <>
                 <div className="flex items-center gap-4 mb-8">
@@ -301,19 +303,21 @@ export default function SystemUsersPage() {
                       type="text"
                       value={formData.username}
                       onChange={(e) => setFormData({...formData, username: e.target.value})}
-                      className="w-full rounded-2xl border border-slate-700/50 bg-slate-800/50 px-6 py-4 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                      className="w-full rounded-2xl border border-slate-700/50 bg-slate-800/50 px-6 py-4 text-white !text-white placeholder:text-slate-600 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                      style={{ color: 'white' }}
                       placeholder="Enter unique identifier..."
                     />
                   </div>
 
                   <div className="space-y-4">
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Authorization Tier</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                       {[
-                        { id: 'inventory', name: 'Staff', icon: User, activeClass: 'bg-slate-500/10 border-slate-500/50 text-slate-400 shadow-lg shadow-slate-500/10' },
-                        { id: 'admin', name: 'Manager', icon: Shield, activeClass: 'bg-indigo-500/10 border-indigo-500/50 text-indigo-400 shadow-lg shadow-indigo-500/10' },
-                        { id: 'payroll_admin', name: 'Payroll', icon: CreditCard, activeClass: 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400 shadow-lg shadow-emerald-500/10' },
-                        { id: 'super_admin', name: 'SysAdmin', icon: ShieldAlert, activeClass: 'bg-amber-500/10 border-amber-500/50 text-amber-400 shadow-lg shadow-amber-500/10' }
+                        { id: 'inventory', name: 'Inv. Staff', icon: User, activeClass: 'bg-slate-500/10 border-slate-500/50 text-slate-400 shadow-lg shadow-slate-500/10' },
+                        { id: 'admin', name: 'Inv. Admin', icon: Shield, activeClass: 'bg-indigo-500/10 border-indigo-500/50 text-indigo-400 shadow-lg shadow-indigo-500/10' },
+                        { id: 'payroll_staff', name: 'Pay. Staff', icon: CreditCard, activeClass: 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400 shadow-lg shadow-emerald-500/10' },
+                        { id: 'payroll_admin', name: 'Pay. Admin', icon: ShieldCheck, activeClass: 'bg-blue-500/10 border-blue-500/50 text-blue-400 shadow-lg shadow-blue-500/10' },
+                        { id: 'super_admin', name: 'Sys. Admin', icon: ShieldAlert, activeClass: 'bg-amber-500/10 border-amber-500/50 text-amber-400 shadow-lg shadow-amber-500/10' }
                       ].map((role) => (
                         <button
                           key={role.id}

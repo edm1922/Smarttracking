@@ -55,10 +55,10 @@ export default function StaffInventoryPage() {
     fetchPersonalInventory();
   }, []);
 
-  const filteredStocks = location?.stocks.filter(s => 
-    s.product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.product.sku.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const filteredStocks = (location?.stocks || []).filter(s => 
+    s.product?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.product?.sku?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   if (loading) {
     return (
@@ -129,7 +129,7 @@ export default function StaffInventoryPage() {
           </div>
           <div>
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Items in Custody</p>
-            <p className="text-2xl font-black text-gray-900">{location?.stocks.length || 0}</p>
+            <p className="text-2xl font-black text-gray-900">{(location?.stocks || []).length}</p>
           </div>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
@@ -139,7 +139,7 @@ export default function StaffInventoryPage() {
           <div>
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Qty</p>
             <p className="text-2xl font-black text-gray-900">
-              {location?.stocks.reduce((acc, s) => acc + s.quantity, 0) || 0}
+              {(location?.stocks || []).reduce((acc, s) => acc + s.quantity, 0)}
             </p>
           </div>
         </div>

@@ -18,7 +18,7 @@ export class UsersService {
     });
   }
 
-  async create(data: { username: string; role: 'admin' | 'inventory' | 'super_admin' | 'payroll_admin' }) {
+  async create(data: { username: string; role: 'admin' | 'inventory' | 'super_admin' | 'payroll_admin' | 'payroll_staff' }) {
     const cleanUsername = data.username.trim().toLowerCase();
     const existing = await this.prisma.user.findUnique({
       where: { username: cleanUsername },
@@ -36,6 +36,7 @@ export class UsersService {
     if (data.role === 'super_admin') prefix = 'SYS';
     else if (data.role === 'admin') prefix = 'ADM';
     else if (data.role === 'payroll_admin') prefix = 'PAY';
+    else if (data.role === 'payroll_staff') prefix = 'STF';
     
     const plainPassword = `${prefix}-${randomChars}${randomDigits}`;
     
@@ -102,6 +103,7 @@ export class UsersService {
     if (targetUser.role === 'super_admin') prefix = 'SYS';
     else if (targetUser.role === 'admin') prefix = 'ADM';
     else if (targetUser.role === 'payroll_admin') prefix = 'PAY';
+    else if (targetUser.role === 'payroll_staff') prefix = 'STF';
     
     const plainPassword = `${prefix}-${randomChars}${randomDigits}`;
     const hashedPassword = await bcrypt.hash(plainPassword, 10);

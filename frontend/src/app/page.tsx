@@ -27,7 +27,7 @@ export default function LoginPage() {
 
       if (role === 'super_admin') {
         router.push('/admin-portal/analytics');
-      } else if (role === 'payroll_admin') {
+      } else if (role === 'payroll_admin' || role === 'payroll_staff') {
         router.push('/dashboard/payroll'); 
       } else {
         router.push('/dashboard');
@@ -66,7 +66,7 @@ export default function LoginPage() {
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:text-sm"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:text-sm"
               />
             </div>
             <div>
@@ -80,7 +80,7 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:text-sm"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:text-sm"
               />
             </div>
           </div>

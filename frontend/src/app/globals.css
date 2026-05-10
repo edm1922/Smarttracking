@@ -35,7 +35,7 @@ body {
 }
 
 input, textarea, select {
-  color: #0f172a !important; /* Ensure dark text on white inputs */
+  color: #0f172a; /* Default dark text for light mode */
 }
 
 input::placeholder, textarea::placeholder {

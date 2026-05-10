@@ -68,6 +68,15 @@ export default function IntegratedPayrollAdmin() {
   const [isSavingCompany, setIsSavingCompany] = useState(false);
   const [selectedCompanyFilter, setSelectedCompanyFilter] = useState('all');
 
+  // Role and Request state
+  const [userRole, setUserRole] = useState<string>('admin');
+  const [userId, setUserId] = useState<string>('');
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [staffRequests, setStaffRequests] = useState<any[]>([]);
+  const [isRequestingApproval, setIsRequestingApproval] = useState(false);
+  const isStaff = userRole.toLowerCase() === 'payroll_staff';
+  const isAdmin = userRole.toLowerCase() === 'admin' || userRole.toLowerCase() === 'payroll_admin';
+
   // Storage Handlers
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [remark, setRemark] = useState('');
@@ -185,6 +194,12 @@ export default function IntegratedPayrollAdmin() {
   };
 
   const handleRowDoubleClick = (run: any) => {
+    if (isStaff) {
+      if (window.confirm(`Request revocation for batch: "${run.label || 'Standard Run'}"?`)) {
+        handleRequestRevoke(run.id);
+      }
+      return;
+    }
     const choice = window.prompt(`Select Action for Batch:\n"${run.label || 'Standard Run'}"\n\nType '1' to RESUME (Continue uploading files to this batch)\nType '2' to REVOKE (Delete this batch and all its records)`, '1');
     
     if (choice === '1') {
@@ -301,6 +316,103 @@ export default function IntegratedPayrollAdmin() {
     }
   };
 
+  const fetchPendingRequests = async () => {
+    try {
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${apiUrl}/payroll/requests/pending`);
+      if (res.ok) {
+        const data = await res.json();
+        setPendingRequests(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch pending requests:', err);
+    }
+  };
+
+  const fetchStaffRequests = async (uid: string) => {
+    try {
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${apiUrl}/payroll/requests/staff/${uid}`);
+      if (res.ok) {
+        const data = await res.json();
+        setStaffRequests(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch staff requests:', err);
+    }
+  };
+
+  const handleRequestUploadApproval = async () => {
+    if (!clientLabel || !periodStart || !periodEnd) {
+      setStatus({ type: 'error', message: 'Please fill out all fields before requesting approval.' });
+      return;
+    }
+    setIsRequestingApproval(true);
+    try {
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${apiUrl}/payroll/requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          type: 'UPLOAD',
+          clientName: clientLabel,
+          periodStart,
+          periodEnd,
+          releaseDate,
+          remark
+        })
+      });
+      if (res.ok) {
+        setStatus({ type: 'success', message: 'Upload request sent! Please wait for Admin approval.' });
+        fetchStaffRequests(userId);
+      }
+    } catch (err: any) {
+      setStatus({ type: 'error', message: err.message });
+    } finally {
+      setIsRequestingApproval(false);
+    }
+  };
+
+  const handleRequestRevoke = async (batchId: string) => {
+    try {
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${apiUrl}/payroll/requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          type: 'REVOKE',
+          batchId
+        })
+      });
+      if (res.ok) {
+        setStatus({ type: 'success', message: 'Revoke request sent to Admin!' });
+        fetchStaffRequests(userId);
+      }
+    } catch (err: any) {
+      setStatus({ type: 'error', message: err.message });
+    }
+  };
+
+  const handleRespondToRequest = async (requestId: string, approved: boolean) => {
+    try {
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${apiUrl}/payroll/requests/${requestId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: approved ? 'APPROVED' : 'REJECTED' })
+      });
+      if (res.ok) {
+        setStatus({ type: 'success', message: `Request ${approved ? 'approved' : 'rejected'} successfully.` });
+        fetchPendingRequests();
+        fetchRuns(); // Refresh runs if a revoke was approved
+      }
+    } catch (err: any) {
+      setStatus({ type: 'error', message: err.message });
+    }
+  };
+
   const fetchCompanies = async () => {
     try {
       const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
@@ -336,11 +448,44 @@ export default function IntegratedPayrollAdmin() {
     }
   };
 
+  const handleDeleteCompany = async () => {
+    if (!clientLabel) return;
+    const company = companies.find(c => c.name === clientLabel);
+    if (!company) return;
+
+    if (!window.confirm(`Are you sure you want to delete the client "${company.name}"? This will only remove it from the select list and will not delete any associated payroll documents.`)) return;
+
+    try {
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${apiUrl}/payroll/companies/${company.id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to delete company');
+      
+      setClientLabel('');
+      fetchCompanies();
+      setStatus({ type: 'success', message: 'Client label removed successfully.' });
+    } catch (err: any) {
+      setStatus({ type: 'error', message: err.message });
+    }
+  };
+
   useEffect(() => {
+    const role = (localStorage.getItem('role') || 'admin').toLowerCase();
+    const id = localStorage.getItem('userId') || '';
+    setUserRole(role);
+    setUserId(id);
+
     fetchLatestRun();
     fetchRuns();
     fetchCompanies();
     if (activeTab === 'credentials') fetchUsers();
+
+    if (role === 'admin' || role === 'payroll_admin') {
+      fetchPendingRequests();
+    } else if (role === 'payroll_staff' && id) {
+      fetchStaffRequests(id);
+    }
   }, [activeTab]);
 
   // Poll for upload progress
@@ -483,6 +628,7 @@ export default function IntegratedPayrollAdmin() {
                 <div className="p-8 space-y-6">
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {!isStaff && (
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">New Client / Company</label>
                         <div className="flex gap-2">
@@ -502,20 +648,32 @@ export default function IntegratedPayrollAdmin() {
                           </button>
                         </div>
                       </div>
+                    )}
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Select Existing Client</label>
-                        <div className="relative">
-                          <select
-                            value={clientLabel}
-                            onChange={(e) => setClientLabel(e.target.value)}
-                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold appearance-none outline-none focus:ring-2 focus:ring-primary/20"
-                          >
-                            <option value="">-- Choose Client --</option>
-                            {companies.map(c => (
-                              <option key={c.id} value={c.name}>{c.name}</option>
-                            ))}
-                          </select>
-                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <select
+                              value={clientLabel}
+                              onChange={(e) => setClientLabel(e.target.value)}
+                              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold appearance-none outline-none focus:ring-2 focus:ring-primary/20"
+                            >
+                              <option value="">-- Choose Client --</option>
+                              {companies.map(c => (
+                                <option key={c.id} value={c.name}>{c.name}</option>
+                              ))}
+                            </select>
+                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                          </div>
+                          {!isStaff && clientLabel && (
+                            <button
+                              onClick={handleDeleteCompany}
+                              className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors"
+                              title="Delete this client label"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -598,7 +756,20 @@ export default function IntegratedPayrollAdmin() {
                   </div>
 
                   <div
-                    onClick={() => clientLabel && fileInputRef.current?.click()}
+                    onClick={() => {
+                      if (!clientLabel) return;
+                      if (isStaff) {
+                        const approved = staffRequests.some(r => 
+                          r.type === 'UPLOAD' && 
+                          r.status === 'APPROVED' && 
+                          r.clientName === clientLabel &&
+                          new Date(r.periodStart).toISOString().split('T')[0] === periodStart &&
+                          new Date(r.periodEnd).toISOString().split('T')[0] === periodEnd
+                        );
+                        if (!approved) return;
+                      }
+                      fileInputRef.current?.click();
+                    }}
                     onDragOver={(e) => {
                       if (!clientLabel) return;
                       e.preventDefault();
@@ -611,6 +782,16 @@ export default function IntegratedPayrollAdmin() {
                     }}
                     onDrop={(e) => {
                       if (!clientLabel) return;
+                      if (isStaff) {
+                        const approved = staffRequests.some(r => 
+                          r.type === 'UPLOAD' && 
+                          r.status === 'APPROVED' && 
+                          r.clientName === clientLabel &&
+                          new Date(r.periodStart).toISOString().split('T')[0] === periodStart &&
+                          new Date(r.periodEnd).toISOString().split('T')[0] === periodEnd
+                        );
+                        if (!approved) return;
+                      }
                       e.preventDefault();
                       e.currentTarget.classList.remove('border-primary');
                       if (e.dataTransfer.files) {
@@ -623,6 +804,18 @@ export default function IntegratedPayrollAdmin() {
                       <div className="space-y-2">
                         <ShieldAlert className="h-10 w-10 text-gray-300 mx-auto mb-4" />
                         <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Select Client First</p>
+                      </div>
+                    ) : isStaff && !staffRequests.some(r => 
+                      r.type === 'UPLOAD' && 
+                      r.status === 'APPROVED' && 
+                      r.clientName === clientLabel &&
+                      new Date(r.periodStart).toISOString().split('T')[0] === periodStart &&
+                      new Date(r.periodEnd).toISOString().split('T')[0] === periodEnd
+                    ) ? (
+                      <div className="space-y-2">
+                        <AlertCircle className="h-10 w-10 text-amber-500 mx-auto mb-4" />
+                        <p className="text-sm font-bold text-gray-900">Admin Approval Required</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Request approval below before uploading files</p>
                       </div>
                     ) : selectedFiles.length > 0 ? (
                       <div className="space-y-2">
@@ -661,14 +854,31 @@ export default function IntegratedPayrollAdmin() {
                     </div>
                   )}
                   <button onClick={() => setIsImportModalOpen(false)} disabled={uploading} className="px-6 py-3 font-bold text-gray-500 hover:text-gray-700 disabled:opacity-50">Cancel</button>
-                  <button
-                    onClick={handleUpload}
-                    disabled={uploading || selectedFiles.length === 0 || !clientLabel || !periodStart || !periodEnd}
-                    className="bg-primary text-white px-10 py-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                    {uploading ? 'Uploading...' : (resumableBatchId ? 'Resume Upload' : 'Start Upload')}
-                  </button>
+                  {isStaff && !staffRequests.some(r => 
+                    r.type === 'UPLOAD' && 
+                    r.status === 'APPROVED' && 
+                    r.clientName === clientLabel &&
+                    new Date(r.periodStart).toISOString().split('T')[0] === periodStart &&
+                    new Date(r.periodEnd).toISOString().split('T')[0] === periodEnd
+                  ) ? (
+                    <button
+                      onClick={handleRequestUploadApproval}
+                      disabled={isRequestingApproval || !clientLabel || !periodStart || !periodEnd}
+                      className="bg-amber-600 text-white px-10 py-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-amber-600/20 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {isRequestingApproval ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertCircle className="h-4 w-4" />}
+                      {isRequestingApproval ? 'Sending Request...' : 'Request Upload Approval'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleUpload}
+                      disabled={uploading || selectedFiles.length === 0 || !clientLabel || !periodStart || !periodEnd}
+                      className="bg-primary text-white px-10 py-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                      {uploading ? 'Uploading...' : (resumableBatchId ? 'Resume Upload' : 'Start Upload')}
+                    </button>
+                  )}
                 </div>
               </motion.div>
             </div>
@@ -692,14 +902,16 @@ export default function IntegratedPayrollAdmin() {
             >
               Storage Hub
             </button>
-            <button
-              onClick={() => setActiveTab('sync')}
-              disabled={runs.length === 0}
-              className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all ${activeTab === 'sync' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'} ${runs.length === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
-              title={runs.length === 0 ? "Upload a PDF first to enable account sync" : ""}
-            >
-              Account Sync
-            </button>
+            {!isStaff && (
+              <button
+                onClick={() => setActiveTab('sync')}
+                disabled={runs.length === 0}
+                className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all ${activeTab === 'sync' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'} ${runs.length === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                title={runs.length === 0 ? "Upload a PDF first to enable account sync" : ""}
+              >
+                Account Sync
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('credentials')}
               className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all ${activeTab === 'credentials' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
@@ -708,6 +920,51 @@ export default function IntegratedPayrollAdmin() {
             </button>
           </div>
         </div>
+
+        {/* Staff Requests Section (Admin Only) */}
+        {!isStaff && pendingRequests.length > 0 && (
+          <div className="bg-amber-50 border border-amber-100 rounded-[2rem] p-8 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-black text-amber-900 uppercase tracking-widest flex items-center gap-2">
+                  <ShieldAlert className="h-4 w-4" /> Pending Staff Requests
+                </h3>
+                <p className="text-[10px] font-bold text-amber-700 mt-1">Payroll staff are waiting for your approval on these actions.</p>
+              </div>
+              <span className="bg-amber-200 text-amber-900 px-3 py-1 rounded-full text-[10px] font-black">{pendingRequests.length} Pending</span>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {pendingRequests.map(req => (
+                <div key={req.id} className="bg-white rounded-2xl p-6 border border-amber-200/50 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-start mb-4">
+                      <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-tighter ${req.type === 'UPLOAD' ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-700'}`}>
+                        {req.type} REQUEST
+                      </span>
+                      <span className="text-[10px] font-bold text-gray-400">{new Date(req.createdAt).toLocaleString()}</span>
+                    </div>
+                    <p className="text-xs font-black text-gray-900">{req.user?.fullName || req.user?.username || 'Staff member'}</p>
+                    <div className="mt-2 text-[10px] font-bold text-gray-500 space-y-1">
+                      {req.type === 'UPLOAD' ? (
+                        <>
+                          <p>Client: {req.clientName}</p>
+                          <p>Period: {new Date(req.periodStart).toLocaleDateString()} - {new Date(req.periodEnd).toLocaleDateString()}</p>
+                        </>
+                      ) : (
+                        <p>Target Batch ID: {req.batchId}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-4">
+                    <button onClick={() => handleRespondToRequest(req.id, true)} className="flex-1 bg-amber-600 text-white py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all">Approve</button>
+                    <button onClick={() => handleRespondToRequest(req.id, false)} className="px-4 py-2 bg-gray-100 text-gray-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-50 hover:text-red-600 transition-all">Reject</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="max-w-7xl mx-auto">
           {status && (
@@ -724,8 +981,8 @@ export default function IntegratedPayrollAdmin() {
           )}
 
           {activeTab === 'storage' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 space-y-8">
+            <div className={`grid grid-cols-1 ${isStaff ? '' : 'lg:grid-cols-4'} gap-8`}>
+              <div className={`${isStaff ? '' : 'lg:col-span-3'} space-y-8`}>
                 {/* Upload Card */}
                 <div className="bg-white rounded-[3rem] border border-gray-200 shadow-sm p-10 flex flex-col items-center justify-center text-center">
                   <div className="h-16 w-16 rounded-2xl bg-blue-50 text-primary flex items-center justify-center mb-6">
@@ -756,7 +1013,7 @@ export default function IntegratedPayrollAdmin() {
                           placeholder="Search Label..."
                           value={historySearch}
                           onChange={(e) => setHistorySearch(e.target.value)}
-                          className="pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all w-36"
+                          className="pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all w-64"
                         />
                       </div>
 
@@ -801,7 +1058,7 @@ export default function IntegratedPayrollAdmin() {
                         <select
                           value={selectedCompanyFilter}
                           onChange={(e) => setSelectedCompanyFilter(e.target.value)}
-                          className="appearance-none bg-gray-50 border border-gray-200 rounded-xl pl-4 pr-10 py-2 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-primary/20"
+                          className="appearance-none bg-gray-50 border border-gray-200 rounded-xl pl-4 pr-10 py-2 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-primary/20 max-w-[250px] truncate"
                         >
                           <option value="all">All Clients</option>
                           {companies.map(c => (
@@ -818,9 +1075,9 @@ export default function IntegratedPayrollAdmin() {
                     <table className="w-full text-left">
                       <thead>
                         <tr className="bg-gray-50/50">
-                          <th className="px-8 py-4 text-[10px] font-black uppercase text-gray-400">Company / Batch</th>
-                          <th className="px-8 py-4 text-[10px] font-black uppercase text-gray-400">Period</th>
-                          <th className="px-8 py-4 text-[10px] font-black uppercase text-gray-400 text-right">Files</th>
+                          <th className="px-10 py-5 text-[10px] font-black uppercase text-gray-400">Company / Batch</th>
+                          <th className="px-10 py-5 text-[10px] font-black uppercase text-gray-400">Period</th>
+                          <th className="px-10 py-5 text-[10px] font-black uppercase text-gray-400 text-right">Files</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
@@ -834,17 +1091,17 @@ export default function IntegratedPayrollAdmin() {
                               className="hover:bg-gray-50/50 transition-colors cursor-pointer group relative" 
                               title="Double click for options (Resume or Revoke)"
                             >
-                              <td className="px-8 py-5">
-                                <p className="text-xs font-black text-gray-900">{run.label || 'Standard Run'}</p>
+                              <td className="px-10 py-6">
+                                <p className="text-sm font-black text-gray-900">{run.label || run.client_name || 'Standard Run'}</p>
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Imported {new Date(run.created_at).toLocaleDateString()}</p>
                               </td>
-                              <td className="px-8 py-5">
-                                <p className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-md inline-block">
+                              <td className="px-10 py-6">
+                                <p className="text-[10px] font-bold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg inline-block whitespace-nowrap">
                                   {new Date(run.period_start).toLocaleDateString()} → {new Date(run.period_end).toLocaleDateString()}
                                 </p>
                               </td>
-                              <td className="px-8 py-5 text-right">
-                                <span className="text-xs font-black text-primary">{run._count?.documents || 0}</span>
+                              <td className="px-10 py-6 text-right">
+                                <span className="text-sm font-black text-primary">{run._count?.documents || 0}</span>
                               </td>
                             </tr>
                           ))
@@ -855,16 +1112,18 @@ export default function IntegratedPayrollAdmin() {
                 </div>
               </div>
 
-              <div className="space-y-6">
-                <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
-                  <h4 className="text-lg font-black mb-2 relative z-10">Smart Sync</h4>
-                  <p className="text-gray-400 text-xs leading-relaxed mb-8 relative z-10">Paste your employee list to instantly provision their personal document vaults.</p>
-                  <button onClick={() => setActiveTab('sync')} className="w-full bg-white text-gray-900 py-4 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3">
-                    <Plus className="h-4 w-4" /> Go to Account Sync
-                  </button>
+              {!isStaff && (
+                <div className="space-y-6">
+                  <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+                    <h4 className="text-lg font-black mb-2 relative z-10">Smart Sync</h4>
+                    <p className="text-gray-400 text-xs leading-relaxed mb-8 relative z-10">Paste your employee list to instantly provision their personal document vaults.</p>
+                    <button onClick={() => setActiveTab('sync')} className="w-full bg-white text-gray-900 py-4 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3">
+                      <Plus className="h-4 w-4" /> Go to Account Sync
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -963,20 +1222,24 @@ export default function IntegratedPayrollAdmin() {
                     >
                       <Printer className="h-4 w-4" /> Print
                     </button>
-                    {filteredUsers.length > 0 && (
-                      <button 
-                        onClick={handleBulkDeleteEmployees}
-                        className="bg-red-50 text-red-600 px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest border border-red-100 hover:bg-red-600 hover:text-white transition-all flex items-center gap-2"
-                      >
-                        <Trash2 className="h-4 w-4" /> Bulk Delete
-                      </button>
+                    {!isStaff && (
+                      <>
+                        {filteredUsers.length > 0 && (
+                          <button 
+                            onClick={handleBulkDeleteEmployees}
+                            className="bg-red-50 text-red-600 px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest border border-red-100 hover:bg-red-600 hover:text-white transition-all flex items-center gap-2"
+                          >
+                            <Trash2 className="h-4 w-4" /> Bulk Delete
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => setActiveTab('sync')}
+                          className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-black transition-all flex items-center gap-2"
+                        >
+                          <RefreshCw className="h-4 w-4" /> Sync Portal
+                        </button>
+                      </>
                     )}
-                    <button 
-                      onClick={() => setActiveTab('sync')}
-                      className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-black transition-all flex items-center gap-2"
-                    >
-                      <RefreshCw className="h-4 w-4" /> Sync Portal
-                    </button>
                   </div>
                 </div>
               </div>
@@ -998,13 +1261,15 @@ export default function IntegratedPayrollAdmin() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-8 print:grid-cols-2 print:gap-4 print:p-0 print:mt-4">
                     {filteredUsers.map((user) => (
                       <div key={user.id} className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col items-center text-center print:break-inside-avoid print:shadow-none print:border-gray-300 relative overflow-hidden group">
-                        <button 
-                          onClick={() => handleDeleteEmployee(user.id)}
-                          className="absolute top-4 left-4 p-2 bg-red-50 text-red-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white z-10 print:hidden"
-                          title="Delete Employee Access"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {!isStaff && (
+                          <button 
+                            onClick={() => handleDeleteEmployee(user.id)}
+                            className="absolute top-4 left-4 p-2 bg-red-50 text-red-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white z-10 print:hidden"
+                            title="Delete Employee Access"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                         <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50/50 rounded-full -mr-12 -mt-12 blur-xl pointer-events-none"></div>
 
                         <div className="bg-white p-2 rounded-2xl border border-gray-100 shadow-sm mb-4">

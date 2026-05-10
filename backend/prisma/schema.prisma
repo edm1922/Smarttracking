@@ -505,7 +505,7 @@ model ActivityLog {
   createdAt DateTime @default(now())
   item      Item?    @relation(fields: [itemId], references: [id])
   product   Product? @relation(fields: [productId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
   @@index([userId, createdAt])
@@ -701,7 +701,7 @@ model ProductTransaction {
   userId     String
   location   Location @relation(fields: [locationId], references: [id])
   product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id])
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([locationId, createdAt])
   @@index([productId, createdAt])
@@ -726,7 +726,7 @@ model PullOutRequest {
   supervisor       String?
   attachmentUrl    String?
   item             Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  user             User     @relation(fields: [userId], references: [id])
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([itemId, createdAt])
   @@index([status])
@@ -767,8 +767,9 @@ model StaffActivity {
   productName String?
   specs       String?
   qty         Int?
+  unit        String?
   createdAt   DateTime @default(now())
-  User        User     @relation(fields: [userId], references: [id])
+  User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@schema("public")
 }
@@ -783,7 +784,7 @@ model StaffInventory {
   productName String
   specs       String   @default("")
   threshold   Int      @default(5)
-  User        User     @relation(fields: [userId], references: [id])
+  User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, productName, specs])
   @@schema("public")
@@ -802,7 +803,7 @@ model StaffRelease {
   date         DateTime @default(now())
   productName  String
   specs        String   @default("")
-  User         User     @relation(fields: [staffId], references: [id])
+  User         User     @relation(fields: [staffId], references: [id], onDelete: Cascade)
 
   @@schema("public")
 }
@@ -874,6 +875,30 @@ model User {
   StaffInventory     StaffInventory[]
   StaffRelease       StaffRelease[]
   documents          Document[]
+  PayrollRequest     PayrollRequest[]
+
+  @@schema("public")
+}
+
+model PayrollRequest {
+  id          String   @id @default(uuid())
+  type        String   // 'UPLOAD' | 'REVOKE'
+  status      String   @default("PENDING") // 'PENDING' | 'APPROVED' | 'REJECTED'
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // For UPLOAD requests
+  clientName  String?
+  periodStart DateTime? @db.Date
+  periodEnd   DateTime? @db.Date
+  releaseDate DateTime? @db.Date
+  remark      String?
+  
+  // For REVOKE requests
+  batchId     String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@schema("public")
 }
@@ -912,7 +937,7 @@ model Document {
   remark         String?
   created_at     DateTime     @default(now())
   batch          StorageBatch @relation(fields: [batch_id], references: [id], onDelete: Cascade)
-  user           User?        @relation(fields: [user_id], references: [id], onDelete: NoAction)
+  user           User?        @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([batch_id, sys_id])
   @@index([sys_id])

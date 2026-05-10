@@ -23,6 +23,13 @@ export default function EmployeeDashboard() {
   const [user, setUser] = useState<any>(null);
   const [slips, setSlips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return 'N/A';
+    const date = new Date(dateStr);
+    const months = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
+    return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+  };
 
   useEffect(() => {
     async function fetchData() {
@@ -117,7 +124,19 @@ export default function EmployeeDashboard() {
                  <h3 className="text-4xl font-black text-gray-900 mb-1">
                    {slips.length}
                  </h3>
-                 <p className="text-gray-400 text-xs font-medium">Latest: {slips[0]?.batch?.created_at ? new Date(slips[0].batch.created_at).toLocaleDateString() : 'N/A'}</p>
+                 <div className="flex items-center gap-2 mt-2">
+                    <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Latest:</span>
+                    <span className="text-primary text-[10px] font-black uppercase tracking-widest bg-primary/5 px-2 py-0.5 rounded-md border border-primary/10">
+                      {slips.length > 0 
+                        ? formatDate(slips.reduce((latest, slip) => {
+                            const current = new Date(slip.batch?.release_date || slip.created_at);
+                            const prev = new Date(latest);
+                            return current > prev ? current.toISOString() : latest;
+                          }, slips[0].batch?.release_date || slips[0].created_at))
+                        : 'N/A'
+                      }
+                    </span>
+                 </div>
                  
                  <div className="mt-8 pt-8 border-t border-gray-50 flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -178,12 +197,12 @@ export default function EmployeeDashboard() {
                       <Calendar className="h-6 w-6 text-gray-400 group-hover:text-white" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-gray-900 mb-1">
-                        Period: {slip.batch?.period_start ? new Date(slip.batch.period_start).toLocaleDateString() : 'N/A'} to {slip.batch?.period_end ? new Date(slip.batch.period_end).toLocaleDateString() : 'N/A'}
+                      <h4 className="text-sm font-black text-gray-900 mb-1">
+                        {formatDate(slip.batch?.period_start)} TO {formatDate(slip.batch?.period_end)}
                       </h4>
                       <div className="flex items-center gap-4">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Type: <span className="text-indigo-500 font-bold">{slip.file_type}</span></span>
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Released: {new Date(slip.created_at).toLocaleDateString()}</span>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Type: <span className="text-indigo-500 font-black">{slip.file_type}</span></span>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Released: <span className="text-gray-900 font-black">{formatDate(slip.batch?.release_date || slip.created_at)}</span></span>
                       </div>
                     </div>
                   </div>

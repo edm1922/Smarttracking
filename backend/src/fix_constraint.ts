@@ -8,14 +8,17 @@ async function main() {
     // 1. Drop existing constraint
     await prisma.$executeRawUnsafe(`ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;`);
     
-    // 2. Add new constraint with 'staff' included
+    // 2. Add new constraint with all current roles
+    const allowedRoles = ['admin', 'inventory', 'super_admin', 'payroll_admin', 'payroll_staff', 'staff', 'employee', 'viewer'];
+    const constraintString = allowedRoles.map(r => `'${r}'`).join(', ');
+    
     await prisma.$executeRawUnsafe(`
       ALTER TABLE public.profiles 
       ADD CONSTRAINT profiles_role_check 
-      CHECK (role IN ('admin', 'inventory', 'super_admin', 'payroll_admin', 'staff'));
+      CHECK (role IN (${constraintString}));
     `);
     
-    console.log("Database constraint updated successfully! 'staff' role is now allowed.");
+    console.log(`Database constraint updated successfully! Allowed roles: ${allowedRoles.join(', ')}`);
   } catch (error: any) {
     console.error("Failed to update constraint:", error.message);
     console.log("Please run the following SQL manually in your Supabase SQL Editor:");

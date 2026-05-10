@@ -35,8 +35,8 @@ useEffect(() => {
       return;
     }
 
-    // Payroll Admin should not be here, they have their own portal section
-    if (storedRole === 'payroll_admin' && pathname === '/dashboard') {
+    // Payroll roles should not be here, they have their own portal section
+    if ((storedRole === 'payroll_admin' || storedRole === 'payroll_staff') && pathname === '/dashboard') {
       router.push('/dashboard/payroll');
       return;
     }
@@ -64,6 +64,7 @@ useEffect(() => {
   const isStaff = role === 'inventory';
   const isSuperAdmin = role === 'super_admin';
   const isAdmin = role === 'admin';
+  const isPayrollUser = role === 'payroll_admin' || role === 'payroll_staff';
 
   const staffItems = [
     { 
@@ -82,11 +83,9 @@ useEffect(() => {
       subItems: [
         { name: 'Create Request', href: '/dashboard/staff/unit-requisition?tab=create' },
         { name: 'Pending Status', href: '/dashboard/staff/unit-requisition?tab=history' },
-        { name: 'My Inventory', href: '/dashboard/staff/unit-requisition?tab=inventory' },
-        { name: 'Employee Releasing', href: '/dashboard/staff/unit-requisition?tab=releasing' }
+        { name: 'Pull Out History', href: '/dashboard/staff/unit-requisition?tab=inventory' },
       ]
     },
-    { name: 'My Inventory', href: '/dashboard/staff/inventory', icon: Database },
   ];
 
   const inventoryItems = [
@@ -151,12 +150,12 @@ useEffect(() => {
       <aside className="fixed inset-y-0 left-0 w-64 border-r border-gray-200 bg-white no-print flex flex-col z-[40]">
         <div className="flex h-16 items-center border-b border-gray-200 px-6 shrink-0 justify-between">
           <span className="text-xl font-bold text-primary">Smart Tracking</span>
-          {!isStaff && role !== 'payroll_admin' && <AdminNotifications />}
+          {!isStaff && !isPayrollUser && <AdminNotifications />}
         </div>
         <nav className="flex-1 space-y-6 p-4 overflow-y-auto custom-scrollbar">
           {!isStaff ? (
             <>
-              {role !== 'payroll_admin' && (
+              {!isPayrollUser && (
                 <div>
                   <p className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Inventory System</p>
                   <div className="space-y-1">
@@ -209,7 +208,7 @@ useEffect(() => {
                 </div>
               )}
 
-              {role !== 'payroll_admin' && (
+              {!isPayrollUser && (
                 <div>
                   <p className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">QR Form System</p>
                   <div className="space-y-1">
@@ -236,7 +235,7 @@ useEffect(() => {
                 </div>
               )}
 
-              {role !== 'payroll_admin' && (
+              {!isPayrollUser && (
                 <div>
                   <p className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Staff Area</p>
                   <div className="space-y-1">
@@ -288,12 +287,12 @@ useEffect(() => {
                   </div>
                 </div>
               )}
-              {(isSuperAdmin || role === 'payroll_admin') && (
+              {(isSuperAdmin || isPayrollUser) && (
                 <div>
                   <p className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Payroll System</p>
                   <div className="space-y-1">
                     {payrollItems.map((item) => {
-                      if (item.name === 'Payroll Admin' && !isSuperAdmin && role !== 'payroll_admin') return null;
+                      if (item.name === 'Payroll Admin' && !isSuperAdmin && !isPayrollUser) return null;
                       const Icon = item.icon;
                       const isActive = pathname.startsWith(item.href);
                       return (
@@ -400,7 +399,21 @@ useEffect(() => {
             </div>
             <div className="ml-3 overflow-hidden">
               <p className="text-sm font-medium text-gray-900 truncate">{username}</p>
-              <p className="text-xs text-gray-500 capitalize">{role}</p>
+              {role === 'payroll_staff' ? (
+                <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-700 border border-amber-200 uppercase tracking-widest mt-0.5">
+                  PAYROLL STAFF
+                </span>
+              ) : role === 'payroll_admin' ? (
+                <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black text-blue-700 border border-blue-200 uppercase tracking-widest mt-0.5">
+                  PAYROLL ADMIN
+                </span>
+              ) : role === 'admin' ? (
+                <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-black text-purple-700 border border-purple-200 uppercase tracking-widest mt-0.5">
+                  INVENTORY ADMIN
+                </span>
+              ) : (
+                <p className="text-xs text-gray-500 font-bold uppercase tracking-tighter mt-1">{role.replace('_', ' ')}</p>
+              )}
             </div>
           </div>
           <button

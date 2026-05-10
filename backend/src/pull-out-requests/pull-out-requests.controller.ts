@@ -36,6 +36,8 @@ export class PullOutRequestsController {
     @Query('search') search?: string,
     @Query('status') status?: string,
     @Query('allPending') allPending?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
     return this.pullOutRequestsService.findByUser(req.user.sub, {
       skip: skip ? parseInt(skip, 10) : 0,
@@ -43,6 +45,8 @@ export class PullOutRequestsController {
       search,
       status,
       allPending: allPending === 'true',
+      startDate,
+      endDate,
     });
   }
 

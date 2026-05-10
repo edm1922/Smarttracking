@@ -586,4 +586,54 @@ export class PayrollService {
       where: { id }
     });
   }
+
+  async createPayrollRequest(userId: string, data: any) {
+    return this.prisma.payrollRequest.create({
+      data: {
+        userId,
+        type: data.type,
+        status: 'PENDING',
+        clientName: data.clientName,
+        periodStart: data.periodStart ? new Date(data.periodStart) : null,
+        periodEnd: data.periodEnd ? new Date(data.periodEnd) : null,
+        releaseDate: data.releaseDate ? new Date(data.releaseDate) : null,
+        remark: data.remark,
+        batchId: data.batchId,
+      }
+    });
+  }
+
+  async getPendingRequests() {
+    return this.prisma.payrollRequest.findMany({
+      where: { status: 'PENDING' },
+      include: { user: true },
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
+  async getStaffRequests(userId: string) {
+    return this.prisma.payrollRequest.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    });
+  }
+
+  async respondToRequest(requestId: string, status: 'APPROVED' | 'REJECTED') {
+    const request = await this.prisma.payrollRequest.findUnique({
+      where: { id: requestId }
+    });
+
+    if (!request) throw new HttpException('Request not found', HttpStatus.NOT_FOUND);
+
+    // If it's a REVOKE request and it's being approved, perform the deletion
+    if (request.type === 'REVOKE' && status === 'APPROVED' && request.batchId) {
+      await this.deleteBatch(request.batchId);
+    }
+
+    return this.prisma.payrollRequest.update({
+      where: { id: requestId },
+      data: { status }
+    });
+  }
 }

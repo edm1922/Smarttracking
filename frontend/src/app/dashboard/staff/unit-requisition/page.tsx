@@ -102,16 +102,14 @@ function UnitRequisitionContent() {
 
   // Staff Inventory & Releasing
   const [staffInventory, setStaffInventory] = useState<any[]>([]);
-  const [staffReleases, setStaffReleases] = useState<any[]>([]);
-  const [isBulkMode, setIsBulkMode] = useState(false);
-  const [bulkRows, setBulkRows] = useState([{ employeeName: '', qty: 1 }]);
   const [selectedInventoryItem, setSelectedInventoryItem] = useState<any>(null);
-  const [releasingForm, setReleasingForm] = useState({
-    shift: '',
-    department: '',
-    supervisor: '',
-    remarks: ''
-  });
+
+  // Pull Out Audit Filter
+  const [startDate, setStartDate] = useState(new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [auditRequests, setAuditRequests] = useState<any[]>([]);
+  const [staffActivities, setStaffActivities] = useState<any[]>([]);
+  const [isAuditLoading, setIsAuditLoading] = useState(false);
 
   const fetchInventory = async () => {
     try {
@@ -208,13 +206,34 @@ function UnitRequisitionContent() {
     }
   };
 
+  const fetchAuditRequests = async () => {
+    try {
+      setIsAuditLoading(true);
+      const [reqRes, actRes] = await Promise.all([
+        api.get('/pull-out-requests/mine', { params: { startDate, endDate, take: 1000 } }),
+        api.get('/staff-inventory/mine/activities', { params: { startDate, endDate } })
+      ]);
+      setAuditRequests(reqRes.data.data || []);
+      setStaffActivities(actRes.data || []);
+    } catch (err) {
+      console.error('Failed to fetch audit requests', err);
+    } finally {
+      setIsAuditLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchInventory();
     fetchStaffInventory();
-    fetchStaffInventory();
-    fetchStaffReleases();
     fetchMyRequests();
+    fetchAuditRequests();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'inventory') {
+      fetchAuditRequests();
+    }
+  }, [activeTab, startDate, endDate]);
 
   const toggleFilter = (productName: string, specKey: string, specValue: string) => {
     setProductFilters(prev => {
@@ -453,46 +472,94 @@ function UnitRequisitionContent() {
     setCurrentRow({ specs: '', qty: 1, unit: 'pcs' });
   };
 
-  const handleReleaseSubmit = async () => {
-    if (!selectedInventoryItem) return;
+  const getAggregatedAudit = () => {
+    // 1. Start with current inventory as the baseline
+    const summary: Record<string, { qty: number; currentStock: number; unit: string; specs: string }> = {};
     
-    try {
-      setIsSubmitting(true);
-      if (isBulkMode) {
-        const releases = bulkRows
-          .filter(row => row.employeeName && row.qty > 0)
-          .map(row => ({
-            ...releasingForm,
-            employeeName: row.employeeName,
-            qty: row.qty,
-            productName: selectedInventoryItem.productName,
-            specs: selectedInventoryItem.specs,
-          }));
-        
-        if (releases.length === 0) return alert('Please add at least one valid employee');
-        await api.post('/staff-inventory/bulk-release', { releases });
-      } else {
-        const { employeeName, qty } = bulkRows[0];
-        if (!employeeName || qty <= 0) return alert('Please enter employee name and valid quantity');
-        await api.post('/staff-inventory/release', {
-          ...releasingForm,
-          employeeName,
-          qty,
-          productName: selectedInventoryItem.productName,
-          specs: selectedInventoryItem.specs,
-        });
+    // Add items from current inventory
+    staffInventory.forEach(item => {
+      const key = `${item.productName}:::${item.specs || 'No Specs'}`;
+      if (!summary[key]) {
+        summary[key] = {
+          qty: 0, // Activity in range
+          currentStock: 0,
+          unit: item.unit || 'pcs',
+          specs: item.specs || 'No Specs'
+        };
       }
+      summary[key].currentStock += item.qty;
+    });
+
+    // 2. Add activity in range
+    staffActivities.forEach(act => {
+      // We only care about items added to inventory in this period
+      if (act.action !== 'REQUEST_APPROVED' && act.action !== 'MANUAL_ADJUST') return;
       
-      alert('Release processed successfully');
-      setSelectedInventoryItem(null);
-      setBulkRows([{ employeeName: '', qty: 1 }]);
-      fetchStaffInventory();
-      fetchStaffReleases();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to process release');
-    } finally {
-      setIsSubmitting(false);
-    }
+      const key = `${act.productName}:::${act.specs || 'No Specs'}`;
+      if (!summary[key]) {
+        summary[key] = { 
+          qty: 0, 
+          currentStock: 0, // This item might not be in current stock anymore (qty 0)
+          unit: act.unit || 'Pcs', 
+          specs: act.specs || 'No Specs' 
+        };
+      }
+      summary[key].qty += (act.qty || 0);
+    });
+
+    return Object.entries(summary)
+      .map(([key, data]) => {
+        const [productName] = key.split(':::');
+        return { productName, ...data };
+      })
+      .sort((a, b) => b.currentStock - a.currentStock); // Sort by most stock
+  };
+
+  const getUnifiedLogs = () => {
+    const logs: any[] = [];
+    
+    // 1. Add Requests (for pending/status tracking)
+    auditRequests.forEach(req => {
+      logs.push({
+        id: req.id,
+        date: req.createdAt,
+        type: 'REQUEST',
+        name: req.item?.name || 'Unknown Item',
+        slug: req.item?.slug || 'N/A',
+        qty: req.qty,
+        unit: req.unit,
+        status: req.status,
+        imageUrl: req.imageUrl
+      });
+    });
+
+    // 2. Add Activities (for the actual audit trail)
+    staffActivities.forEach(act => {
+      // Avoid duplicating request-related actions that are already in auditRequests
+      // These activities often have inconsistent naming (e.g. using slugs as product names)
+      if (['PULL_REQUEST', 'REQUEST_APPROVED', 'REQUEST_REJECTED'].includes(act.action)) return;
+
+      let status = act.action;
+      if (act.action === 'ITEM_RELEASE') status = 'RELEASED';
+      if (act.action === 'BULK_RELEASE') status = 'BULK RELEASE';
+      if (act.action === 'MANUAL_ADJUST') status = 'MANUAL ADD';
+      if (act.action === 'UPDATE_ITEM') status = 'UPDATED';
+      if (act.action === 'DELETE_ITEM') status = 'DELETED';
+
+      logs.push({
+        id: act.id,
+        date: act.createdAt,
+        type: 'ACTIVITY',
+        name: act.productName,
+        slug: act.specs || 'No Specs',
+        qty: act.qty,
+        unit: act.unit || 'pcs',
+        status: status,
+        imageUrl: null
+      });
+    });
+
+    return logs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   };
 
   const handleDeleteItem = async () => {
@@ -1077,142 +1144,153 @@ function UnitRequisitionContent() {
 
       {activeTab === 'inventory' && (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-           <div className="flex items-center justify-between">
+           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl">
               <div>
-                <h2 className="text-2xl font-black text-gray-900 tracking-tight">Personal Stock Inventory</h2>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Items approved for your use or manually added</p>
+                <h2 className="text-2xl font-black text-gray-900 tracking-tight">Pull Out History & Audit Log</h2>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Monitor all items requested from the warehouse</p>
               </div>
-              <button onClick={handleManualStockAdd} className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:bg-primary transition-all">
-                <Plus className="h-4 w-4" /> Add Manual Stock
-              </button>
-           </div>
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {staffInventory.map(item => (
-                <div 
-                  key={item.id} 
-                  onDoubleClick={() => setDetailItem(item)}
-                  className={`bg-white p-8 rounded-[2.5rem] border shadow-xl group transition-all cursor-pointer relative ${item.qty <= (item.threshold || 5) ? 'border-red-200 bg-red-50/10' : 'border-gray-100'}`}
+              
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-3 bg-gray-50 px-4 py-2 rounded-2xl border border-gray-100">
+                  <span className="text-[10px] font-black text-gray-400 uppercase">From</span>
+                  <input 
+                    type="date" 
+                    value={startDate} 
+                    onChange={e => setStartDate(e.target.value)}
+                    className="bg-transparent border-none text-xs font-bold focus:ring-0 p-0"
+                  />
+                </div>
+                <div className="flex items-center gap-3 bg-gray-50 px-4 py-2 rounded-2xl border border-gray-100">
+                  <span className="text-[10px] font-black text-gray-400 uppercase">To</span>
+                  <input 
+                    type="date" 
+                    value={endDate} 
+                    onChange={e => setEndDate(e.target.value)}
+                    className="bg-transparent border-none text-xs font-bold focus:ring-0 p-0"
+                  />
+                </div>
+                <button 
+                  onClick={fetchAuditRequests}
+                  className="p-3 bg-primary text-white rounded-2xl shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
                 >
-                   {item.qty <= (item.threshold || 5) && (
-                     <div className="absolute top-6 left-6 flex items-center gap-1 px-2 py-1 bg-red-500 text-white rounded-lg text-[8px] font-black uppercase tracking-widest animate-pulse">
-                       <AlertTriangle className="h-3 w-3" /> Low Stock
-                     </div>
-                   )}
-                   <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                     <div className="bg-gray-50 text-[8px] font-black uppercase px-2 py-1 rounded text-gray-400">Double-click for details</div>
-                   </div>
-                   <div className="h-12 w-12 bg-primary/5 rounded-2xl flex items-center justify-center text-primary mb-6 group-hover:bg-primary group-hover:text-white transition-all">
-                      <Box className="h-6 w-6" />
-                   </div>
-                   <h3 className="text-sm font-black text-gray-900 mb-1">{item.productName}</h3>
-                   <p className="text-[10px] font-bold text-gray-400 uppercase leading-tight mb-4">{item.specs}</p>
-                   <p className="text-[9px] font-bold text-primary uppercase tracking-widest mb-4 bg-primary/5 inline-block px-2 py-1 rounded">{item.unit}</p>
-                   <div className="flex items-end justify-between mt-auto">
-                      <div>
-                        <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Available</span>
-                        <span className="text-3xl font-black text-gray-900">{item.qty}</span>
+                  <Search className="h-5 w-5" />
+                </button>
+              </div>
+           </div>
+
+           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* LEFT SIDE: SUMMARY */}
+              <div className="lg:col-span-4 space-y-6">
+                <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl">
+                  <div className="flex items-center gap-3 mb-8">
+                    <div className="h-10 w-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+                      <ListIcon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">Requested Summary</h3>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase">Total approved in range</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    {getAggregatedAudit().map((item, idx) => (
+                      <div key={idx} className="p-5 bg-gray-50/50 rounded-2xl border border-gray-100 flex items-center justify-between group hover:bg-white hover:border-primary/20 transition-all">
+                        <div className="space-y-1">
+                          <p className="text-xs font-black text-gray-900">{item.productName}</p>
+                          <p className="text-[9px] font-bold text-gray-400 uppercase leading-tight">{item.specs}</p>
+                          {item.qty > 0 && (
+                            <span className="inline-block mt-1 text-[8px] font-black bg-green-50 text-green-600 px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                              +{item.qty} {item.unit} in period
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <span className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Current Stock</span>
+                          <span className="text-xl font-black text-gray-900">{item.currentStock}</span>
+                          <span className="block text-[8px] font-black text-gray-400 uppercase tracking-widest">{item.unit}</span>
+                        </div>
                       </div>
-                      <button onClick={() => { setSelectedInventoryItem(item); router.push('/dashboard/staff/unit-requisition?tab=releasing'); }} className="p-3 bg-gray-50 text-gray-400 hover:text-white hover:bg-primary rounded-xl transition-all">
-                        <Truck className="h-5 w-5" />
-                      </button>
+                    ))}
+                    {getAggregatedAudit().length === 0 && (
+                      <div className="py-12 text-center">
+                        <Package className="h-10 w-10 text-gray-200 mx-auto mb-3" />
+                        <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">No data for this period</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT SIDE: LOGS */}
+              <div className="lg:col-span-8 bg-white rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden">
+                <div className="p-8 border-b border-gray-100 bg-gray-50/30 flex items-center justify-between">
+                   <div className="flex items-center gap-3">
+                     <div className="h-10 w-10 bg-gray-900 rounded-xl flex items-center justify-center text-white">
+                        <History className="h-5 w-5" />
+                     </div>
+                     <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">Detailed Audit Logs</h3>
                    </div>
                 </div>
-              ))}
-              {staffInventory.length === 0 && (
-                <div className="col-span-full py-20 text-center bg-white rounded-[2.5rem] border border-dashed border-gray-200">
-                   <Box className="h-12 w-12 text-gray-200 mx-auto mb-4" />
-                   <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Your inventory is empty</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-gray-50/30">
+                        <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
+                        <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Item</th>
+                        <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Qty</th>
+                        <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {getUnifiedLogs().map((log) => (
+                        <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="px-8 py-5">
+                            <p className="text-sm font-bold text-gray-700 leading-none mb-1">{new Date(log.date).toLocaleDateString()}</p>
+                            <p className="text-[9px] text-gray-400 font-medium">{new Date(log.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                          </td>
+                          <td className="px-8 py-5">
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center overflow-hidden">
+                                {log.imageUrl ? <img src={log.imageUrl} className="w-full h-full object-cover" /> : <Box className="h-4 w-4 text-gray-300" />}
+                              </div>
+                              <div>
+                                <p className="text-xs font-black text-gray-900 mb-0.5">{log.name}</p>
+                                <p className="text-[9px] font-mono font-bold text-primary uppercase">{log.slug}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-5 text-center font-black text-gray-900">
+                            {log.qty} <span className="text-[9px] font-bold text-gray-400 uppercase ml-1">{log.unit}</span>
+                          </td>
+                          <td className="px-8 py-5">
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                              log.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 
+                              log.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 
+                              log.status === 'SUBMITTED' ? 'bg-blue-100 text-blue-700' :
+                              log.status === 'MANUAL ADD' ? 'bg-amber-100 text-amber-700' :
+                              'bg-orange-100 text-orange-700'
+                            }`}>
+                              {log.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {getUnifiedLogs().length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="py-20 text-center">
+                            <Clock className="h-12 w-12 text-gray-200 mx-auto mb-4" />
+                            <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">No requests found in this range</p>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-              )}
+              </div>
            </div>
         </div>
       )}
 
-      {activeTab === 'releasing' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-           <div className="lg:col-span-5 space-y-6">
-              <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-2xl overflow-hidden flex flex-col">
-                 <div className="bg-gray-900 px-8 py-6 flex items-center justify-between">
-                    <h2 className="text-sm font-black text-white uppercase tracking-widest flex items-center">
-                      <Truck className="mr-3 h-5 w-5 text-primary" /> Employee Issuance
-                    </h2>
-                    <div className="flex items-center gap-2">
-                       <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Bulk Mode</span>
-                       <button onClick={() => setIsBulkMode(!isBulkMode)} className={`w-10 h-6 rounded-full transition-all relative ${isBulkMode ? 'bg-primary' : 'bg-gray-700'}`}>
-                         <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${isBulkMode ? 'left-5' : 'left-1'}`} />
-                       </button>
-                    </div>
-                 </div>
-                 <div className="p-8 space-y-6">
-                    <div>
-                       <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Selected Item</label>
-                       <select value={selectedInventoryItem?.id || ''} onChange={(e) => setSelectedInventoryItem(staffInventory.find(i => i.id === e.target.value))} className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none">
-                          <option value="">Select an item to release...</option>
-                          {staffInventory.map(item => (
-                            <option key={item.id} value={item.id}>{item.productName} ({item.specs}) • {item.qty} {item.unit} available</option>
-                          ))}
-                       </select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                       <div>
-                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Shift</label>
-                          <input type="text" placeholder="Day/Night" value={releasingForm.shift} onChange={e => setReleasingForm({...releasingForm, shift: e.target.value})} className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none" />
-                       </div>
-                       <div>
-                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Department</label>
-                          <input type="text" placeholder="Production/Admin" value={releasingForm.department} onChange={e => setReleasingForm({...releasingForm, department: e.target.value})} className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none" />
-                       </div>
-                    </div>
-                    <div>
-                       <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Supervisor</label>
-                       <input type="text" placeholder="Authorized Signatory" value={releasingForm.supervisor} onChange={e => setReleasingForm({...releasingForm, supervisor: e.target.value})} className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none" />
-                    </div>
-                    <div className="space-y-4">
-                       <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{isBulkMode ? 'Employee List' : 'Recipient Details'}</label>
-                       {bulkRows.map((row, idx) => (
-                         <div key={idx} className="flex gap-4">
-                            <input type="text" placeholder="Full Name" value={row.employeeName} onChange={e => { const newRows = [...bulkRows]; newRows[idx].employeeName = e.target.value; setBulkRows(newRows); }} className="flex-1 px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none" />
-                            <input type="number" value={row.qty} onChange={e => { const newRows = [...bulkRows]; newRows[idx].qty = parseInt(e.target.value); setBulkRows(newRows); }} className="w-24 px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-center outline-none" />
-                            {isBulkMode && idx > 0 && ( <button onClick={() => setBulkRows(bulkRows.filter((_, i) => i !== idx))} className="p-4 text-red-400 hover:text-red-600"><X className="h-5 w-5" /></button> )}
-                         </div>
-                       ))}
-                       {isBulkMode && ( <button onClick={() => setBulkRows([...bulkRows, { employeeName: '', qty: 1 }])} className="w-full py-4 border-2 border-dashed border-gray-100 rounded-2xl text-[10px] font-black text-gray-400 uppercase tracking-widest hover:bg-gray-50 transition-all">+ Add Another Employee</button> )}
-                    </div>
-                    <button onClick={handleReleaseSubmit} disabled={isSubmitting || !selectedInventoryItem} className="w-full py-6 bg-primary text-white rounded-[2rem] text-sm font-black uppercase tracking-widest shadow-2xl shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50">
-                      {isSubmitting ? 'Processing...' : 'Confirm Issuance'}
-                    </button>
-                 </div>
-              </div>
-           </div>
-           <div className="lg:col-span-7">
-              <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-xl overflow-hidden flex flex-col">
-                 <div className="p-8 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
-                    <div><h2 className="text-xl font-black text-gray-900 tracking-tight">Issuance Log</h2><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">History of items released to employees</p></div>
-                    <button onClick={fetchStaffReleases} className="p-3 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-primary"><Activity className="h-5 w-5" /></button>
-                 </div>
-                 <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                       <thead><tr className="bg-gray-50/30"><th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th><th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Employee</th><th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Item</th><th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Qty</th></tr></thead>
-                       <tbody className="divide-y divide-gray-50">
-                          {staffReleases.map(rel => (
-                            <tr key={rel.id} className="hover:bg-gray-50/50 transition-colors">
-                               <td className="px-8 py-5 text-sm font-bold text-gray-700">{new Date(rel.date).toLocaleDateString()}</td>
-                               <td className="px-8 py-5"><p className="text-sm font-black text-gray-900">{rel.employeeName}</p><p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">{rel.department} • {rel.shift}</p></td>
-                               <td className="px-8 py-5">
-                                 <p className="text-sm font-black text-gray-900">{rel.productName}</p>
-                                 <p className="text-[10px] font-bold text-gray-400 uppercase leading-tight">{rel.specs}</p>
-                                 {rel.itemSlug && <p className="text-[9px] font-mono text-primary mt-1 opacity-60">Source: {rel.itemSlug}</p>}
-                               </td>
-                               <td className="px-8 py-5 text-center font-black text-gray-900">{rel.qty}</td>
-                            </tr>
-                          ))}
-                       </tbody>
-                    </table>
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
 
       {showSubmitModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 animate-in fade-in">

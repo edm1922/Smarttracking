@@ -20,7 +20,7 @@ export default function UsersPage() {
   
   const [formData, setFormData] = useState({
     username: '',
-    role: 'inventory' as 'admin' | 'inventory',
+    role: 'inventory' as 'admin' | 'inventory' | 'payroll_staff' | 'payroll_admin',
   });
 
   const [generatedUser, setGeneratedUser] = useState<any | null>(null);
@@ -133,10 +133,14 @@ export default function UsersPage() {
                     <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${
                       user.role === 'admin' 
                         ? 'bg-purple-100 text-purple-700 border border-purple-200' 
+                        : user.role === 'payroll_admin'
+                        ? 'bg-indigo-100 text-indigo-700 border border-indigo-200'
+                        : user.role === 'payroll_staff'
+                        ? 'bg-amber-100 text-amber-700 border border-amber-200'
                         : 'bg-blue-100 text-blue-700 border border-blue-200'
                     }`}>
-                      {user.role === 'admin' ? <Shield className="h-3 w-3 mr-1" /> : <User className="h-3 w-3 mr-1" />}
-                      {user.role}
+                      {user.role === 'admin' || user.role === 'payroll_admin' ? <Shield className="h-3 w-3 mr-1" /> : <User className="h-3 w-3 mr-1" />}
+                      {user.role === 'payroll_staff' ? 'PAYROLL STAFF' : user.role === 'payroll_admin' ? 'PAYROLL ADMIN' : user.role === 'admin' ? 'INVENTORY ADMIN' : user.role === 'inventory' ? 'INVENTORY STAFF' : user.role.toUpperCase().replace('_', ' ')}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-xs text-gray-500">
@@ -159,7 +163,7 @@ export default function UsersPage() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl animate-in fade-in zoom-in duration-200">
+          <div className="w-full max-w-md rounded-[2rem] bg-white p-8 shadow-2xl animate-in fade-in zoom-in duration-200 max-h-[95vh] overflow-y-auto custom-scrollbar relative">
             {!generatedUser ? (
               <>
                 <h2 className="text-xl font-bold text-gray-900 mb-2">Generate New Account</h2>
@@ -173,35 +177,59 @@ export default function UsersPage() {
                       type="text"
                       value={formData.username}
                       onChange={(e) => setFormData({...formData, username: e.target.value})}
-                      className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                      className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                       placeholder="e.g. jdoe_warehouse"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Role</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setFormData({...formData, role: 'inventory'})}
-                        className={`px-4 py-3 rounded-xl border text-sm font-bold transition-all ${
-                          formData.role === 'inventory' 
-                            ? 'bg-primary/5 border-primary text-primary shadow-sm' 
-                            : 'border-gray-100 text-gray-500 hover:border-gray-200'
-                        }`}
-                      >
-                        Inventory User
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFormData({...formData, role: 'admin'})}
-                        className={`px-4 py-3 rounded-xl border text-sm font-bold transition-all ${
-                          formData.role === 'admin' 
-                            ? 'bg-purple-50 border-purple-600 text-purple-600 shadow-sm' 
-                            : 'border-gray-100 text-gray-500 hover:border-gray-200'
-                        }`}
-                      >
-                        Admin
-                      </button>
+                    <div className="grid grid-cols-1 gap-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFormData({...formData, role: 'inventory'})}
+                          className={`px-4 py-3 rounded-xl border text-xs font-bold transition-all ${
+                            formData.role === 'inventory' 
+                              ? 'bg-primary/5 border-primary text-primary shadow-sm' 
+                              : 'border-gray-100 text-gray-500 hover:border-gray-200'
+                          }`}
+                        >
+                          Inv. Staff
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({...formData, role: 'admin'})}
+                          className={`px-4 py-3 rounded-xl border text-xs font-bold transition-all ${
+                            formData.role === 'admin' 
+                              ? 'bg-purple-50 border-purple-600 text-purple-600 shadow-sm' 
+                              : 'border-gray-100 text-gray-500 hover:border-gray-200'
+                          }`}
+                        >
+                          Inv. Admin
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({...formData, role: 'payroll_staff'})}
+                          className={`px-4 py-3 rounded-xl border text-xs font-bold transition-all ${
+                            formData.role === 'payroll_staff' 
+                              ? 'bg-amber-50 border-amber-600 text-amber-600 shadow-sm' 
+                              : 'border-gray-100 text-gray-500 hover:border-gray-200'
+                          }`}
+                        >
+                          Pay. Staff
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({...formData, role: 'payroll_admin'})}
+                          className={`px-4 py-3 rounded-xl border text-xs font-bold transition-all ${
+                            formData.role === 'payroll_admin' 
+                              ? 'bg-blue-50 border-blue-600 text-blue-600 shadow-sm' 
+                              : 'border-gray-100 text-gray-500 hover:border-gray-200'
+                          }`}
+                        >
+                          Pay. Admin
+                        </button>
+                      </div>
                     </div>
                   </div>
 

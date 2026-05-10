@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export class StaffInventoryService {
   constructor(private prisma: PrismaService) {}
 
-  private async logActivity(userId: string, action: string, description: string, productName?: string, specs?: string, qty?: number) {
+  private async logActivity(userId: string, action: string, description: string, productName?: string, specs?: string, qty?: number, unit?: string) {
     return this.prisma.staffActivity.create({
       data: {
         userId,
@@ -13,7 +13,8 @@ export class StaffInventoryService {
         description,
         productName,
         specs,
-        qty
+        qty,
+        unit
       }
     });
   }
@@ -52,7 +53,8 @@ export class StaffInventoryService {
       `Manually added ${data.qty} ${data.unit || 'pcs'} of ${data.productName}`,
       data.productName,
       data.specs,
-      data.qty
+      data.qty,
+      data.unit || 'pcs'
     );
 
     return result;
@@ -110,7 +112,8 @@ export class StaffInventoryService {
       `Released ${data.qty} of ${data.productName} to ${data.employeeName}`,
       data.productName,
       data.specs,
-      data.qty
+      data.qty,
+      stock.unit
     );
 
     return result;
@@ -159,7 +162,9 @@ export class StaffInventoryService {
       'BULK_RELEASE', 
       `Performed bulk release of ${releases.length} items`,
       releases[0]?.productName,
-      releases[0]?.specs
+      releases[0]?.specs,
+      releases.reduce((sum, r) => sum + r.qty, 0),
+      releases[0]?.unit || 'pcs'
     );
 
     return { success: true };
@@ -169,6 +174,26 @@ export class StaffInventoryService {
     return this.prisma.staffRelease.findMany({
       where: { staffId: userId },
       orderBy: { date: 'desc' },
+    });
+  }
+
+  async findMyActivities(userId: string, params: { startDate?: string; endDate?: string } = {}) {
+    const { startDate, endDate } = params;
+    const where: any = { userId };
+
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
+
+    return this.prisma.staffActivity.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -215,7 +240,8 @@ export class StaffInventoryService {
       `Updated ${data.productName} qty to ${data.qty} and threshold to ${data.threshold}`,
       data.productName,
       data.specs,
-      data.qty
+      data.qty,
+      result.unit
     );
 
     return result;

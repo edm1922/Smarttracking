@@ -9,7 +9,7 @@ export class PullOutRequestsService {
     private itemsService: ItemsService,
   ) {}
 
-  private async logActivity(userId: string, action: string, description: string, productName?: string, specs?: string, qty?: number) {
+  private async logActivity(userId: string, action: string, description: string, productName?: string, specs?: string, qty?: number, unit?: string) {
     return this.prisma.staffActivity.create({
       data: {
         userId,
@@ -17,7 +17,8 @@ export class PullOutRequestsService {
         description,
         productName,
         specs,
-        qty
+        qty,
+        unit
       }
     });
   }
@@ -96,8 +97,8 @@ export class PullOutRequestsService {
     return result;
   }
 
-  async findByUser(userId: string, params: { skip?: number; take?: number; search?: string; status?: string; allPending?: boolean } = {}) {
-    const { skip = 0, take = 20, search, status, allPending } = params;
+  async findByUser(userId: string, params: { skip?: number; take?: number; search?: string; status?: string; allPending?: boolean; startDate?: string; endDate?: string } = {}) {
+    const { skip = 0, take = 20, search, status, allPending, startDate, endDate } = params;
 
     const where: any = {};
     if (allPending) {
@@ -106,6 +107,16 @@ export class PullOutRequestsService {
       where.userId = userId;
       if (status) {
         where.status = status;
+      }
+    }
+
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
       }
     }
 
@@ -329,7 +340,8 @@ export class PullOutRequestsService {
       `Pull Request for ${qty} ${request.unit} of ${productName} was approved`,
       productName,
       finalSpecs,
-      qty
+      qty,
+      request.unit
     );
 
     return result;

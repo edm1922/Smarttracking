@@ -149,4 +149,27 @@ export class PayrollController {
   async deleteCompany(@Param('id') id: string) {
     return this.payrollService.deleteCompany(id);
   }
+
+  @Post('requests')
+  async createRequest(@Body() body: any) {
+    return this.payrollService.createPayrollRequest(body.userId, body);
+  }
+
+  @Get('requests/pending')
+  async getPendingRequests() {
+    return this.payrollService.getPendingRequests();
+  }
+
+  @Get('requests/staff/:userId')
+  async getStaffRequests(@Param('userId') userId: string) {
+    return this.payrollService.getStaffRequests(userId);
+  }
+
+  @Patch('requests/:id/status')
+  async respondToRequest(
+    @Param('id') id: string,
+    @Body() body: { status: 'APPROVED' | 'REJECTED' }
+  ) {
+    return this.payrollService.respondToRequest(id, body.status);
+  }
 }

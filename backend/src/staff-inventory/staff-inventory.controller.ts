@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req, Query } from '@nestjs/common';
 import { StaffInventoryService } from './staff-inventory.service';
 import { AuthGuard } from '../auth/auth.guard';
 
@@ -10,6 +10,15 @@ export class StaffInventoryController {
   @Get('mine')
   async findMine(@Req() req: any) {
     return this.staffInventoryService.findMine(req.user.sub);
+  }
+
+  @Get('mine/activities')
+  async findMyActivities(
+    @Req() req: any,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.staffInventoryService.findMyActivities(req.user.sub, { startDate, endDate });
   }
 
   @Post('adjust')
