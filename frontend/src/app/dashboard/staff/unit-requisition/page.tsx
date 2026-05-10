@@ -103,6 +103,15 @@ function UnitRequisitionContent() {
   // Staff Inventory & Releasing
   const [staffInventory, setStaffInventory] = useState<any[]>([]);
   const [selectedInventoryItem, setSelectedInventoryItem] = useState<any>(null);
+  const [staffReleases, setStaffReleases] = useState<any[]>([]);
+  const [releaseForm, setReleaseForm] = useState({
+    employeeName: '',
+    shift: '',
+    department: '',
+    supervisor: '',
+    qty: 1,
+    remarks: ''
+  });
 
   // Pull Out Audit Filter
   const [startDate, setStartDate] = useState(new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0]);
@@ -206,6 +215,32 @@ function UnitRequisitionContent() {
     }
   };
 
+  const handleRelease = async () => {
+    if (!selectedInventoryItem) return alert('No item selected');
+    if (!releaseForm.employeeName) return alert('Employee Name is required');
+    if (releaseForm.qty > selectedInventoryItem.qty) return alert('Insufficient stock');
+    
+    try {
+      setIsSubmitting(true);
+      await api.post('/staff-inventory/release', {
+        ...releaseForm,
+        productName: selectedInventoryItem.productName,
+        specs: selectedInventoryItem.specs,
+      });
+      alert('Item released successfully!');
+      setSelectedInventoryItem(null);
+      setReleaseForm({ employeeName: '', shift: '', department: '', supervisor: '', qty: 1, remarks: '' });
+      fetchStaffInventory();
+      fetchStaffReleases();
+      setActiveTab('inventory');
+      router.push('/dashboard/staff/unit-requisition?tab=inventory');
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to release item');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const fetchAuditRequests = async () => {
     try {
       setIsAuditLoading(true);
@@ -227,6 +262,7 @@ function UnitRequisitionContent() {
     fetchStaffInventory();
     fetchMyRequests();
     fetchAuditRequests();
+    fetchStaffReleases();
   }, []);
 
   useEffect(() => {
@@ -1288,6 +1324,176 @@ function UnitRequisitionContent() {
                 </div>
               </div>
            </div>
+        </div>
+      )}
+
+      {activeTab === 'releasing' && (
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-7 space-y-6">
+              <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-xl overflow-hidden">
+                <div className="bg-gray-900 px-8 py-6">
+                  <h2 className="text-sm font-black text-white uppercase tracking-widest flex items-center">
+                    <Truck className="mr-3 h-5 w-5 text-primary" />
+                    Issuance Form (Release to Staff)
+                  </h2>
+                </div>
+                <div className="p-8 space-y-6">
+                  {!selectedInventoryItem ? (
+                    <div className="py-20 text-center border-2 border-dashed border-gray-100 rounded-[2rem]">
+                      <Package className="h-12 w-12 text-gray-200 mx-auto mb-4" />
+                      <p className="text-sm font-bold text-gray-300 uppercase tracking-widest mb-4">No item selected for release</p>
+                      <button 
+                        onClick={() => setActiveTab('inventory')}
+                        className="px-6 py-3 bg-gray-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest"
+                      >
+                        Go to My Inventory
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-6">
+                        <div className="col-span-2">
+                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Employee Name / Receiver</label>
+                          <input 
+                            type="text" 
+                            placeholder="Enter full name..."
+                            value={releaseForm.employeeName}
+                            onChange={e => setReleaseForm({...releaseForm, employeeName: e.target.value})}
+                            className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none focus:border-primary/30 transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Department</label>
+                          <input 
+                            type="text" 
+                            placeholder="e.g. Production"
+                            value={releaseForm.department}
+                            onChange={e => setReleaseForm({...releaseForm, department: e.target.value})}
+                            className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none focus:border-primary/30 transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Shift</label>
+                          <select 
+                            value={releaseForm.shift}
+                            onChange={e => setReleaseForm({...releaseForm, shift: e.target.value})}
+                            className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none focus:border-primary/30 transition-all appearance-none"
+                          >
+                            <option value="">Select Shift</option>
+                            <option value="MORNING">Morning</option>
+                            <option value="AFTERNOON">Afternoon</option>
+                            <option value="NIGHT">Night</option>
+                            <option value="GRAVEYARD">Graveyard</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Quantity to Release</label>
+                          <input 
+                            type="number" 
+                            min="1"
+                            max={selectedInventoryItem.qty}
+                            value={releaseForm.qty}
+                            onChange={e => setReleaseForm({...releaseForm, qty: parseInt(e.target.value) || 1})}
+                            className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none focus:border-primary/30 transition-all"
+                          />
+                          <p className="mt-1.5 ml-1 text-[9px] font-bold text-gray-400">Available: {selectedInventoryItem.qty} {selectedInventoryItem.unit}</p>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Witness / Supervisor</label>
+                          <input 
+                            type="text" 
+                            placeholder="Optional..."
+                            value={releaseForm.supervisor}
+                            onChange={e => setReleaseForm({...releaseForm, supervisor: e.target.value})}
+                            className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none focus:border-primary/30 transition-all"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Remarks</label>
+                          <textarea 
+                            rows={2}
+                            placeholder="Reason for issuance..."
+                            value={releaseForm.remarks}
+                            onChange={e => setReleaseForm({...releaseForm, remarks: e.target.value})}
+                            className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none focus:border-primary/30 transition-all resize-none"
+                          />
+                        </div>
+                      </div>
+                      <button 
+                        onClick={handleRelease}
+                        disabled={isSubmitting || !releaseForm.employeeName}
+                        className="w-full py-5 bg-primary text-white rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                      >
+                        {isSubmitting ? <Clock className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                        Confirm Issuance
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-5 space-y-6">
+              {selectedInventoryItem && (
+                <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl animate-in slide-in-from-right-4">
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">Selected Asset</h3>
+                  <div className="flex items-start gap-4 mb-6">
+                    <div className="h-16 w-16 bg-primary/5 rounded-2xl flex items-center justify-center text-primary">
+                      <Box className="h-8 w-8" />
+                    </div>
+                    <div>
+                      <h4 className="text-xl font-black text-gray-900 leading-tight mb-1">{selectedInventoryItem.productName}</h4>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{selectedInventoryItem.unit}</p>
+                    </div>
+                  </div>
+                  <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+                    <div>
+                      <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Specifications</p>
+                      <p className="text-xs font-bold text-gray-700 leading-relaxed">{selectedInventoryItem.specs}</p>
+                    </div>
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                      <div>
+                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Stock Level</p>
+                        <p className="text-2xl font-black text-gray-900">{selectedInventoryItem.qty} <span className="text-sm text-gray-400">{selectedInventoryItem.unit}</span></p>
+                      </div>
+                      {selectedInventoryItem.qty <= (selectedInventoryItem.threshold || 5) && (
+                        <div className="px-3 py-1.5 bg-red-100 text-red-600 rounded-xl text-[8px] font-black uppercase tracking-widest animate-pulse">
+                          Low Stock
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden">
+                <div className="flex items-center justify-between mb-8">
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Recent Issuances</h3>
+                  <History className="h-4 w-4 text-gray-300" />
+                </div>
+                <div className="space-y-4">
+                  {staffReleases.slice(0, 5).map((rel, idx) => (
+                    <div key={idx} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-black text-gray-900">{rel.employeeName}</p>
+                        <p className="text-[9px] font-bold text-gray-400 uppercase">{rel.productName} • {rel.qty} items</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] font-black text-primary uppercase">{new Date(rel.date).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {staffReleases.length === 0 && (
+                    <div className="py-10 text-center">
+                      <Clock className="h-8 w-8 text-gray-100 mx-auto mb-2" />
+                      <p className="text-[9px] font-bold text-gray-300 uppercase">No issuance records yet</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
