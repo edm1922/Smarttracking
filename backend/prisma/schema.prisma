@@ -499,13 +499,13 @@ model ActivityLog {
   id        String   @id @default(uuid())
   userId    String
   itemId    String?
-  productId String?
   action    String
   changes   Json?
   createdAt DateTime @default(now())
+  productId String?
   item      Item?    @relation(fields: [itemId], references: [id])
   product   Product? @relation(fields: [productId], references: [id])
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([createdAt])
   @@index([userId, createdAt])
@@ -519,7 +519,7 @@ model Batch {
   description String?
   createdAt   DateTime      @default(now())
   CustomField CustomField[]
-  items        Item[]
+  items       Item[]
 
   @@schema("public")
 }
@@ -533,8 +533,6 @@ model Category {
 
   @@schema("public")
 }
-
-
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model CustomField {
@@ -554,26 +552,26 @@ model CustomField {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model InternalRequest {
-  id                                                  String    @id @default(uuid())
-  requestNo                                           String    @unique
-  date                                                DateTime  @default(now())
-  employeeName                                        String
-  employeeRole                                        String
-  departmentArea                                      String
-  shift                                               String
-  supervisor                                          String
-  locationId                                          String
-  productId                                           String
-  quantity                                            Int
-  status                                              String    @default("PENDING")
-  remarks                                             String?
-  createdAt                                           DateTime  @default(now())
-  attachmentUrl                                       String?
-  additionalImages                                    Json?
-  targetLocationId                                    String?
-  location                                            Location  @relation("InternalRequest_locationIdToLocation", fields: [locationId], references: [id])
-  product                                             Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
-  targetLocation                                      Location? @relation("InternalRequest_targetLocationIdToLocation", fields: [targetLocationId], references: [id])
+  id               String    @id @default(uuid())
+  requestNo        String    @unique
+  date             DateTime  @default(now())
+  employeeName     String
+  employeeRole     String
+  departmentArea   String
+  shift            String
+  supervisor       String
+  locationId       String
+  productId        String
+  quantity         Int
+  status           String    @default("PENDING")
+  remarks          String?
+  createdAt        DateTime  @default(now())
+  attachmentUrl    String?
+  additionalImages Json?
+  targetLocationId String?
+  location         Location  @relation("InternalRequest_locationIdToLocation", fields: [locationId], references: [id])
+  product          Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  targetLocation   Location? @relation("InternalRequest_targetLocationIdToLocation", fields: [targetLocationId], references: [id])
 
   @@index([locationId])
   @@index([productId, createdAt])
@@ -590,7 +588,7 @@ model Item {
   status         String           @default("Available")
   locked         Boolean          @default(false)
   createdAt      DateTime         @default(now())
-  updatedAt      DateTime @updatedAt
+  updatedAt      DateTime         @updatedAt
   imageUrl       String?
   batchId        String?
   categoryId     String?
@@ -617,13 +615,13 @@ model Item {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model ItemFieldValue {
-  id          String      @id @default(uuid())
-  itemId      String
-  fieldId     String
-  value       Json
-  createdAt   DateTime    @default(now())
-  field       CustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
-  item        Item        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  id        String      @id @default(uuid())
+  itemId    String
+  fieldId   String
+  value     Json
+  createdAt DateTime    @default(now())
+  field     CustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  item      Item        @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
   @@schema("public")
 }
@@ -661,17 +659,17 @@ model Product {
   name               String
   description        String?
   createdAt          DateTime             @default(now())
-  updatedAt          DateTime @updatedAt
+  updatedAt          DateTime             @updatedAt
   price              Float                @default(0)
   threshold          Float                @default(0)
   unit               String               @default("PCS")
   imageUrl           String?
   imageUrl2          String?
   showInInventory    Boolean              @default(true)
+  activityLogs       ActivityLog[]
   InternalRequest    InternalRequest[]
   stocks             ProductStock[]
   ProductTransaction ProductTransaction[]
-  activityLogs       ActivityLog[]
 
   @@schema("public")
 }
@@ -682,8 +680,8 @@ model ProductStock {
   productId  String
   locationId String
   quantity   Int      @default(0)
-  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([productId, locationId])
   @@schema("public")
@@ -701,7 +699,7 @@ model ProductTransaction {
   userId     String
   location   Location @relation(fields: [locationId], references: [id])
   product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([locationId, createdAt])
   @@index([productId, createdAt])
@@ -726,7 +724,7 @@ model PullOutRequest {
   supervisor       String?
   attachmentUrl    String?
   item             Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([itemId, createdAt])
   @@index([status])
@@ -767,9 +765,9 @@ model StaffActivity {
   productName String?
   specs       String?
   qty         Int?
-  unit        String?
   createdAt   DateTime @default(now())
-  User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  unit        String?
+  User        User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@schema("public")
 }
@@ -784,7 +782,7 @@ model StaffInventory {
   productName String
   specs       String   @default("")
   threshold   Int      @default(5)
-  User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  User        User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([userId, productName, specs])
   @@schema("public")
@@ -803,17 +801,17 @@ model StaffRelease {
   date         DateTime @default(now())
   productName  String
   specs        String   @default("")
-  User         User     @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  User         User     @relation(fields: [staffId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@schema("public")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model Status {
-  id                                                     String             @id @default(uuid())
-  name                                                   String             @unique
-  orderIndex                                             Int                @default(0)
-  Item                                                   Item[]
+  id              String             @id @default(uuid())
+  name            String             @unique
+  orderIndex      Int                @default(0)
+  Item            Item[]
   fromTransitions StatusTransition[] @relation("StatusTransition_fromStatusIdToStatus")
   toTransitions   StatusTransition[] @relation("StatusTransition_toStatusIdToStatus")
 
@@ -822,11 +820,11 @@ model Status {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model StatusTransition {
-  id                                           String @id @default(uuid())
-  fromStatusId                                 String
-  toStatusId                                   String
-  fromStatus Status @relation("StatusTransition_fromStatusIdToStatus", fields: [fromStatusId], references: [id], onDelete: Cascade)
-  toStatus   Status @relation("StatusTransition_toStatusIdToStatus", fields: [toStatusId], references: [id], onDelete: Cascade)
+  id           String @id @default(uuid())
+  fromStatusId String
+  toStatusId   String
+  fromStatus   Status @relation("StatusTransition_fromStatusIdToStatus", fields: [fromStatusId], references: [id], onDelete: Cascade)
+  toStatus     Status @relation("StatusTransition_toStatusIdToStatus", fields: [toStatusId], references: [id], onDelete: Cascade)
 
   @@unique([fromStatusId, toStatusId])
   @@schema("public")
@@ -861,44 +859,21 @@ model TrafficLog {
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model User {
   id                 String               @id @default(uuid())
-  sys_id             String?              @unique
-  company_label      String?
-  fullName           String?
   username           String               @unique
   password           String
   role               String               @default("viewer")
   createdAt          DateTime             @default(now())
+  fullName           String?
+  sys_id             String?              @unique
+  company_label      String?
   ActivityLog        ActivityLog[]
+  documents          Document[]
   ProductTransaction ProductTransaction[]
   PullOutRequest     PullOutRequest[]
   StaffActivity      StaffActivity[]
   StaffInventory     StaffInventory[]
   StaffRelease       StaffRelease[]
-  documents          Document[]
   PayrollRequest     PayrollRequest[]
-
-  @@schema("public")
-}
-
-model PayrollRequest {
-  id          String   @id @default(uuid())
-  type        String   // 'UPLOAD' | 'REVOKE'
-  status      String   @default("PENDING") // 'PENDING' | 'APPROVED' | 'REJECTED'
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // For UPLOAD requests
-  clientName  String?
-  periodStart DateTime? @db.Date
-  periodEnd   DateTime? @db.Date
-  releaseDate DateTime? @db.Date
-  remark      String?
-  
-  // For REVOKE requests
-  batchId     String?
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
 
   @@schema("public")
 }
@@ -913,34 +888,57 @@ model Company {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model StorageBatch {
-  id              String     @id @default(uuid())
-  client_name     String?
-  period_start    DateTime?  @db.Date
-  period_end      DateTime?  @db.Date
-  label           String?
-  remark          String?
-  release_date    DateTime?  @db.Date
-  created_at      DateTime   @default(now())
-  documents       Document[]
+  id           String     @id @default(uuid())
+  client_name  String?
+  period_start DateTime?  @db.Date
+  period_end   DateTime?  @db.Date
+  label        String?
+  created_at   DateTime   @default(now())
+  remark       String?
+  release_date DateTime?  @db.Date
+  documents    Document[]
 
   @@schema("public")
 }
 
 model Document {
-  id             String       @id @default(uuid())
-  batch_id       String
-  sys_id         String
-  user_id        String?
-  file_name      String
-  storage_path   String
-  file_type      String       @default("PDF")
-  remark         String?
-  created_at     DateTime     @default(now())
-  batch          StorageBatch @relation(fields: [batch_id], references: [id], onDelete: Cascade)
-  user           User?        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  id           String       @id @default(uuid())
+  batch_id     String
+  sys_id       String
+  user_id      String?
+  file_name    String
+  storage_path String
+  file_type    String       @default("PDF")
+  created_at   DateTime     @default(now())
+  remark       String?
+  batch        StorageBatch @relation(fields: [batch_id], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([batch_id, sys_id])
   @@index([sys_id])
+  @@schema("public")
+}
+
+model PayrollRequest {
+  id     String @id @default(uuid())
+  type   String // 'UPLOAD' | 'REVOKE'
+  status String @default("PENDING") // 'PENDING' | 'APPROVED' | 'REJECTED'
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // For UPLOAD requests
+  clientName  String?
+  periodStart DateTime? @db.Date
+  periodEnd   DateTime? @db.Date
+  releaseDate DateTime? @db.Date
+  remark      String?
+
+  // For REVOKE requests
+  batchId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@schema("public")
 }
 

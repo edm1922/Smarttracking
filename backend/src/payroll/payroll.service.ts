@@ -588,6 +588,9 @@ export class PayrollService {
   }
 
   async createPayrollRequest(userId: string, data: any) {
+    if (!userId) {
+      throw new HttpException('User ID is required for payroll requests', HttpStatus.BAD_REQUEST);
+    }
     return this.prisma.payrollRequest.create({
       data: {
         userId,

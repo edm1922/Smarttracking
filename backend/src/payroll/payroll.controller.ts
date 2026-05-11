@@ -153,17 +153,38 @@ export class PayrollController {
 
   @Post('requests')
   async createRequest(@Body() body: any) {
-    return this.payrollService.createPayrollRequest(body.userId, body);
+    try {
+      return await this.payrollService.createPayrollRequest(body.userId, body);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to create payroll request',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
   @Get('requests/pending')
   async getPendingRequests() {
-    return this.payrollService.getPendingRequests();
+    try {
+      return await this.payrollService.getPendingRequests();
+    } catch (error) {
+      throw new HttpException(
+        'Failed to fetch pending requests',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
   @Get('requests/staff/:userId')
   async getStaffRequests(@Param('userId') userId: string) {
-    return this.payrollService.getStaffRequests(userId);
+    try {
+      return await this.payrollService.getStaffRequests(userId);
+    } catch (error) {
+      throw new HttpException(
+        'Failed to fetch staff requests',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
   @Patch('requests/:id/status')
@@ -171,6 +192,13 @@ export class PayrollController {
     @Param('id') id: string,
     @Body() body: { status: 'APPROVED' | 'REJECTED' }
   ) {
-    return this.payrollService.respondToRequest(id, body.status);
+    try {
+      return await this.payrollService.respondToRequest(id, body.status);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to respond to request',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 }

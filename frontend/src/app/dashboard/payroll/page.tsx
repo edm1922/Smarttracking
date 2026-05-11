@@ -320,12 +320,15 @@ export default function IntegratedPayrollAdmin() {
     try {
       const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
       const res = await fetch(`${apiUrl}/payroll/requests/pending`);
-      if (res.ok) {
-        const data = await res.json();
-        setPendingRequests(data);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to fetch pending requests');
       }
-    } catch (err) {
+      setPendingRequests(data);
+    } catch (err: any) {
       console.error('Failed to fetch pending requests:', err);
+      // We don't always want to show a toast for polling errors to avoid annoying the user
+      // but we log it for debugging.
     }
   };
 
@@ -343,6 +346,10 @@ export default function IntegratedPayrollAdmin() {
   };
 
   const handleRequestUploadApproval = async () => {
+    if (!userId) {
+      setStatus({ type: 'error', message: 'Unable to identify your staff account. Please re-login.' });
+      return;
+    }
     if (!clientLabel || !periodStart || !periodEnd) {
       setStatus({ type: 'error', message: 'Please fill out all fields before requesting approval.' });
       return;
@@ -363,10 +370,12 @@ export default function IntegratedPayrollAdmin() {
           remark
         })
       });
-      if (res.ok) {
-        setStatus({ type: 'success', message: 'Upload request sent! Please wait for Admin approval.' });
-        fetchStaffRequests(userId);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to send upload request');
       }
+      setStatus({ type: 'success', message: 'Upload request sent! Please wait for Admin approval.' });
+      fetchStaffRequests(userId);
     } catch (err: any) {
       setStatus({ type: 'error', message: err.message });
     } finally {
@@ -375,6 +384,10 @@ export default function IntegratedPayrollAdmin() {
   };
 
   const handleRequestRevoke = async (batchId: string) => {
+    if (!userId) {
+      setStatus({ type: 'error', message: 'Unable to identify your staff account. Please re-login.' });
+      return;
+    }
     try {
       const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
       const res = await fetch(`${apiUrl}/payroll/requests`, {
@@ -386,10 +399,12 @@ export default function IntegratedPayrollAdmin() {
           batchId
         })
       });
-      if (res.ok) {
-        setStatus({ type: 'success', message: 'Revoke request sent to Admin!' });
-        fetchStaffRequests(userId);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to send revoke request');
       }
+      setStatus({ type: 'success', message: 'Revoke request sent to Admin!' });
+      fetchStaffRequests(userId);
     } catch (err: any) {
       setStatus({ type: 'error', message: err.message });
     }
@@ -403,11 +418,13 @@ export default function IntegratedPayrollAdmin() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: approved ? 'APPROVED' : 'REJECTED' })
       });
-      if (res.ok) {
-        setStatus({ type: 'success', message: `Request ${approved ? 'approved' : 'rejected'} successfully.` });
-        fetchPendingRequests();
-        fetchRuns(); // Refresh runs if a revoke was approved
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || `Failed to ${approved ? 'approve' : 'reject'} request`);
       }
+      setStatus({ type: 'success', message: `Request ${approved ? 'approved' : 'rejected'} successfully.` });
+      fetchPendingRequests();
+      fetchRuns(); // Refresh runs if a revoke was approved
     } catch (err: any) {
       setStatus({ type: 'error', message: err.message });
     }
@@ -498,6 +515,17 @@ export default function IntegratedPayrollAdmin() {
     }
     return () => clearInterval(interval);
   }, [uploading]);
+
+  // Poll for pending requests (Admins only)
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isAdmin) {
+      interval = setInterval(() => {
+        fetchPendingRequests();
+      }, 10000); // Poll every 10 seconds
+    }
+    return () => clearInterval(interval);
+  }, [isAdmin]);
 
   const handleBulkSync = async () => {
     if (!syncText.trim()) {
