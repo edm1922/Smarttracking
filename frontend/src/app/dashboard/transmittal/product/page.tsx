@@ -33,6 +33,7 @@ export default function ProductTransmittalPage() {
   const [transmittalType, setTransmittalType] = useState<'MATERIAL' | 'EMPLOYEE'>('MATERIAL');
   const [logs, setLogs] = useState<any[]>([]);
   const [releases, setReleases] = useState<any[]>([]);
+  const [pullRequests, setPullRequests] = useState<any[]>([]);
   const [logFilter, setLogFilter] = useState<'IN' | 'OUT'>('OUT');
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -113,6 +114,14 @@ export default function ProductTransmittalPage() {
         console.error('Failed to fetch releases', err);
       }
     };
+    const fetchPullRequests = async () => {
+      try {
+        const res = await api.get('/pull-out-requests', { params: { take: 1000 } });
+        setPullRequests(res.data.data || []);
+      } catch (err) {
+        console.error('Failed to fetch pull requests', err);
+      }
+    };
     const loadPreset = () => {
       const saved = localStorage.getItem('transmittal_preset');
       if (saved) {
@@ -129,6 +138,7 @@ export default function ProductTransmittalPage() {
     fetchProducts();
     fetchLogs();
     fetchReleases();
+    fetchPullRequests();
     loadPreset();
     setMounted(true);
   }, []);
@@ -475,19 +485,43 @@ export default function ProductTransmittalPage() {
                     </button>
                   ))
                 ) : (
-                  releases.filter(rel => 
-                    rel.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    rel.productName.toLowerCase().includes(searchTerm.toLowerCase())
-                  ).map(rel => (
-                    <button key={rel.id} onClick={() => addReleaseItem(rel)} className="flex flex-col p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-primary/5 hover:border-primary/20 transition-all text-left">
-                      <div className="flex items-center justify-between w-full mb-1">
-                        <div className="text-xs font-bold text-gray-900">{rel.productName}</div>
-                        <div className="text-[10px] font-black text-primary bg-primary/10 px-1.5 rounded">{rel.qty}</div>
-                      </div>
-                      <div className="text-[10px] text-gray-500 font-bold">{rel.employeeName}</div>
-                      <div className="text-[9px] text-gray-400 uppercase font-black">{rel.department} • {new Date(rel.date).toLocaleDateString()}</div>
-                    </button>
-                  ))
+                  <div className="space-y-4">
+                    {/* Pull Out Requests */}
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Unit Requests</h4>
+                      {pullRequests.filter(req => 
+                        (req.item?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        (req.user?.username || '').toLowerCase().includes(searchTerm.toLowerCase())
+                      ).map(req => (
+                        <button key={`pr-${req.id}`} onClick={() => addReleaseItem({ ...req, employeeName: req.user?.username, productName: req.item?.name, qty: req.qty, date: req.createdAt })} className="flex flex-col p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-primary/5 hover:border-primary/20 transition-all text-left w-full">
+                          <div className="flex items-center justify-between w-full mb-1">
+                            <div className="text-xs font-bold text-gray-900">{req.item?.name}</div>
+                            <div className="text-[10px] font-black text-primary bg-primary/10 px-1.5 rounded">{req.qty} {req.unit}</div>
+                          </div>
+                          <div className="text-[10px] text-gray-500 font-bold">Requested by: {req.user?.username}</div>
+                          <div className="text-[9px] text-gray-400 uppercase font-black">{req.status} • {new Date(req.createdAt).toLocaleDateString()}</div>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Manual Staff Releases */}
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Staff Issuance History</h4>
+                      {releases.filter(rel => 
+                        rel.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        rel.productName.toLowerCase().includes(searchTerm.toLowerCase())
+                      ).map(rel => (
+                        <button key={`rel-${rel.id}`} onClick={() => addReleaseItem(rel)} className="flex flex-col p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-primary/5 hover:border-primary/20 transition-all text-left w-full">
+                          <div className="flex items-center justify-between w-full mb-1">
+                            <div className="text-xs font-bold text-gray-900">{rel.productName}</div>
+                            <div className="text-[10px] font-black text-primary bg-primary/10 px-1.5 rounded">{rel.qty}</div>
+                          </div>
+                          <div className="text-[10px] text-gray-500 font-bold">Issued to: {rel.employeeName}</div>
+                          <div className="text-[9px] text-gray-400 uppercase font-black">{rel.department} • {new Date(rel.date).toLocaleDateString()}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
