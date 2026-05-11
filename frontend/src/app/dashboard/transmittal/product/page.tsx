@@ -67,6 +67,59 @@ export default function ProductTransmittalPage() {
 
   const [selectedItems, setSelectedItems] = useState<TransmittalItem[]>([]);
 
+  const fetchProducts = async () => {
+    try {
+      const res = await api.get('/products', { params: { take: 1000, search: searchTerm } });
+      setProducts(res.data.data);
+
+      // Load pending items from multi-select
+      const pending = localStorage.getItem('pending_transmittal');
+      if (pending) {
+        const items = JSON.parse(pending);
+        setSelectedItems(items.map((p: any) => ({
+          id: Math.random().toString(36).substr(2, 9),
+          productId: p.id,
+          name: p.name,
+          sku: p.sku,
+          unit: p.unit || 'PCS',
+          quantity: 1
+        })));
+        localStorage.removeItem('pending_transmittal');
+      }
+    } catch (err) {
+      console.error('Failed to fetch products', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchLogs = async () => {
+    try {
+      const res = await api.get('/products/logs', { params: { take: 5000, search: searchTerm } });
+      setLogs(res.data.data || []);
+    } catch (err) {
+      console.error('Failed to fetch logs', err);
+    }
+  };
+
+  const fetchReleases = async () => {
+    try {
+      const res = await api.get('/staff-inventory/admin/releases');
+      setReleases(res.data || []);
+    } catch (err) {
+      console.error('Failed to fetch releases', err);
+    }
+  };
+
+  const fetchPullRequests = async () => {
+    try {
+      const res = await api.get('/pull-out-requests', { params: { take: 1000 } });
+      setPullRequests(res.data.data || []);
+    } catch (err) {
+      console.error('Failed to fetch pull requests', err);
+    }
+  };
+
   useEffect(() => {
     setHeaderInfo(prev => ({
       ...prev,
@@ -75,55 +128,6 @@ export default function ProductTransmittalPage() {
       from: localStorage.getItem('username') || ''
     }));
 
-    const fetchProducts = async () => {
-      try {
-        const res = await api.get('/products', { params: { take: 1000 } });
-        setProducts(res.data.data);
-
-        // Load pending items from multi-select
-        const pending = localStorage.getItem('pending_transmittal');
-        if (pending) {
-          const items = JSON.parse(pending);
-          setSelectedItems(items.map((p: any) => ({
-            id: Math.random().toString(36).substr(2, 9),
-            productId: p.id,
-            name: p.name,
-            sku: p.sku,
-            unit: p.unit || 'PCS',
-            quantity: 1
-          })));
-          localStorage.removeItem('pending_transmittal');
-        }
-      } catch (err) {
-        console.error('Failed to fetch products', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    const fetchLogs = async () => {
-      try {
-        const res = await api.get('/products/logs', { params: { take: 5000 } });
-        setLogs(res.data.data || []);
-      } catch (err) {
-        console.error('Failed to fetch logs', err);
-      }
-    };
-    const fetchReleases = async () => {
-      try {
-        const res = await api.get('/staff-inventory/admin/releases');
-        setReleases(res.data || []);
-      } catch (err) {
-        console.error('Failed to fetch releases', err);
-      }
-    };
-    const fetchPullRequests = async () => {
-      try {
-        const res = await api.get('/pull-out-requests', { params: { take: 1000 } });
-        setPullRequests(res.data.data || []);
-      } catch (err) {
-        console.error('Failed to fetch pull requests', err);
-      }
-    };
     const loadPreset = () => {
       const saved = localStorage.getItem('transmittal_preset');
       if (saved) {
@@ -137,13 +141,23 @@ export default function ProductTransmittalPage() {
       }
     };
 
-    fetchProducts();
-    fetchLogs();
-    fetchReleases();
-    fetchPullRequests();
     loadPreset();
     setMounted(true);
   }, []);
+
+  // Debounced search effect
+  useEffect(() => {
+    if (!mounted) return;
+
+    const timeout = setTimeout(() => {
+      fetchProducts();
+      fetchLogs();
+      fetchReleases();
+      fetchPullRequests();
+    }, 500);
+
+    return () => clearTimeout(timeout);
+  }, [searchTerm, mounted]);
 
   const updateSubject = (mode: 'PRODUCT' | 'LOG' | 'RELEASE', filter: 'IN' | 'OUT', type?: 'MATERIAL' | 'EMPLOYEE') => {
     const currentType = type || transmittalType;
