@@ -184,6 +184,18 @@ export default function ProductTransmittalPage() {
   const addLogItem = (log: any) => {
     const existing = selectedItems.find(item => item.productId === log.product.id);
     
+    // Parse requestedBy from remarks if possible
+    let parsedRequester = '';
+    if (log.remarks?.includes('Req by:')) {
+      parsedRequester = log.remarks.split('Req by:')[1]?.trim();
+    } else if (log.remarks?.includes('Legacy Quick Pull:')) {
+      if (log.remarks.includes('| Req by:')) {
+        parsedRequester = log.remarks.split('| Req by:')[1]?.trim();
+      } else {
+        parsedRequester = log.remarks.split('Legacy Quick Pull:')[1]?.split('(')[0]?.trim();
+      }
+    }
+
     if (existing) {
       if (existing.logIds.includes(log.id)) return;
       setSelectedItems(selectedItems.map(item => 
@@ -191,18 +203,25 @@ export default function ProductTransmittalPage() {
           ? { ...item, quantity: item.quantity + log.quantity, logIds: [...item.logIds, log.id] } 
           : item
       ));
-      return;
+    } else {
+      setSelectedItems([...selectedItems, {
+        id: Math.random().toString(36).substr(2, 9),
+        productId: log.product.id,
+        logIds: [log.id],
+        name: log.product.name,
+        sku: log.product.sku,
+        unit: log.product.unit || 'PCS',
+        quantity: log.quantity
+      }]);
     }
 
-    setSelectedItems([...selectedItems, {
-      id: Math.random().toString(36).substr(2, 9),
-      productId: log.product.id,
-      logIds: [log.id],
-      name: log.product.name,
-      sku: log.product.sku,
-      unit: log.product.unit || 'PCS',
-      quantity: log.quantity
-    }]);
+    if (parsedRequester) {
+      setHeaderInfo(prev => ({
+        ...prev,
+        endUser: parsedRequester,
+        department: log.location?.name || prev.department
+      }));
+    }
   };
 
   const addReleaseItem = (rel: any) => {
@@ -486,7 +505,47 @@ export default function ProductTransmittalPage() {
                   ))
                 ) : (
                   <div className="space-y-4">
-                    {/* Pull Out Requests */}
+                    {/* Stock Out Logs with Requester */}
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Stock Out History</h4>
+                      {logs.filter(log => 
+                        log.type === 'OUT' && (
+                          (log.remarks || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (log.product?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+                        )
+                      ).map(log => {
+                        let parsedRequester = '';
+                        if (log.remarks?.includes('Req by:')) {
+                          parsedRequester = log.remarks.split('Req by:')[1]?.trim();
+                        } else if (log.remarks?.includes('Legacy Quick Pull:')) {
+                          if (log.remarks.includes('| Req by:')) {
+                            parsedRequester = log.remarks.split('| Req by:')[1]?.trim();
+                          } else {
+                            parsedRequester = log.remarks.split('Legacy Quick Pull:')[1]?.split('(')[0]?.trim();
+                          }
+                        }
+
+                        return (
+                          <button key={`log-${log.id}`} onClick={() => addLogItem(log)} className="flex flex-col p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-primary/5 hover:border-primary/20 transition-all text-left w-full">
+                            <div className="flex items-center justify-between w-full mb-1">
+                              <div className="text-xs font-bold text-gray-900">{log.product?.name}</div>
+                              <div className="text-[10px] font-black text-primary bg-primary/10 px-1.5 rounded">{log.quantity}</div>
+                            </div>
+                            {parsedRequester ? (
+                              <div className="text-[10px] text-gray-900 font-black flex items-center">
+                                <User className="h-3 w-3 mr-1 text-primary" />
+                                Requested by: {parsedRequester}
+                              </div>
+                            ) : (
+                              <div className="text-[10px] text-gray-500 italic line-clamp-1">{log.remarks || 'No remarks'}</div>
+                            )}
+                            <div className="text-[9px] text-gray-400 uppercase font-black">{log.location?.name} • {new Date(log.createdAt).toLocaleDateString()}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Unit Requests */}
                     <div className="space-y-2">
                       <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Unit Requests</h4>
                       {pullRequests.filter(req => 
@@ -498,7 +557,10 @@ export default function ProductTransmittalPage() {
                             <div className="text-xs font-bold text-gray-900">{req.item?.name}</div>
                             <div className="text-[10px] font-black text-primary bg-primary/10 px-1.5 rounded">{req.qty} {req.unit}</div>
                           </div>
-                          <div className="text-[10px] text-gray-500 font-bold">Requested by: {req.user?.username}</div>
+                          <div className="text-[10px] text-gray-900 font-black flex items-center">
+                            <User className="h-3 w-3 mr-1 text-primary" />
+                            Requested by: {req.user?.username}
+                          </div>
                           <div className="text-[9px] text-gray-400 uppercase font-black">{req.status} • {new Date(req.createdAt).toLocaleDateString()}</div>
                         </button>
                       ))}
@@ -516,7 +578,10 @@ export default function ProductTransmittalPage() {
                             <div className="text-xs font-bold text-gray-900">{rel.productName}</div>
                             <div className="text-[10px] font-black text-primary bg-primary/10 px-1.5 rounded">{rel.qty}</div>
                           </div>
-                          <div className="text-[10px] text-gray-500 font-bold">Issued to: {rel.employeeName}</div>
+                          <div className="text-[10px] text-gray-900 font-black flex items-center">
+                            <User className="h-3 w-3 mr-1 text-primary" />
+                            Issued to: {rel.employeeName}
+                          </div>
                           <div className="text-[9px] text-gray-400 uppercase font-black">{rel.department} • {new Date(rel.date).toLocaleDateString()}</div>
                         </button>
                       ))}
