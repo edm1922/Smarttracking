@@ -102,7 +102,7 @@ export default function ProductTransmittalPage() {
     };
     const fetchLogs = async () => {
       try {
-        const res = await api.get('/products/logs', { params: { take: 2000 } });
+        const res = await api.get('/products/logs', { params: { take: 5000 } });
         setLogs(res.data.data || []);
       } catch (err) {
         console.error('Failed to fetch logs', err);
@@ -689,36 +689,36 @@ export default function ProductTransmittalPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-12 mb-12">
-          <div className="space-y-4">
-            <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">Department:</div><div className="text-base font-bold border-b border-gray-200 pb-1">{headerInfo.department || '____________________'}</div></div>
-            <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">End-User / Recipient:</div><div className="text-base font-bold border-b border-gray-200 pb-1">{headerInfo.endUser || '____________________'}</div></div>
-            <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">Position:</div><div className="text-base font-bold border-b border-gray-200 pb-1">{headerInfo.position || '____________________'}</div></div>
+        <div className="grid grid-cols-2 gap-8 mb-8">
+          <div className="space-y-3">
+            <div><div className="text-[9px] font-black text-gray-400 uppercase mb-0.5">Department:</div><div className="text-sm font-bold border-b border-gray-100 pb-0.5">{headerInfo.department || '____________________'}</div></div>
+            <div><div className="text-[9px] font-black text-gray-400 uppercase mb-0.5">End-User / Recipient:</div><div className="text-sm font-bold border-b border-gray-100 pb-0.5">{headerInfo.endUser || '____________________'}</div></div>
+            <div><div className="text-[9px] font-black text-gray-400 uppercase mb-0.5">Position:</div><div className="text-sm font-bold border-b border-gray-100 pb-0.5">{headerInfo.position || '____________________'}</div></div>
           </div>
-          <div className="space-y-4">
-            <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">Date:</div><div className="text-base font-bold border-b border-gray-200 pb-1">{new Date(headerInfo.date).toLocaleDateString(undefined, { dateStyle: 'long' })}</div></div>
-            <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">Source / Supplier:</div><div className="text-base font-bold border-b border-gray-200 pb-1">{headerInfo.sourceSupplier || '____________________'}</div></div>
-            <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">Subject:</div><div className="text-base font-bold border-b border-gray-200 pb-1">{headerInfo.subject}</div></div>
+          <div className="space-y-3">
+            <div><div className="text-[9px] font-black text-gray-400 uppercase mb-0.5">Date:</div><div className="text-sm font-bold border-b border-gray-100 pb-0.5">{new Date(headerInfo.date).toLocaleDateString(undefined, { dateStyle: 'long' })}</div></div>
+            <div><div className="text-[9px] font-black text-gray-400 uppercase mb-0.5">Source / Supplier:</div><div className="text-sm font-bold border-b border-gray-100 pb-0.5">{headerInfo.sourceSupplier || '____________________'}</div></div>
+            <div><div className="text-[9px] font-black text-gray-400 uppercase mb-0.5">Subject:</div><div className="text-sm font-bold border-b border-gray-100 pb-0.5">{headerInfo.subject}</div></div>
           </div>
         </div>
 
-        <table className="w-full border-collapse mb-8 border border-gray-900">
+        <table className="w-full border-collapse mb-4 border border-gray-900">
           <thead>
             <tr className="border-b-2 border-gray-900 bg-gray-50">
               {transmittalType === 'EMPLOYEE' ? (
                 <>
-                  <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest w-12 border-r border-gray-900">No.</th>
-                  <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest border-r border-gray-900">Requested by</th>
-                  <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest border-r border-gray-900">Item requested</th>
-                  <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest border-r border-gray-900">Date requested</th>
-                  <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest w-20">Qty</th>
+                  <th className="py-1 px-3 text-left text-[8px] font-black uppercase tracking-widest w-8 border-r border-gray-900">No.</th>
+                  <th className="py-1 px-3 text-left text-[8px] font-black uppercase tracking-widest border-r border-gray-900">Requested by</th>
+                  <th className="py-1 px-3 text-left text-[8px] font-black uppercase tracking-widest border-r border-gray-900">Item requested</th>
+                  <th className="py-1 px-3 text-left text-[8px] font-black uppercase tracking-widest border-r border-gray-900">Date requested</th>
+                  <th className="py-1 px-3 text-left text-[8px] font-black uppercase tracking-widest w-16">Qty</th>
                 </>
               ) : (
                 <>
-                  <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest w-12 border-r border-gray-900">No.</th>
-                  <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest border-r border-gray-900">Description</th>
-                  <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest w-20 border-r border-gray-900">Qty</th>
-                  <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest">Part No. / SKU</th>
+                  <th className="py-1 px-3 text-left text-[8px] font-black uppercase tracking-widest w-8 border-r border-gray-900">No.</th>
+                  <th className="py-1 px-3 text-left text-[8px] font-black uppercase tracking-widest border-r border-gray-900">Description</th>
+                  <th className="py-1 px-3 text-left text-[8px] font-black uppercase tracking-widest w-16 border-r border-gray-900">Qty</th>
+                  <th className="py-1 px-3 text-left text-[8px] font-black uppercase tracking-widest">Part No. / SKU</th>
                 </>
               )}
             </tr>
@@ -728,21 +728,18 @@ export default function ProductTransmittalPage() {
               <tr key={item.id} className="border-b border-gray-900">
                 {transmittalType === 'EMPLOYEE' ? (
                   <>
-                    <td className="py-2 px-4 text-[10px] font-bold border-r border-gray-900 text-center">{idx + 1}</td>
-                    <td className="py-2 px-4 text-[10px] font-black border-r border-gray-900">{item.requestedBy || '-'}</td>
-                    <td className="py-2 px-4 text-[10px] font-bold border-r border-gray-900">
-                      <div>{item.name}</div>
-                      <div className="text-[8px] font-mono text-gray-500 uppercase mt-0.5">{item.sku}</div>
-                    </td>
-                    <td className="py-2 px-4 text-[10px] font-bold border-r border-gray-900">{item.dateRequested || '-'}</td>
-                    <td className="py-2 px-4 text-[10px] font-black text-center">{item.quantity} {item.unit || 'PCS'}</td>
+                    <td className="py-1 px-3 text-[9px] font-bold border-r border-gray-900 text-center">{idx + 1}</td>
+                    <td className="py-1 px-3 text-[9px] font-black border-r border-gray-900 uppercase">{item.requestedBy || '-'}</td>
+                    <td className="py-1 px-3 text-[9px] font-bold border-r border-gray-900 uppercase">{item.name}</td>
+                    <td className="py-1 px-3 text-[9px] font-bold border-r border-gray-900">{item.dateRequested || '-'}</td>
+                    <td className="py-1 px-3 text-[9px] font-black text-center">{item.quantity} {item.unit || 'PCS'}</td>
                   </>
                 ) : (
                   <>
-                    <td className="py-2 px-4 text-[10px] font-bold border-r border-gray-900">{idx + 1}</td>
-                    <td className="py-2 px-4 text-[10px] font-bold border-r border-gray-900">{item.name}</td>
-                    <td className="py-2 px-4 text-[10px] font-black border-r border-gray-900">{item.quantity} {item.unit || 'PCS'}</td>
-                    <td className="py-2 px-4 text-[10px] font-mono">{item.sku || '-'}</td>
+                    <td className="py-1 px-3 text-[9px] font-bold border-r border-gray-900">{idx + 1}</td>
+                    <td className="py-1 px-3 text-[9px] font-bold border-r border-gray-900 uppercase">{item.name}</td>
+                    <td className="py-1 px-3 text-[9px] font-black border-r border-gray-900">{item.quantity} {item.unit || 'PCS'}</td>
+                    <td className="py-1 px-3 text-[9px] font-mono">{item.sku || '-'}</td>
                   </>
                 )}
               </tr>
@@ -750,19 +747,19 @@ export default function ProductTransmittalPage() {
           </tbody>
         </table>
 
-        <div className="grid grid-cols-2 gap-x-12 gap-y-6 pt-8">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-4 pt-4">
           {['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy'].filter(field => {
             const showField = field === 'preparedBy' ? 'showPrepared' : 
                             field === 'checkedBy' ? 'showChecked' :
                             field === 'receivedBy' ? 'showReceived' : 'showApproved';
             return (headerInfo as any)[showField];
           }).map(field => (
-            <div key={field} className="flex flex-col items-start border-t border-gray-100 pt-2">
-              <div className="w-full text-[9px] font-black text-gray-400 uppercase mb-4">{field.replace(/By$/, ' By')}:</div>
+            <div key={field} className="flex flex-col items-start pt-1">
+              <div className="w-full text-[8px] font-black text-gray-400 uppercase mb-2">{field.replace(/By$/, ' By')}:</div>
               <div className="w-full">
-                <div className="text-[10px] font-black mb-1 uppercase text-center">{(headerInfo as any)[field] || '____________________'}</div>
-                <div className="border-b-2 border-gray-900 w-full mb-1"></div>
-                <div className="text-center text-[8px] font-bold text-gray-400 uppercase italic tracking-tighter">Signature / Date</div>
+                <div className="text-[9px] font-black mb-0.5 uppercase text-center">{(headerInfo as any)[field] || '____________________'}</div>
+                <div className="border-b border-gray-900 w-full mb-0.5"></div>
+                <div className="text-center text-[7px] font-bold text-gray-400 uppercase italic tracking-tighter">Signature / Date</div>
               </div>
             </div>
           ))}

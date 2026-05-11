@@ -332,7 +332,7 @@ export class ProductsService {
       ];
     }
 
-    const safeTake = Math.min(take ?? 20, 100);
+    const safeTake = Math.min(take ? Number(take) : 20, 5000);
     const start = Date.now();
 
     const [data, total] = await Promise.all([
