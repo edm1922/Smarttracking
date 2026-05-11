@@ -25,6 +25,8 @@ interface TransmittalItem {
   sku: string;
   unit: string;
   quantity: number;
+  requestedBy?: string;
+  dateRequested?: string;
 }
 
 export default function ProductTransmittalPage() {
@@ -162,12 +164,14 @@ export default function ProductTransmittalPage() {
   if (!mounted) return null;
 
   const addItem = (product: Product) => {
-    const existing = selectedItems.find(item => item.productId === product.id);
-    if (existing) {
-      setSelectedItems(selectedItems.map(item => 
-        item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item
-      ));
-      return;
+    if (transmittalType !== 'EMPLOYEE') {
+      const existing = selectedItems.find(item => item.productId === product.id);
+      if (existing) {
+        setSelectedItems(selectedItems.map(item => 
+          item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item
+        ));
+        return;
+      }
     }
 
     setSelectedItems([...selectedItems, {
@@ -182,8 +186,6 @@ export default function ProductTransmittalPage() {
   };
 
   const addLogItem = (log: any) => {
-    const existing = selectedItems.find(item => item.productId === log.product.id);
-    
     // Parse requestedBy from remarks if possible
     let parsedRequester = '';
     if (log.remarks?.includes('Req by:')) {
@@ -196,24 +198,38 @@ export default function ProductTransmittalPage() {
       }
     }
 
-    if (existing) {
-      if (existing.logIds.includes(log.id)) return;
-      setSelectedItems(selectedItems.map(item => 
-        item.productId === log.product.id 
-          ? { ...item, quantity: item.quantity + log.quantity, logIds: [...item.logIds, log.id] } 
-          : item
-      ));
-    } else {
-      setSelectedItems([...selectedItems, {
-        id: Math.random().toString(36).substr(2, 9),
-        productId: log.product.id,
-        logIds: [log.id],
-        name: log.product.name,
-        sku: log.product.sku,
-        unit: log.product.unit || 'PCS',
-        quantity: log.quantity
-      }]);
+    if (transmittalType !== 'EMPLOYEE') {
+      const existing = selectedItems.find(item => item.productId === log.product.id);
+      if (existing) {
+        if (existing.logIds.includes(log.id)) return;
+        setSelectedItems(selectedItems.map(item => 
+          item.productId === log.product.id 
+            ? { ...item, quantity: item.quantity + log.quantity, logIds: [...item.logIds, log.id] } 
+            : item
+        ));
+        
+        if (parsedRequester) {
+          setHeaderInfo(prev => ({
+            ...prev,
+            endUser: parsedRequester,
+            department: log.location?.name || prev.department
+          }));
+        }
+        return;
+      }
     }
+
+    setSelectedItems([...selectedItems, {
+      id: Math.random().toString(36).substr(2, 9),
+      productId: log.product.id,
+      logIds: [log.id],
+      name: log.product.name,
+      sku: log.product.sku,
+      unit: log.product.unit || 'PCS',
+      quantity: log.quantity,
+      requestedBy: parsedRequester || 'System Personnel',
+      dateRequested: new Date(log.createdAt).toLocaleDateString()
+    }]);
 
     if (parsedRequester) {
       setHeaderInfo(prev => ({
@@ -235,7 +251,9 @@ export default function ProductTransmittalPage() {
       name: rel.productName,
       sku: rel.itemSlug || 'N/A',
       unit: 'PCS',
-      quantity: rel.qty
+      quantity: rel.qty,
+      requestedBy: rel.employeeName,
+      dateRequested: new Date(rel.date).toLocaleDateString()
     }]);
 
     // Auto-fill header
@@ -426,9 +444,9 @@ export default function ProductTransmittalPage() {
                   Select Items
                 </h3>
                 <div className="flex bg-gray-100 p-1 rounded-lg">
-                  <button onClick={() => { setSelectionMode('PRODUCT'); updateSubject('PRODUCT', logFilter); }} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${selectionMode === 'PRODUCT' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}>Stocks</button>
-                  <button onClick={() => { setSelectionMode('LOG'); updateSubject('LOG', logFilter); }} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${selectionMode === 'LOG' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}>Stock History</button>
-                  <button onClick={() => { setSelectionMode('RELEASE'); updateSubject('RELEASE', logFilter); }} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${selectionMode === 'RELEASE' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}>Employee Releases</button>
+                  <button onClick={() => { setSelectionMode('PRODUCT'); setTransmittalType('MATERIAL'); updateSubject('PRODUCT', logFilter, 'MATERIAL'); }} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${selectionMode === 'PRODUCT' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}>Stocks</button>
+                  <button onClick={() => { setSelectionMode('LOG'); setTransmittalType('MATERIAL'); updateSubject('LOG', logFilter, 'MATERIAL'); }} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${selectionMode === 'LOG' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}>Stock History</button>
+                  <button onClick={() => { setSelectionMode('RELEASE'); setTransmittalType('EMPLOYEE'); updateSubject('RELEASE', logFilter, 'EMPLOYEE'); }} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${selectionMode === 'RELEASE' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}>Employee Releases</button>
                 </div>
               </div>
 
@@ -599,29 +617,57 @@ export default function ProductTransmittalPage() {
               </div>
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Stock Item</th>
-                    <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Quantity</th>
-                    <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Action</th>
-                  </tr>
+                  {transmittalType === 'EMPLOYEE' ? (
+                    <tr>
+                      <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-12">No.</th>
+                      <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Requested by</th>
+                      <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Item requested</th>
+                      <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date requested</th>
+                      <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-24">Qty</th>
+                      <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest w-12">Action</th>
+                    </tr>
+                  ) : (
+                    <tr>
+                      <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Stock Item</th>
+                      <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-32">Quantity</th>
+                      <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest w-12">Action</th>
+                    </tr>
+                  )}
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {selectedItems.map(item => (
+                  {selectedItems.map((item, idx) => (
                     <tr key={item.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-bold text-gray-900">{item.name}</div>
-                        <div className="text-[10px] font-mono text-gray-500">{item.sku}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <input type="number" value={isNaN(item.quantity) ? '' : item.quantity} onChange={e => updateQuantity(item.id, parseInt(e.target.value) || 0)} className="w-20 rounded border border-gray-200 px-3 py-1 text-sm outline-none focus:ring-1" />
-                      </td>
+                      {transmittalType === 'EMPLOYEE' ? (
+                        <>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-bold text-gray-500">{idx + 1}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-bold text-primary">{item.requestedBy || '-'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-bold text-gray-900">{item.name}</div>
+                            <div className="text-[10px] font-mono text-gray-400 uppercase">{item.sku}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-medium text-gray-500">{item.dateRequested || '-'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <input type="number" value={isNaN(item.quantity) ? '' : item.quantity} onChange={e => updateQuantity(item.id, parseInt(e.target.value) || 0)} className="w-20 rounded border border-gray-200 px-3 py-1 text-sm outline-none focus:ring-1" />
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-bold text-gray-900">{item.name}</div>
+                            <div className="text-[10px] font-mono text-gray-500">{item.sku}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <input type="number" value={isNaN(item.quantity) ? '' : item.quantity} onChange={e => updateQuantity(item.id, parseInt(e.target.value) || 0)} className="w-20 rounded border border-gray-200 px-3 py-1 text-sm outline-none focus:ring-1" />
+                          </td>
+                        </>
+                      )}
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <button onClick={() => removeItem(item.id)} className="text-red-500 hover:text-red-700 p-1"><Trash2 className="h-4 w-4" /></button>
                       </td>
                     </tr>
                   ))}
                   {selectedItems.length === 0 && (
-                    <tr><td colSpan={3} className="px-6 py-12 text-center text-sm text-gray-400 italic">No products selected.</td></tr>
+                    <tr><td colSpan={transmittalType === 'EMPLOYEE' ? 6 : 3} className="px-6 py-12 text-center text-sm text-gray-400 italic">No items selected.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -656,22 +702,49 @@ export default function ProductTransmittalPage() {
           </div>
         </div>
 
-        <table className="w-full border-collapse mb-8">
+        <table className="w-full border-collapse mb-8 border border-gray-900">
           <thead>
-            <tr className="border-y-2 border-gray-900 bg-gray-50">
-              <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest w-12">No.</th>
-              <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest">Description</th>
-              <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest w-20">Qty</th>
-              <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest">Part No. / SKU</th>
+            <tr className="border-b-2 border-gray-900 bg-gray-50">
+              {transmittalType === 'EMPLOYEE' ? (
+                <>
+                  <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest w-12 border-r border-gray-900">No.</th>
+                  <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest border-r border-gray-900">Requested by</th>
+                  <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest border-r border-gray-900">Item requested</th>
+                  <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest border-r border-gray-900">Date requested</th>
+                  <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest w-20">Qty</th>
+                </>
+              ) : (
+                <>
+                  <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest w-12 border-r border-gray-900">No.</th>
+                  <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest border-r border-gray-900">Description</th>
+                  <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest w-20 border-r border-gray-900">Qty</th>
+                  <th className="py-2 px-4 text-left text-[10px] font-black uppercase tracking-widest">Part No. / SKU</th>
+                </>
+              )}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-gray-900">
             {selectedItems.map((item, idx) => (
-              <tr key={item.id} className="border-b border-gray-100">
-                <td className="py-2 px-4 text-[10px] font-bold">{idx + 1}</td>
-                <td className="py-2 px-4 text-[10px] font-bold">{item.name}</td>
-                <td className="py-2 px-4 text-[10px] font-black">{item.quantity} {item.unit || 'PCS'}</td>
-                <td className="py-2 px-4 text-[10px] font-mono">{item.sku || '-'}</td>
+              <tr key={item.id} className="border-b border-gray-900">
+                {transmittalType === 'EMPLOYEE' ? (
+                  <>
+                    <td className="py-2 px-4 text-[10px] font-bold border-r border-gray-900 text-center">{idx + 1}</td>
+                    <td className="py-2 px-4 text-[10px] font-black border-r border-gray-900">{item.requestedBy || '-'}</td>
+                    <td className="py-2 px-4 text-[10px] font-bold border-r border-gray-900">
+                      <div>{item.name}</div>
+                      <div className="text-[8px] font-mono text-gray-500 uppercase mt-0.5">{item.sku}</div>
+                    </td>
+                    <td className="py-2 px-4 text-[10px] font-bold border-r border-gray-900">{item.dateRequested || '-'}</td>
+                    <td className="py-2 px-4 text-[10px] font-black text-center">{item.quantity} {item.unit || 'PCS'}</td>
+                  </>
+                ) : (
+                  <>
+                    <td className="py-2 px-4 text-[10px] font-bold border-r border-gray-900">{idx + 1}</td>
+                    <td className="py-2 px-4 text-[10px] font-bold border-r border-gray-900">{item.name}</td>
+                    <td className="py-2 px-4 text-[10px] font-black border-r border-gray-900">{item.quantity} {item.unit || 'PCS'}</td>
+                    <td className="py-2 px-4 text-[10px] font-mono">{item.sku || '-'}</td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>
