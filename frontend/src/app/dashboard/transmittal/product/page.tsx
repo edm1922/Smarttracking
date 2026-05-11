@@ -29,8 +29,10 @@ interface TransmittalItem {
 
 export default function ProductTransmittalPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [selectionMode, setSelectionMode] = useState<'PRODUCT' | 'LOG'>('PRODUCT');
+  const [selectionMode, setSelectionMode] = useState<'PRODUCT' | 'LOG' | 'RELEASE'>('PRODUCT');
+  const [transmittalType, setTransmittalType] = useState<'MATERIAL' | 'EMPLOYEE'>('MATERIAL');
   const [logs, setLogs] = useState<any[]>([]);
+  const [releases, setReleases] = useState<any[]>([]);
   const [logFilter, setLogFilter] = useState<'IN' | 'OUT'>('OUT');
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -103,6 +105,14 @@ export default function ProductTransmittalPage() {
         console.error('Failed to fetch logs', err);
       }
     };
+    const fetchReleases = async () => {
+      try {
+        const res = await api.get('/staff-inventory/admin/releases');
+        setReleases(res.data || []);
+      } catch (err) {
+        console.error('Failed to fetch releases', err);
+      }
+    };
     const loadPreset = () => {
       const saved = localStorage.getItem('transmittal_preset');
       if (saved) {
@@ -118,15 +128,24 @@ export default function ProductTransmittalPage() {
 
     fetchProducts();
     fetchLogs();
+    fetchReleases();
     loadPreset();
     setMounted(true);
   }, []);
 
-  const updateSubject = (mode: 'PRODUCT' | 'LOG', filter: 'IN' | 'OUT') => {
+  const updateSubject = (mode: 'PRODUCT' | 'LOG' | 'RELEASE', filter: 'IN' | 'OUT', type?: 'MATERIAL' | 'EMPLOYEE') => {
+    const currentType = type || transmittalType;
+    if (currentType === 'EMPLOYEE') {
+      setHeaderInfo(prev => ({ ...prev, subject: 'Employee Receiving Transmittal' }));
+      return;
+    }
+
     if (mode === 'PRODUCT') {
       setHeaderInfo(prev => ({ ...prev, subject: 'Material Transmittal' }));
-    } else {
+    } else if (mode === 'LOG') {
       setHeaderInfo(prev => ({ ...prev, subject: filter === 'IN' ? 'Stock IN' : 'Stock OUT' }));
+    } else {
+      setHeaderInfo(prev => ({ ...prev, subject: 'Employee Issuance' }));
     }
   };
 
@@ -174,6 +193,29 @@ export default function ProductTransmittalPage() {
       unit: log.product.unit || 'PCS',
       quantity: log.quantity
     }]);
+  };
+
+  const addReleaseItem = (rel: any) => {
+    const itemId = rel.id;
+    if (selectedItems.some(i => i.logIds.includes(itemId))) return;
+
+    setSelectedItems([...selectedItems, {
+      id: Math.random().toString(36).substr(2, 9),
+      productId: rel.itemSlug || rel.productName,
+      logIds: [itemId],
+      name: rel.productName,
+      sku: rel.itemSlug || 'N/A',
+      unit: 'PCS',
+      quantity: rel.qty
+    }]);
+
+    // Auto-fill header
+    setHeaderInfo(prev => ({
+      ...prev,
+      endUser: rel.employeeName,
+      department: rel.department,
+      position: rel.supervisor ? `Supervisor: ${rel.supervisor}` : prev.position
+    }));
   };
 
   const removeItem = (id: string) => {
@@ -249,6 +291,21 @@ export default function ProductTransmittalPage() {
           >
             <Printer className="mr-2 h-4 w-4" />
             Generate & Print
+          </button>
+        </div>
+
+        <div className="flex bg-white p-1 rounded-2xl border border-gray-100 shadow-sm w-fit no-print mb-4">
+          <button 
+            onClick={() => { setTransmittalType('MATERIAL'); updateSubject(selectionMode, logFilter, 'MATERIAL'); }} 
+            className={`px-6 py-2 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${transmittalType === 'MATERIAL' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-400 hover:text-gray-600'}`}
+          >
+            Material Transmittal
+          </button>
+          <button 
+            onClick={() => { setTransmittalType('EMPLOYEE'); updateSubject(selectionMode, logFilter, 'EMPLOYEE'); }} 
+            className={`px-6 py-2 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${transmittalType === 'EMPLOYEE' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-400 hover:text-gray-600'}`}
+          >
+            Employee Receiving
           </button>
         </div>
 
@@ -342,6 +399,7 @@ export default function ProductTransmittalPage() {
                 <div className="flex bg-gray-100 p-1 rounded-lg">
                   <button onClick={() => { setSelectionMode('PRODUCT'); updateSubject('PRODUCT', logFilter); }} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${selectionMode === 'PRODUCT' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}>Stocks</button>
                   <button onClick={() => { setSelectionMode('LOG'); updateSubject('LOG', logFilter); }} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${selectionMode === 'LOG' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}>Stock History</button>
+                  <button onClick={() => { setSelectionMode('RELEASE'); updateSubject('RELEASE', logFilter); }} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${selectionMode === 'RELEASE' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}>Employee Releases</button>
                 </div>
               </div>
 
@@ -406,7 +464,7 @@ export default function ProductTransmittalPage() {
                       <Plus className="h-4 w-4 text-gray-400" />
                     </button>
                   ))
-                ) : (
+                ) : selectionMode === 'LOG' ? (
                   filteredLogs.map(log => (
                     <button key={log.id} onClick={() => addLogItem(log)} className="flex flex-col p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-primary/5 hover:border-primary/20 transition-all text-left">
                       <div className="flex items-center justify-between w-full mb-1">
@@ -414,6 +472,20 @@ export default function ProductTransmittalPage() {
                         <div className="text-[10px] font-black text-primary bg-primary/10 px-1.5 rounded">{log.quantity}</div>
                       </div>
                       <div className="text-[10px] text-gray-500 italic line-clamp-1">{log.remarks || 'No remarks'}</div>
+                    </button>
+                  ))
+                ) : (
+                  releases.filter(rel => 
+                    rel.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    rel.productName.toLowerCase().includes(searchTerm.toLowerCase())
+                  ).map(rel => (
+                    <button key={rel.id} onClick={() => addReleaseItem(rel)} className="flex flex-col p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-primary/5 hover:border-primary/20 transition-all text-left">
+                      <div className="flex items-center justify-between w-full mb-1">
+                        <div className="text-xs font-bold text-gray-900">{rel.productName}</div>
+                        <div className="text-[10px] font-black text-primary bg-primary/10 px-1.5 rounded">{rel.qty}</div>
+                      </div>
+                      <div className="text-[10px] text-gray-500 font-bold">{rel.employeeName}</div>
+                      <div className="text-[9px] text-gray-400 uppercase font-black">{rel.department} • {new Date(rel.date).toLocaleDateString()}</div>
                     </button>
                   ))
                 )}

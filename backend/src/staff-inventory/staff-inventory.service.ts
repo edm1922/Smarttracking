@@ -255,6 +255,13 @@ export class StaffInventoryService {
     });
   }
 
+  async findAllReleases() {
+    return this.prisma.staffRelease.findMany({
+      include: { User: true },
+      orderBy: { date: 'desc' },
+    });
+  }
+
   async findAllStaffInventory() {
     return this.prisma.staffInventory.findMany({
       include: { User: true },

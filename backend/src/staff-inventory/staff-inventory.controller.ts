@@ -57,6 +57,11 @@ export class StaffInventoryController {
     return this.staffInventoryService.findAllActivities();
   }
 
+  @Get('admin/releases')
+  async findAllReleases() {
+    return this.staffInventoryService.findAllReleases();
+  }
+
   @Get('admin/inventory')
   async findAllStaffInventory() {
     return this.staffInventoryService.findAllStaffInventory();
