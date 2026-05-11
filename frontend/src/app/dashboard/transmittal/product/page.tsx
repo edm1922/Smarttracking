@@ -95,7 +95,7 @@ export default function ProductTransmittalPage() {
 
   const fetchLogs = async () => {
     try {
-      const res = await api.get('/products/logs', { params: { take: 5000, search: searchTerm } });
+      const res = await api.get('/products/logs', { params: { take: 10000, search: searchTerm } });
       setLogs(res.data.data || []);
     } catch (err) {
       console.error('Failed to fetch logs', err);

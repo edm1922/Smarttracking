@@ -321,8 +321,8 @@ export class ProductsService {
 
   async findAllTransactions(params: { skip?: number; take?: number; search?: string } = {}) {
     const { skip = 0, take = 20, search } = params;
-
     const where: any = {};
+
     if (search) {
       where.OR = [
         { remarks: { contains: search, mode: 'insensitive' } },
@@ -332,7 +332,7 @@ export class ProductsService {
       ];
     }
 
-    const safeTake = Math.min(take ? Number(take) : 20, 5000);
+    const safeTake = search ? 10000 : Math.min(take ? Number(take) : 20, 5000);
     const start = Date.now();
 
     const [data, total] = await Promise.all([
