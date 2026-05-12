@@ -174,40 +174,39 @@ export default function IntegratedPayrollAdmin() {
       });
     } catch (err: any) {
       console.error('Upload error:', err);
-
-      // Check if this was a background processing conflict (409)
-      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
-      
-      // Check if we can resume by looking at the latest run
-      try {
-        const latestRes = await fetch(`${apiUrl}/payroll/latest-run`);
-        const latest = await latestRes.json();
-
-        // Match criteria: label/clientName and periods must match
-        const formLabel = clientLabel || '';
-        const batchLabel = latest?.label || latest?.client_name || '';
-
-        if (latest &&
-          batchLabel === formLabel &&
-          latest.period_start && new Date(latest.period_start).toISOString().split('T')[0] === periodStart &&
-          latest.period_end && new Date(latest.period_end).toISOString().split('T')[0] === periodEnd) {
-
-          setResumableBatchId(latest.id);
-          setStatus({
-            type: 'error',
-            message: "System limit reached. IMPORTANT: The process might still be running in the background. Please REFRESH the page and check if the 'Files' count is still increasing. If it stops, you can then resume by uploading again."
-          });
-          setUploading(false);
-          return;
-        }
-      } catch (checkErr) {
-        console.error('Failed to check for resumable batch:', checkErr);
-      }
-
       setStatus({ type: 'error', message: err.message });
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleStopProcessing = async (batchId: string) => {
+    if (!window.confirm("Are you sure you want to STOP processing this batch? Any pages already uploaded will remain, but the rest will be skipped.")) {
+      return;
+    }
+    try {
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${apiUrl}/payroll/stop-processing/${batchId}`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        setStatus({ type: 'success', message: 'Processing cancellation requested.' });
+        fetchProcessingStatus();
+      }
+    } catch (err: any) {
+      console.error('Failed to stop processing:', err);
+      setStatus({ type: 'error', message: 'Failed to stop processing.' });
+    }
+  };
+
+  const handleResumeFromTable = (run: any) => {
+    setClientLabel(run.label || run.client_name || '');
+    setPeriodStart(run.period_start ? new Date(run.period_start).toISOString().split('T')[0] : '');
+    setPeriodEnd(run.period_end ? new Date(run.period_end).toISOString().split('T')[0] : '');
+    setReleaseDate(run.release_date ? new Date(run.release_date).toISOString().split('T')[0] : '');
+    setResumableBatchId(run.id);
+    setIsImportModalOpen(true);
+    setStatus({ type: 'success', message: `Resume mode activated for batch: ${run.label || run.client_name}` });
   };
 
   const fetchRuns = async () => {
@@ -225,28 +224,6 @@ export default function IntegratedPayrollAdmin() {
     }
   };
 
-  const handleRowDoubleClick = (run: any) => {
-    if (isStaff) {
-      if (window.confirm(`Request revocation for batch: "${run.label || 'Standard Run'}"?`)) {
-        handleRequestRevoke(run.id);
-      }
-      return;
-    }
-    const choice = window.prompt(`Select Action for Batch:\n"${run.label || 'Standard Run'}"\n\nType '1' to RESUME (Continue uploading files to this batch)\nType '2' to REVOKE (Delete this batch and all its records)`, '1');
-    
-    if (choice === '1') {
-      // Setup resume state
-      setClientLabel(run.label || run.client_name || '');
-      setPeriodStart(run.period_start ? new Date(run.period_start).toISOString().split('T')[0] : '');
-      setPeriodEnd(run.period_end ? new Date(run.period_end).toISOString().split('T')[0] : '');
-      setReleaseDate(run.release_date ? new Date(run.release_date).toISOString().split('T')[0] : '');
-      setResumableBatchId(run.id);
-      setIsImportModalOpen(true);
-      setStatus({ type: 'success', message: `Resume mode activated for batch: ${run.label || run.client_name}` });
-    } else if (choice === '2') {
-      handleDeleteBatch(run.id);
-    }
-  };
 
   const handleDeleteBatch = async (batchId: string) => {
     if (!window.confirm("Are you sure you want to revoke and delete this entire batch? This action cannot be undone and will remove all associated documents from the database and storage.")) {
@@ -1165,18 +1142,17 @@ export default function IntegratedPayrollAdmin() {
                           <th className="px-10 py-5 text-[10px] font-black uppercase text-gray-400">Company / Batch</th>
                           <th className="px-10 py-5 text-[10px] font-black uppercase text-gray-400">Period</th>
                           <th className="px-10 py-5 text-[10px] font-black uppercase text-gray-400 text-right">Files</th>
+                          <th className="px-10 py-5 text-[10px] font-black uppercase text-gray-400 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {filteredHistoryRuns.length === 0 ? (
-                          <tr><td colSpan={3} className="px-8 py-10 text-center text-gray-400 text-xs">No storage batches found.</td></tr>
+                          <tr><td colSpan={4} className="px-8 py-10 text-center text-gray-400 text-xs">No storage batches found.</td></tr>
                         ) : (
                           filteredHistoryRuns.map((run) => (
                             <tr 
                               key={run.id} 
-                              onDoubleClick={() => handleRowDoubleClick(run)} 
                               className="hover:bg-gray-50/50 transition-colors cursor-pointer group relative" 
-                              title="Double click for options (Resume or Revoke)"
                             >
                               <td className="px-10 py-6">
                                 <p className="text-sm font-black text-gray-900">{run.label || run.client_name || 'Standard Run'}</p>
@@ -1190,14 +1166,45 @@ export default function IntegratedPayrollAdmin() {
                               <td className="px-10 py-6 text-right">
                                 <div className="flex items-center justify-end gap-3">
                                   {processingBatchIds.includes(run.id) && (
-                                    <div className="flex items-center gap-2">
-                                      <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                                      <span className="text-[10px] font-black text-primary uppercase animate-pulse">Syncing...</span>
+                                    <div className="flex items-center gap-2 group/stop">
+                                      <Loader2 className="h-3 w-3 animate-spin text-primary group-hover/stop:hidden" />
+                                      <span className="text-[10px] font-black text-primary uppercase animate-pulse group-hover/stop:hidden">Syncing...</span>
+                                      <button 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleStopProcessing(run.id);
+                                        }}
+                                        className="hidden group-hover/stop:flex items-center gap-1 bg-red-50 text-red-600 px-2 py-1 rounded-md border border-red-100 hover:bg-red-600 hover:text-white transition-all scale-90"
+                                        title="Stop Processing"
+                                      >
+                                        <X className="h-3 w-3" />
+                                        <span className="text-[10px] font-black uppercase">Stop</span>
+                                      </button>
                                     </div>
                                   )}
                                   <span className={`text-sm font-black ${processingBatchIds.includes(run.id) ? 'text-primary' : 'text-gray-900'}`}>
                                     {run._count?.documents || 0}
                                   </span>
+                                </div>
+                              </td>
+                               <td className="px-10 py-6 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); handleResumeFromTable(run); }}
+                                    className="p-2 hover:bg-blue-50 text-primary rounded-lg transition-all"
+                                    title="Resume Upload"
+                                  >
+                                    <Upload className="h-4 w-4" />
+                                  </button>
+                                  {!isStaff && (
+                                    <button 
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteBatch(run.id); }}
+                                      className="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-all"
+                                      title="Revoke Batch"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
