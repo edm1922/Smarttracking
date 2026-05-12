@@ -21,6 +21,8 @@ export class PayrollService {
     this.supabaseAdmin = createClient(supabaseUrl || '', supabaseKey || '');
   }
 
+  private activeBatches = new Set<string>();
+
   private normalizeSysId(id: string): string {
     if (!id) return '';
     // Remove all non-alphanumeric characters and convert to uppercase
@@ -46,12 +48,18 @@ export class PayrollService {
     
     let batch;
     if (resumeBatchId) {
+      if (this.activeBatches.has(resumeBatchId)) {
+        this.logger.warn(`Attempted to resume batch ${resumeBatchId} while it is already processing.`);
+        throw new HttpException('This batch is already being processed in the background. Please wait for it to complete.', HttpStatus.CONFLICT);
+      }
+      
       batch = await this.prisma.storageBatch.findUnique({
         where: { id: resumeBatchId }
       });
       if (!batch) {
         throw new HttpException('Batch to resume not found', HttpStatus.NOT_FOUND);
       }
+      this.activeBatches.add(batch.id);
       this.logger.log(`Resuming batch ${batch.id}. Will skip already processed documents.`);
     } else {
       // Create the batch record
@@ -65,132 +73,138 @@ export class PayrollService {
           remark: remark || null,
         },
       });
+      this.activeBatches.add(batch.id);
     }
 
     const sourcePdfDoc = await PDFDocument.load(pdfBuffer);
     const totalPages = sourcePdfDoc.getPageCount();
     const results = [];
 
-    // Pre-fetch existing documents in this batch if resuming
-    const existingSysIds = new Set<string>();
-    if (resumeBatchId) {
-      const existingDocs = await this.prisma.document.findMany({
-        where: { batch_id: batch.id },
-        select: { sys_id: true }
-      });
-      existingDocs.forEach(d => existingSysIds.add(this.normalizeSysId(d.sys_id)));
-      this.logger.log(`Resume: Pre-fetched ${existingSysIds.size} existing employee IDs for batch ${batch.id}`);
-    }
-
-    // Cache for user lookups to avoid redundant DB calls
-    const userCache = new Map<string, any>();
-
-    // Process each page individually
-    for (let i = 0; i < totalPages; i++) {
-      const pageNumber = i + 1;
-      try {
-        // Extract this single page to a new PDF
-        const singlePagePdf = await PDFDocument.create();
-        const [copiedPage] = await singlePagePdf.copyPages(sourcePdfDoc, [i]);
-        singlePagePdf.addPage(copiedPage);
-        const pageBytes = await singlePagePdf.save();
-
-        // Scan this specific page for IDs
-        const idsOnPage = await this.scanSinglePageForIds(Buffer.from(pageBytes));
-        
-        if (idsOnPage.length === 0) {
-          this.logger.warn(`No ID found on page ${pageNumber}, skipping.`);
-          continue;
-        }
-
-        // For each ID found on this page, upload/map it
-        for (let employeeId of idsOnPage) {
-          employeeId = this.normalizeSysId(employeeId);
-
-          // RESTORED LOGIC: Skip if this ID already exists in this batch
-          if (resumeBatchId && existingSysIds.has(employeeId)) {
-            this.logger.log(`[Resume] Skipping ID ${employeeId} on Page ${pageNumber} (Already in batch)`);
-            results.push({ page: pageNumber, id: employeeId, status: 'skipped' });
+    try {
+      // Pre-fetch existing documents in this batch if resuming
+      const existingSysIds = new Set<string>();
+      if (resumeBatchId) {
+        const existingDocs = await this.prisma.document.findMany({
+          where: { batch_id: batch.id },
+          select: { sys_id: true }
+        });
+        existingDocs.forEach(d => existingSysIds.add(this.normalizeSysId(d.sys_id)));
+        this.logger.log(`Resume: Pre-fetched ${existingSysIds.size} existing employee IDs for batch ${batch.id}`);
+      }
+  
+      // Cache for user lookups to avoid redundant DB calls
+      const userCache = new Map<string, any>();
+  
+      // Process each page individually
+      for (let i = 0; i < totalPages; i++) {
+        const pageNumber = i + 1;
+        try {
+          // Extract this single page to a new PDF
+          const singlePagePdf = await PDFDocument.create();
+          const [copiedPage] = await singlePagePdf.copyPages(sourcePdfDoc, [i]);
+          singlePagePdf.addPage(copiedPage);
+          const pageBytes = await singlePagePdf.save();
+  
+          // Scan this specific page for IDs
+          const idsOnPage = await this.scanSinglePageForIds(Buffer.from(pageBytes));
+          
+          if (idsOnPage.length === 0) {
+            this.logger.warn(`No ID found on page ${pageNumber}, skipping.`);
             continue;
           }
-          
-          this.logger.log(`[Process] Adding ID ${employeeId} Page ${pageNumber}`);
-
-          const fileName = `${employeeId}_p${pageNumber}_${Date.now()}.pdf`;
-          const filePath = `documents/${batch.id}/${fileName}`;
-
-          // Upload to Supabase
-          const { error: uploadError } = await this.supabaseAdmin
-            .storage
-            .from('payroll-documents')
-            .upload(filePath, pageBytes, {
-              contentType: 'application/pdf',
-              upsert: true
-            });
-
-          if (uploadError) throw uploadError;
-
-          const { data: { publicUrl } } = this.supabaseAdmin
-            .storage
-            .from('payroll-documents')
-            .getPublicUrl(filePath);
-
-          // Get employee from cache or DB
-          const cacheKey = `${employeeId}_${label || ''}`;
-          let employee = userCache.get(cacheKey);
-          
-          if (!employee && !userCache.has(cacheKey)) {
-            employee = await this.prisma.user.findFirst({
-              where: { 
+  
+          // For each ID found on this page, upload/map it
+          for (let employeeId of idsOnPage) {
+            employeeId = this.normalizeSysId(employeeId);
+  
+            // RESTORED LOGIC: Skip if this ID already exists in this batch
+            if (resumeBatchId && existingSysIds.has(employeeId)) {
+              this.logger.log(`[Resume] Skipping ID ${employeeId} on Page ${pageNumber} (Already in batch)`);
+              results.push({ page: pageNumber, id: employeeId, status: 'skipped' });
+              continue;
+            }
+            
+            this.logger.log(`[Process] Adding ID ${employeeId} Page ${pageNumber}`);
+  
+            const fileName = `${employeeId}_p${pageNumber}_${Date.now()}.pdf`;
+            const filePath = `documents/${batch.id}/${fileName}`;
+  
+            // Upload to Supabase
+            const { error: uploadError } = await this.supabaseAdmin
+              .storage
+              .from('payroll-documents')
+              .upload(filePath, pageBytes, {
+                contentType: 'application/pdf',
+                upsert: true
+              });
+  
+            if (uploadError) throw uploadError;
+  
+            const { data: { publicUrl } } = this.supabaseAdmin
+              .storage
+              .from('payroll-documents')
+              .getPublicUrl(filePath);
+  
+            // Get employee from cache or DB
+            const cacheKey = `${employeeId}_${label || ''}`;
+            let employee = userCache.get(cacheKey);
+            
+            if (!employee && !userCache.has(cacheKey)) {
+              employee = await this.prisma.user.findFirst({
+                where: { 
+                  sys_id: employeeId,
+                  ...(label ? { company_label: label } : {})
+                }
+              });
+              userCache.set(cacheKey, employee || null); // Cache null if not found to avoid re-searching
+            }
+  
+            await this.prisma.document.create({
+              data: {
+                batch_id: batch.id,
+                user_id: employee?.id || null,
                 sys_id: employeeId,
-                ...(label ? { company_label: label } : {})
-              }
+                storage_path: publicUrl,
+                file_name: fileName,
+                file_type: 'PAYSLIP_PAGE',
+                remark: remark || null,
+              },
             });
-            userCache.set(cacheKey, employee || null); // Cache null if not found to avoid re-searching
+            
+            // Add to existingSysIds in case there are duplicates within the same PDF
+            existingSysIds.add(employeeId);
+            
+            results.push({ page: pageNumber, id: employeeId, status: 'success' });
           }
-
-          await this.prisma.document.create({
-            data: {
-              batch_id: batch.id,
-              user_id: employee?.id || null,
-              sys_id: employeeId,
-              storage_path: publicUrl,
-              file_name: fileName,
-              file_type: 'PAYSLIP_PAGE',
-              remark: remark || null,
-            },
-          });
+        } catch (err) {
+          this.logger.error(`Error processing page ${pageNumber}: ${err.message}`);
+          results.push({ page: pageNumber, status: 'error', error: err.message });
           
-          // Add to existingSysIds in case there are duplicates within the same PDF
-          existingSysIds.add(employeeId);
-          
-          results.push({ page: pageNumber, id: employeeId, status: 'success' });
-        }
-      } catch (err) {
-        this.logger.error(`Error processing page ${pageNumber}: ${err.message}`);
-        results.push({ page: pageNumber, status: 'error', error: err.message });
-        
-        // If the batch was deleted mid-processing, stop to prevent orphaned files
-        if (err.message && err.message.includes('Foreign key constraint') && err.message.includes('batch_id')) {
-          this.logger.warn(`Batch ${batch.id} was deleted mid-processing. Aborting remaining pages.`);
-          break;
+          // If the batch was deleted mid-processing, stop to prevent orphaned files
+          if (err.message && err.message.includes('Foreign key constraint') && err.message.includes('batch_id')) {
+            this.logger.warn(`Batch ${batch.id} was deleted mid-processing. Aborting remaining pages.`);
+            break;
+          }
         }
       }
+  
+      const added = results.filter(r => r.status === 'success').length;
+      const skipped = results.filter(r => r.status === 'skipped').length;
+      const errors = results.filter(r => r.status === 'error').length;
+  
+      return {
+        batchId: batch.id,
+        totalPages,
+        processed: results.length,
+        added,
+        skipped,
+        errors,
+        details: results
+      };
+    } finally {
+      this.activeBatches.delete(batch.id);
+      this.logger.log(`Finished processing batch ${batch.id}. Lock released.`);
     }
-
-    const added = results.filter(r => r.status === 'success').length;
-    const skipped = results.filter(r => r.status === 'skipped').length;
-    const errors = results.filter(r => r.status === 'error').length;
-
-    return {
-      batchId: batch.id,
-      totalPages,
-      processed: results.length,
-      added,
-      skipped,
-      errors,
-      details: results
-    };
   }
 
   async reviseDocuments(batchId: string, selectedSysIds: string[], remark: string, fileBuffer: Buffer) {
