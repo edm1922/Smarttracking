@@ -120,7 +120,56 @@ export default function StaffRequisitionPage() {
 
   useEffect(() => {
     fetchData();
+    
+    // Load from local storage
+    try {
+      const savedEmployees = localStorage.getItem('requisition_employees');
+      const savedItems = localStorage.getItem('requisition_items');
+      const savedForm = localStorage.getItem('requisition_form');
+      
+      if (savedEmployees) setEmployees(JSON.parse(savedEmployees));
+      if (savedItems) setSelectedItems(JSON.parse(savedItems));
+      if (savedForm) {
+        const parsedForm = JSON.parse(savedForm);
+        setForm(prev => ({ ...prev, ...parsedForm }));
+      }
+    } catch (e) {
+      console.error('Failed to load saved requisition', e);
+    }
   }, []);
+
+  // Save to local storage
+  useEffect(() => {
+    localStorage.setItem('requisition_employees', JSON.stringify(employees));
+  }, [employees]);
+
+  useEffect(() => {
+    localStorage.setItem('requisition_items', JSON.stringify(selectedItems));
+  }, [selectedItems]);
+
+  useEffect(() => {
+    const { date, locationId, departmentArea, shift, supervisorName, remarks } = form;
+    localStorage.setItem('requisition_form', JSON.stringify({ departmentArea, shift, supervisorName, remarks }));
+  }, [form.departmentArea, form.shift, form.supervisorName, form.remarks]);
+
+  const clearForm = () => {
+    if (confirm('Are you sure you want to clear all entries and start a new requisition?')) {
+      setEmployees([]);
+      setSelectedItems([]);
+      setForm({
+        date: new Date().toISOString().split('T')[0],
+        locationId: locations[0]?.id || '',
+        departmentArea: '',
+        shift: '',
+        supervisorName: '',
+        remarks: ''
+      });
+      localStorage.removeItem('requisition_employees');
+      localStorage.removeItem('requisition_items');
+      localStorage.removeItem('requisition_form');
+      window.location.reload(); // Refresh to be safe
+    }
+  };
 
   useEffect(() => {
     setHighlightedIndex(-1);
@@ -488,12 +537,20 @@ export default function StaffRequisitionPage() {
           <h1 className="text-3xl font-black text-gray-900 tracking-tight">Staff Requisition Portal</h1>
           <p className="text-sm text-gray-500 font-medium">Browse inventory and build your material request</p>
         </div>
-        <button 
-          onClick={() => window.print()}
-          className="px-6 py-2.5 bg-white border border-gray-200 text-gray-700 hover:text-primary hover:border-primary/30 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm flex items-center gap-2"
-        >
-          <Printer className="h-4 w-4" /> Print Blank Form
-        </button>
+        <div className="flex gap-3">
+          <button 
+            onClick={clearForm}
+            className="px-6 py-2.5 bg-gray-50 border border-gray-200 text-gray-500 hover:bg-red-50 hover:text-red-600 hover:border-red-100 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm flex items-center gap-2"
+          >
+            <Trash2 className="h-4 w-4" /> Reset Form
+          </button>
+          <button 
+            onClick={() => window.print()}
+            className="px-6 py-2.5 bg-white border border-gray-200 text-gray-700 hover:text-primary hover:border-primary/30 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm flex items-center gap-2"
+          >
+            <Printer className="h-4 w-4" /> Print Blank Form
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
