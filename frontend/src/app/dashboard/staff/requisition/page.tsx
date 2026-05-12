@@ -22,6 +22,7 @@ interface Product {
   imageUrl2?: string | null;
   stocks: ProductStock[];
   totalStock?: number;
+  unit?: string;
 }
 
 interface Location {
@@ -63,6 +64,12 @@ export default function StaffRequisitionPage() {
   const [existingEmployees, setExistingEmployees] = useState<{ name: string; position: string }[]>([]);
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [activeEmployeeNames, setActiveEmployeeNames] = useState<string[]>([]);
+  
+  // Quick Item Search state
+  const [quickItemInput, setQuickItemInput] = useState('');
+  const [showItemDropdown, setShowItemDropdown] = useState(false);
+  const [highlightedItemIndex, setHighlightedItemIndex] = useState(-1);
   
   // Cart state
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
@@ -172,17 +179,35 @@ export default function StaffRequisitionPage() {
     }
   );
 
+  const filteredQuickProducts = products.filter(p => {
+    const search = quickItemInput.toLowerCase();
+    const name = (p.name || '').toLowerCase();
+    const sku = (p.sku || '').toLowerCase();
+    const available = p.stocks.find(s => s.location?.id === form.locationId)?.quantity || 0;
+    return (name.includes(search) || sku.includes(search)) && available > 0 && !selectedItems.some(si => si.productId === p.id);
+  }).slice(0, 5); // Limit to 5 results for mini search
+
   const removeEmployee = (nameToRemove: string) => {
     setEmployees(employees.filter(e => e.name !== nameToRemove));
   };
 
-  const addItemToCart = (product: Product, availableQty: number) => {
+  const toggleEmployeeSelection = (name: string) => {
+    setActiveEmployeeNames(prev => 
+      prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
+    );
+  };
+
+  const addItemToCart = (product: Product, availableQty: number, targetEmployeeNames?: string[]) => {
     if (selectedItems.some(item => item.productId === product.id)) {
       return; // Already in cart
     }
     
     const initialQuantities: Record<string, number> = {};
-    employees.forEach(emp => initialQuantities[emp.name] = 1);
+    const targets = targetEmployeeNames && targetEmployeeNames.length > 0 ? targetEmployeeNames : employees.map(e => e.name);
+
+    employees.forEach(emp => {
+      initialQuantities[emp.name] = targets.includes(emp.name) ? 1 : 0;
+    });
     
     setSelectedItems([...selectedItems, {
       productId: product.id,
@@ -459,22 +484,109 @@ export default function StaffRequisitionPage() {
                     
                     {employees.length > 0 && (
                       <div className="flex flex-wrap gap-2 pt-2">
-                        {employees.map(emp => (
-                          <div 
-                            key={emp.name} 
-                            onDoubleClick={() => handleEditEmployee(emp)}
-                            title="Double-click to edit"
-                            className="flex items-center gap-1.5 bg-primary/10 text-primary px-3 py-1.5 rounded-lg text-xs font-bold border border-primary/20 animate-in zoom-in-95 cursor-pointer select-none hover:bg-primary/20 transition-all"
-                          >
-                            <div className="flex flex-col items-start leading-tight">
-                              <span>{emp.name}</span>
-                              <span className="text-[9px] opacity-60 uppercase">{emp.position}</span>
+                        {employees.map(emp => {
+                          const isActive = activeEmployeeNames.includes(emp.name);
+                          return (
+                            <div 
+                              key={emp.name} 
+                              onClick={() => toggleEmployeeSelection(emp.name)}
+                              onDoubleClick={() => handleEditEmployee(emp)}
+                              title="Click to toggle selection | Double-click to edit"
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border animate-in zoom-in-95 cursor-pointer select-none transition-all ${
+                                isActive 
+                                ? 'bg-primary text-white border-primary shadow-md scale-105 z-10' 
+                                : 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20'
+                              }`}
+                            >
+                              <div className="flex flex-col items-start leading-tight">
+                                <span>{emp.name}</span>
+                                <span className={`text-[9px] uppercase ${isActive ? 'text-white/70' : 'text-gray-400'}`}>{emp.position}</span>
+                              </div>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); removeEmployee(emp.name); }} 
+                                className={`transition-colors ml-1 ${isActive ? 'hover:text-white' : 'hover:text-red-500'}`}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
                             </div>
-                            <button onClick={(e) => { e.stopPropagation(); removeEmployee(emp.name); }} className="hover:text-red-500 transition-colors ml-1">
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        ))}
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* QUICK ITEM SEARCH */}
+                    {employees.length > 0 && (
+                      <div className="mt-4 p-4 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center">
+                            <Search className="h-3 w-3 mr-1.5" />
+                            Quick Item Add {activeEmployeeNames.length > 0 ? `(Targeting ${activeEmployeeNames.length} selected)` : '(All Employees)'}
+                          </label>
+                          {activeEmployeeNames.length > 0 && (
+                            <button onClick={() => setActiveEmployeeNames([])} className="text-[9px] font-bold text-primary hover:underline uppercase">Clear Selection</button>
+                          )}
+                        </div>
+                        <div className="relative">
+                          <input 
+                            type="text" 
+                            placeholder={activeEmployeeNames.length > 0 ? `Search item for ${activeEmployeeNames.join(', ')}...` : "Search item for all employees..."}
+                            value={quickItemInput}
+                            onChange={(e) => { setQuickItemInput(e.target.value); setShowItemDropdown(true); }}
+                            onFocus={() => quickItemInput.length > 0 && setShowItemDropdown(true)}
+                            onBlur={() => setTimeout(() => setShowItemDropdown(false), 200)}
+                            onKeyDown={(e) => {
+                              if (showItemDropdown && filteredQuickProducts.length > 0) {
+                                if (e.key === 'ArrowDown') {
+                                  e.preventDefault();
+                                  setHighlightedItemIndex(prev => (prev + 1) % filteredQuickProducts.length);
+                                } else if (e.key === 'ArrowUp') {
+                                  e.preventDefault();
+                                  setHighlightedItemIndex(prev => (prev - 1 + filteredQuickProducts.length) % filteredQuickProducts.length);
+                                } else if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const prod = highlightedItemIndex >= 0 ? filteredQuickProducts[highlightedItemIndex] : filteredQuickProducts[0];
+                                  if (prod) {
+                                    const available = prod.stocks.find(s => s.location?.id === form.locationId)?.quantity || 0;
+                                    addItemToCart(prod, available, activeEmployeeNames);
+                                    setQuickItemInput('');
+                                    setShowItemDropdown(false);
+                                  }
+                                }
+                              }
+                            }}
+                            className="w-full rounded-xl border border-gray-200 px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all bg-white"
+                          />
+                          {showItemDropdown && filteredQuickProducts.length > 0 && (
+                            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto overflow-x-hidden">
+                              {filteredQuickProducts.map((prod, idx) => {
+                                const available = prod.stocks.find(s => s.location?.id === form.locationId)?.quantity || 0;
+                                return (
+                                  <button
+                                    key={prod.id}
+                                    type="button"
+                                    onClick={() => {
+                                      addItemToCart(prod, available, activeEmployeeNames);
+                                      setQuickItemInput('');
+                                      setShowItemDropdown(false);
+                                    }}
+                                    onMouseEnter={() => setHighlightedItemIndex(idx)}
+                                    className={`w-full text-left px-4 py-3 text-sm transition-colors flex items-center justify-between border-b border-gray-50 last:border-0 ${highlightedItemIndex === idx ? 'bg-primary/10 text-primary' : 'hover:bg-gray-50'}`}
+                                  >
+                                    <div className="flex flex-col">
+                                      <span className="font-bold text-gray-900">{prod.name}</span>
+                                      <span className="text-[10px] text-gray-400 line-clamp-1">{prod.description || prod.sku}</span>
+                                    </div>
+                                    <div className="text-right">
+                                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${available > 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                                        {available} {(prod as any).unit || 'pcs'}
+                                      </span>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
