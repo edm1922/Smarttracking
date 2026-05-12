@@ -1341,7 +1341,7 @@ export default function IntegratedPayrollAdmin() {
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Password</span>
-                            <code className="text-xs font-mono font-bold text-gray-600 bg-white px-2 py-1 rounded-md border border-gray-200">{user.sys_id}</code>
+                            <code className="text-xs font-mono font-bold text-gray-600 bg-white px-2 py-1 rounded-md border border-gray-200">{user.sys_id?.replace(/-/g, '')}</code>
                           </div>
                         </div>
 
