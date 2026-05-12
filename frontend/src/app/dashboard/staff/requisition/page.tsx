@@ -254,7 +254,7 @@ export default function StaffRequisitionPage() {
     const name = (p.name || '').toLowerCase();
     const sku = (p.sku || '').toLowerCase();
     const available = p.stocks.find(s => s.location?.id === form.locationId)?.quantity || 0;
-    return (name.includes(search) || sku.includes(search)) && available > 0;
+    return (name.includes(search) || sku.includes(search));
   }).slice(0, 5); // Limit to 5 results for mini search
 
   const removeEmployee = (nameToRemove: string) => {
