@@ -527,6 +527,17 @@ export default function IntegratedPayrollAdmin() {
     return () => clearInterval(interval);
   }, [isAdmin]);
 
+  // Poll for staff requests (Staff only)
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isStaff && userId) {
+      interval = setInterval(() => {
+        fetchStaffRequests(userId);
+      }, 5000); // Poll every 5 seconds
+    }
+    return () => clearInterval(interval);
+  }, [isStaff, userId]);
+
   const handleBulkSync = async () => {
     if (!syncText.trim()) {
       setStatus({ type: 'error', message: 'Please paste the employee list first.' });
@@ -787,13 +798,17 @@ export default function IntegratedPayrollAdmin() {
                     onClick={() => {
                       if (!clientLabel) return;
                       if (isStaff) {
-                        const approved = staffRequests.some(r => 
-                          r.type === 'UPLOAD' && 
-                          r.status === 'APPROVED' && 
-                          r.clientName === clientLabel &&
-                          new Date(r.periodStart).toISOString().split('T')[0] === periodStart &&
-                          new Date(r.periodEnd).toISOString().split('T')[0] === periodEnd
-                        );
+                        const approved = staffRequests.some(r => {
+                          const reqStart = r.periodStart ? new Date(r.periodStart).toISOString().split('T')[0] : null;
+                          const reqEnd = r.periodEnd ? new Date(r.periodEnd).toISOString().split('T')[0] : null;
+                          return (
+                            r.type === 'UPLOAD' && 
+                            r.status === 'APPROVED' && 
+                            r.clientName?.trim().toUpperCase() === clientLabel?.trim().toUpperCase() &&
+                            reqStart === periodStart &&
+                            reqEnd === periodEnd
+                          );
+                        });
                         if (!approved) return;
                       }
                       fileInputRef.current?.click();
@@ -811,13 +826,17 @@ export default function IntegratedPayrollAdmin() {
                     onDrop={(e) => {
                       if (!clientLabel) return;
                       if (isStaff) {
-                        const approved = staffRequests.some(r => 
-                          r.type === 'UPLOAD' && 
-                          r.status === 'APPROVED' && 
-                          r.clientName === clientLabel &&
-                          new Date(r.periodStart).toISOString().split('T')[0] === periodStart &&
-                          new Date(r.periodEnd).toISOString().split('T')[0] === periodEnd
-                        );
+                        const approved = staffRequests.some(r => {
+                          const reqStart = r.periodStart ? new Date(r.periodStart).toISOString().split('T')[0] : null;
+                          const reqEnd = r.periodEnd ? new Date(r.periodEnd).toISOString().split('T')[0] : null;
+                          return (
+                            r.type === 'UPLOAD' && 
+                            r.status === 'APPROVED' && 
+                            r.clientName?.trim().toUpperCase() === clientLabel?.trim().toUpperCase() &&
+                            reqStart === periodStart &&
+                            reqEnd === periodEnd
+                          );
+                        });
                         if (!approved) return;
                       }
                       e.preventDefault();
@@ -833,13 +852,17 @@ export default function IntegratedPayrollAdmin() {
                         <ShieldAlert className="h-10 w-10 text-gray-300 mx-auto mb-4" />
                         <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Select Client First</p>
                       </div>
-                    ) : isStaff && !staffRequests.some(r => 
-                      r.type === 'UPLOAD' && 
-                      r.status === 'APPROVED' && 
-                      r.clientName === clientLabel &&
-                      new Date(r.periodStart).toISOString().split('T')[0] === periodStart &&
-                      new Date(r.periodEnd).toISOString().split('T')[0] === periodEnd
-                    ) ? (
+                    ) : isStaff && !staffRequests.some(r => {
+                      const reqStart = r.periodStart ? new Date(r.periodStart).toISOString().split('T')[0] : null;
+                      const reqEnd = r.periodEnd ? new Date(r.periodEnd).toISOString().split('T')[0] : null;
+                      return (
+                        r.type === 'UPLOAD' && 
+                        r.status === 'APPROVED' && 
+                        r.clientName?.trim().toUpperCase() === clientLabel?.trim().toUpperCase() &&
+                        reqStart === periodStart &&
+                        reqEnd === periodEnd
+                      );
+                    }) ? (
                       <div className="space-y-2">
                         <AlertCircle className="h-10 w-10 text-amber-500 mx-auto mb-4" />
                         <p className="text-sm font-bold text-gray-900">Admin Approval Required</p>
@@ -882,13 +905,17 @@ export default function IntegratedPayrollAdmin() {
                     </div>
                   )}
                   <button onClick={() => setIsImportModalOpen(false)} disabled={uploading} className="px-6 py-3 font-bold text-gray-500 hover:text-gray-700 disabled:opacity-50">Cancel</button>
-                  {isStaff && !staffRequests.some(r => 
-                    r.type === 'UPLOAD' && 
-                    r.status === 'APPROVED' && 
-                    r.clientName === clientLabel &&
-                    new Date(r.periodStart).toISOString().split('T')[0] === periodStart &&
-                    new Date(r.periodEnd).toISOString().split('T')[0] === periodEnd
-                  ) ? (
+                  {isStaff && !staffRequests.some(r => {
+                    const reqStart = r.periodStart ? new Date(r.periodStart).toISOString().split('T')[0] : null;
+                    const reqEnd = r.periodEnd ? new Date(r.periodEnd).toISOString().split('T')[0] : null;
+                    return (
+                      r.type === 'UPLOAD' && 
+                      r.status === 'APPROVED' && 
+                      r.clientName?.trim().toUpperCase() === clientLabel?.trim().toUpperCase() &&
+                      reqStart === periodStart &&
+                      reqEnd === periodEnd
+                    );
+                  }) ? (
                     <button
                       onClick={handleRequestUploadApproval}
                       disabled={isRequestingApproval || !clientLabel || !periodStart || !periodEnd}
