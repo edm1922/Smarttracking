@@ -402,9 +402,10 @@ export class PayrollService {
     const validEntries = [];
 
     for (const line of lines) {
-      const match = line.match(/^(CSC-[\d-]+)\s+(.+)$/i);
+      const match = line.match(/^(CSC-?[\d-]+)\s+(.+)$/i);
       if (match) {
-        const sys_id = match[1].toUpperCase();
+        const raw_sys_id = match[1].toUpperCase();
+        const sys_id = raw_sys_id.replace(/-/g, '');
         const fullName = match[2].trim();
         
         const nameParts = fullName.split(',').map(p => p.trim());
@@ -413,7 +414,8 @@ export class PayrollService {
         const cleanLast = lastName.toLowerCase().replace(/[^a-z0-9]/g, '');
         const cleanFirstTwo = firstName.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 2);
         
-        const idSuffix = sys_id.split('-').pop() || '';
+        // Preserve suffix from dashed format if possible for username consistency
+        const idSuffix = raw_sys_id.split('-').pop() || '';
         const username = `${cleanLast}${cleanFirstTwo}${idSuffix}`;
         
         validEntries.push({
@@ -432,14 +434,21 @@ export class PayrollService {
     for (const entry of validEntries) {
       try {
         const hashedPassword = await bcrypt.hash(entry.password, 10);
-        const existing = await this.prisma.user.findUnique({
-          where: { sys_id: entry.sys_id }
+        // Search by both formats to handle migration
+        const existing = await this.prisma.user.findFirst({
+          where: { 
+            OR: [
+              { sys_id: entry.sys_id },
+              { username: entry.username } // Username is a good fallback
+            ]
+          }
         });
 
         if (existing) {
           await this.prisma.user.update({
-            where: { sys_id: entry.sys_id },
+            where: { id: existing.id },
             data: { 
+              sys_id: entry.sys_id, // Update to standardized format
               fullName: entry.fullName, 
               username: entry.username, 
               password: hashedPassword,
@@ -555,9 +564,9 @@ export class PayrollService {
         if (!item) return resolve([...new Set(ids)]);
 
         if (item.text) {
-          const match = item.text.match(/CSC-[\d-]+/i);
+          const match = item.text.match(/CSC-?[\d-]+/i);
           if (match) {
-            ids.push(match[0].toUpperCase());
+            ids.push(match[0].toUpperCase().replace(/-/g, ''));
           }
         }
       });
