@@ -162,6 +162,11 @@ export default function StaffRequisitionPage() {
     });
     
     setDraftEntry(null);
+    
+    // Auto focus back to employee name to keep workflow fast
+    setTimeout(() => {
+      document.getElementById('employee-name-input')?.focus();
+    }, 10);
   };
 
   const addProductToDraft = (product: Product) => {
