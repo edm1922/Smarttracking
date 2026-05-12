@@ -21,6 +21,20 @@ export class PayrollService {
     this.supabaseAdmin = createClient(supabaseUrl || '', supabaseKey || '');
   }
 
+  private normalizeSysId(id: string): string {
+    if (!id) return '';
+    let normalized = id.toUpperCase().trim();
+    // Standard format: CSC-XXXX-YYYY (e.g. CSC-1234-567)
+    // If it's a CSC ID without dashes, add them
+    if (!normalized.includes('-') && normalized.startsWith('CSC')) {
+      if (normalized.length >= 7) {
+        // Handle CSC1234567 -> CSC-1234-567
+        normalized = `CSC-${normalized.substring(3, 7)}-${normalized.substring(7)}`;
+      }
+    }
+    return normalized;
+  }
+
   async processMasterPdf(pdfBuffer: Buffer, batchData: any) {
     const { clientName, periodStart, periodEnd, label, remark, releaseDate, resumeBatchId } = batchData;
     this.logger.log(`Starting precision 1-page splitting for ${clientName}${resumeBatchId ? ` (RESUMING batch: ${resumeBatchId})` : ''}`);
@@ -53,14 +67,29 @@ export class PayrollService {
     const results = [];
 
     // Pre-fetch existing documents in this batch if resuming
-    const existingSysIds = new Set<string>();
+    const processedPages = new Map<string, Set<number>>();
     if (resumeBatchId) {
       const existingDocs = await this.prisma.document.findMany({
         where: { batch_id: batch.id },
-        select: { sys_id: true }
+        select: { sys_id: true, file_name: true }
       });
-      existingDocs.forEach(d => existingSysIds.add(d.sys_id));
-      this.logger.log(`Pre-fetched ${existingSysIds.size} existing document IDs for resume logic.`);
+      
+      existingDocs.forEach(d => {
+        const id = this.normalizeSysId(d.sys_id);
+        // Extract page number from filename: employeeId_pX_timestamp.pdf
+        const pageMatch = d.file_name.match(/_p(\d+)_/);
+        const page = pageMatch ? parseInt(pageMatch[1], 10) : 1;
+        
+        if (!processedPages.has(id)) {
+          processedPages.set(id, new Set());
+        }
+        const pagesSet = processedPages.get(id);
+        if (pagesSet) {
+          pagesSet.add(page);
+        }
+      });
+      
+      this.logger.log(`Pre-fetched ${existingDocs.length} existing documents for ${processedPages.size} employees in batch ${batch.id}.`);
     }
 
     // Cache for user lookups to avoid redundant DB calls
@@ -85,8 +114,10 @@ export class PayrollService {
         }
 
         // For each ID found on this page, upload/map it
-        for (const employeeId of idsOnPage) {
-          if (resumeBatchId && existingSysIds.has(employeeId)) {
+        for (let employeeId of idsOnPage) {
+          employeeId = this.normalizeSysId(employeeId);
+
+          if (resumeBatchId && processedPages.get(employeeId)?.has(pageNumber)) {
             this.logger.log(`Page ${pageNumber}: ID ${employeeId} already exists in batch ${batch.id}. Skipping.`);
             results.push({ page: pageNumber, id: employeeId, status: 'skipped' });
             continue;
@@ -137,8 +168,14 @@ export class PayrollService {
             },
           });
           
-          // Add to existingSysIds in case there are duplicates within the same PDF
-          existingSysIds.add(employeeId);
+          // Update processedPages in case there are duplicates within the same PDF
+          if (!processedPages.has(employeeId)) {
+            processedPages.set(employeeId, new Set());
+          }
+          const pagesSet = processedPages.get(employeeId);
+          if (pagesSet) {
+            pagesSet.add(pageNumber);
+          }
           
           results.push({ page: pageNumber, id: employeeId, status: 'success' });
         }
@@ -154,10 +191,17 @@ export class PayrollService {
       }
     }
 
+    const added = results.filter(r => r.status === 'success').length;
+    const skipped = results.filter(r => r.status === 'skipped').length;
+    const errors = results.filter(r => r.status === 'error').length;
+
     return {
       batchId: batch.id,
       totalPages,
       processed: results.length,
+      added,
+      skipped,
+      errors,
       details: results
     };
   }
@@ -177,8 +221,8 @@ export class PayrollService {
         singlePageDoc.addPage(copiedPage);
         const singlePageBytes = await singlePageDoc.save();
 
-        const ids = await this.scanSinglePageForIds(Buffer.from(singlePageBytes));
-        const targetSysId = ids.find(id => selectedSysIds.includes(id));
+        const ids = (await this.scanSinglePageForIds(Buffer.from(singlePageBytes))).map(id => this.normalizeSysId(id));
+        const targetSysId = ids.find(id => selectedSysIds.map(s => this.normalizeSysId(s)).includes(id));
 
         if (targetSysId) {
           const fileName = `${targetSysId}_revised_${Date.now()}.pdf`;
@@ -436,10 +480,12 @@ export class PayrollService {
     for (const entry of validEntries) {
       try {
         const hashedPassword = await bcrypt.hash(entry.password, 10);
+        const normalizedSysId = this.normalizeSysId(entry.sys_id);
         // Search by both formats to handle migration
         const existing = await this.prisma.user.findFirst({
           where: { 
             OR: [
+              { sys_id: normalizedSysId },
               { sys_id: entry.sys_id },
               { username: entry.username } // Username is a good fallback
             ]
@@ -450,7 +496,7 @@ export class PayrollService {
           await this.prisma.user.update({
             where: { id: existing.id },
             data: { 
-              sys_id: entry.sys_id, // Update to standardized format
+              sys_id: normalizedSysId, // Update to standardized format
               fullName: entry.fullName, 
               username: entry.username, 
               password: hashedPassword,
@@ -461,7 +507,7 @@ export class PayrollService {
         } else {
           await this.prisma.user.create({
             data: {
-              sys_id: entry.sys_id,
+              sys_id: normalizedSysId,
               fullName: entry.fullName,
               username: entry.username,
               password: hashedPassword,
@@ -568,11 +614,7 @@ export class PayrollService {
         if (item.text) {
           const match = item.text.match(/CSC-?[\d-]+/i);
           if (match) {
-            let id = match[0].toUpperCase();
-            if (!id.includes('-') && id.startsWith('CSC')) {
-              id = `CSC-${id.substring(3, 7)}-${id.substring(7)}`;
-            }
-            ids.push(id);
+            ids.push(this.normalizeSysId(match[0]));
           }
         }
       });
