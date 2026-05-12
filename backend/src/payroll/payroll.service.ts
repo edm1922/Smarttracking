@@ -72,31 +72,14 @@ export class PayrollService {
     const results = [];
 
     // Pre-fetch existing documents in this batch if resuming
-    const processedPages = new Map<string, Set<number>>();
+    const existingSysIds = new Set<string>();
     if (resumeBatchId) {
       const existingDocs = await this.prisma.document.findMany({
         where: { batch_id: batch.id },
-        select: { sys_id: true, file_name: true }
+        select: { sys_id: true }
       });
-      
-      this.logger.log(`Resume: Found ${existingDocs.length} existing documents in batch ${batch.id}`);
-      
-      existingDocs.forEach(d => {
-        const id = this.normalizeSysId(d.sys_id);
-        // Extract page number from filename: employeeId_pX_timestamp.pdf
-        const pageMatch = d.file_name.match(/_p(\d+)_/);
-        const page = pageMatch ? parseInt(pageMatch[1], 10) : 1;
-        
-        if (!processedPages.has(id)) {
-          processedPages.set(id, new Set());
-        }
-        const pagesSet = processedPages.get(id);
-        if (pagesSet) {
-          pagesSet.add(page);
-        }
-      });
-      
-      this.logger.log(`Pre-fetched ${existingDocs.length} existing documents for ${processedPages.size} employees in batch ${batch.id}.`);
+      existingDocs.forEach(d => existingSysIds.add(this.normalizeSysId(d.sys_id)));
+      this.logger.log(`Resume: Pre-fetched ${existingSysIds.size} existing employee IDs for batch ${batch.id}`);
     }
 
     // Cache for user lookups to avoid redundant DB calls
@@ -124,8 +107,9 @@ export class PayrollService {
         for (let employeeId of idsOnPage) {
           employeeId = this.normalizeSysId(employeeId);
 
-          if (resumeBatchId && processedPages.get(employeeId)?.has(pageNumber)) {
-            this.logger.log(`[Resume] Skipping ID ${employeeId} Page ${pageNumber} (Already processed)`);
+          // RESTORED LOGIC: Skip if this ID already exists in this batch
+          if (resumeBatchId && existingSysIds.has(employeeId)) {
+            this.logger.log(`[Resume] Skipping ID ${employeeId} on Page ${pageNumber} (Already in batch)`);
             results.push({ page: pageNumber, id: employeeId, status: 'skipped' });
             continue;
           }
@@ -177,14 +161,8 @@ export class PayrollService {
             },
           });
           
-          // Update processedPages in case there are duplicates within the same PDF
-          if (!processedPages.has(employeeId)) {
-            processedPages.set(employeeId, new Set());
-          }
-          const pagesSet = processedPages.get(employeeId);
-          if (pagesSet) {
-            pagesSet.add(pageNumber);
-          }
+          // Add to existingSysIds in case there are duplicates within the same PDF
+          existingSysIds.add(employeeId);
           
           results.push({ page: pageNumber, id: employeeId, status: 'success' });
         }
@@ -454,33 +432,29 @@ export class PayrollService {
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     const validEntries = [];
 
-    for (const line of lines) {
-      const match = line.match(/^(CSC-?[\d-]+)\s+(.+)$/i);
-      if (match) {
-        let sys_id = match[1].toUpperCase();
-        // Ensure it has dashes for the database if it was pasted without them
-        if (!sys_id.includes('-') && sys_id.startsWith('CSC')) {
-           sys_id = `CSC-${sys_id.substring(3, 7)}-${sys_id.substring(7)}`;
+      for (const line of lines) {
+        const match = line.match(/^(CSC-?[\d-]+)\s+(.+)$/i);
+        if (match) {
+          const sys_id = this.normalizeSysId(match[1]);
+          const fullName = match[2].trim();
+          
+          const nameParts = fullName.split(',').map(p => p.trim());
+          const lastName = nameParts[0] || '';
+          const firstName = nameParts[1] || '';
+          const cleanLast = lastName.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const cleanFirstTwo = firstName.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 2);
+          
+          const idSuffix = sys_id.split('-').pop() || '';
+          const username = `${cleanLast}${cleanFirstTwo}${idSuffix}`;
+          
+          validEntries.push({
+            sys_id,
+            fullName,
+            username,
+            password: sys_id.replace(/-/g, '') // Password remains dash-less
+          });
         }
-        const fullName = match[2].trim();
-        
-        const nameParts = fullName.split(',').map(p => p.trim());
-        const lastName = nameParts[0] || '';
-        const firstName = nameParts[1] || '';
-        const cleanLast = lastName.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const cleanFirstTwo = firstName.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 2);
-        
-        const idSuffix = sys_id.split('-').pop() || '';
-        const username = `${cleanLast}${cleanFirstTwo}${idSuffix}`;
-        
-        validEntries.push({
-          sys_id,
-          fullName,
-          username,
-          password: sys_id.replace(/-/g, '') // Password remains dash-less
-        });
       }
-    }
 
     let successCount = 0;
     let newCount = 0;
