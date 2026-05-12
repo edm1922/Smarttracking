@@ -123,7 +123,17 @@ export class PayrollController {
       resumeBatchId: resumeBatchId
     };
 
-    return this.payrollService.processRemoteMasterPdf(filePath, batchData);
+    // Fire and forget - processing happens in background
+    this.payrollService.processRemoteMasterPdf(filePath, batchData).catch(err => {
+      console.error('Background PDF processing failed:', err);
+    });
+
+    return { status: 'Accepted', message: 'Processing started in background' };
+  }
+
+  @Post('stop-processing/:id')
+  async stopProcessing(@Param('id') id: string) {
+    return this.payrollService.cancelBatchProcessing(id);
   }
 
   @Get('all-payslips')

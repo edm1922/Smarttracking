@@ -22,6 +22,7 @@ export class PayrollService {
   }
 
   private activeBatches = new Set<string>();
+  private cancelledBatches = new Set<string>();
 
   private normalizeSysId(id: string): string {
     if (!id) return '';
@@ -97,6 +98,12 @@ export class PayrollService {
   
       // Process each page individually
       for (let i = 0; i < totalPages; i++) {
+        if (this.cancelledBatches.has(batch.id)) {
+          this.logger.warn(`Batch ${batch.id} was cancelled by user. Stopping processing.`);
+          this.cancelledBatches.delete(batch.id);
+          break;
+        }
+
         const pageNumber = i + 1;
         try {
           // Extract this single page to a new PDF
@@ -209,6 +216,15 @@ export class PayrollService {
 
   getProcessingStatus() {
     return Array.from(this.activeBatches);
+  }
+
+  cancelBatchProcessing(batchId: string) {
+    if (this.activeBatches.has(batchId)) {
+      this.cancelledBatches.add(batchId);
+      this.logger.log(`Cancellation requested for batch ${batchId}`);
+      return { status: 'Cancelled', message: 'Cancellation requested' };
+    }
+    return { status: 'Error', message: 'Batch not active' };
   }
 
   async reviseDocuments(batchId: string, selectedSysIds: string[], remark: string, fileBuffer: Buffer) {
