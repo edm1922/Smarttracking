@@ -58,8 +58,9 @@ export default function StaffRequisitionPage() {
   
   // Multiple Employees state
   const [employeeInput, setEmployeeInput] = useState('');
-  const [employees, setEmployees] = useState<string[]>([]);
-  const [existingEmployees, setExistingEmployees] = useState<string[]>([]);
+  const [positionInput, setPositionInput] = useState('');
+  const [employees, setEmployees] = useState<{ name: string; position: string }[]>([]);
+  const [existingEmployees, setExistingEmployees] = useState<{ name: string; position: string }[]>([]);
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   
   // Cart state
@@ -104,10 +105,12 @@ export default function StaffRequisitionPage() {
   }, []);
 
   const addEmployee = () => {
-    const trimmed = employeeInput.trim();
-    if (trimmed && !employees.includes(trimmed)) {
-      setEmployees([...employees, trimmed]);
+    const trimmedName = employeeInput.trim();
+    const trimmedPos = positionInput.trim() || 'Staff';
+    if (trimmedName && !employees.some(e => e.name === trimmedName)) {
+      setEmployees([...employees, { name: trimmedName, position: trimmedPos }]);
       setEmployeeInput('');
+      setPositionInput('');
       setShowEmployeeDropdown(false);
     }
   };
@@ -117,22 +120,23 @@ export default function StaffRequisitionPage() {
     setShowEmployeeDropdown(value.length > 0);
   };
 
-  const selectExistingEmployee = (name: string) => {
-    if (!employees.includes(name)) {
-      setEmployees([...employees, name]);
+  const selectExistingEmployee = (emp: { name: string; position: string }) => {
+    if (!employees.some(e => e.name === emp.name)) {
+      setEmployees([...employees, emp]);
     }
     setEmployeeInput('');
+    setPositionInput('');
     setShowEmployeeDropdown(false);
   };
 
   const filteredExistingEmployees = existingEmployees.filter(
-    (name: string) =>
-      name.toLowerCase().includes(employeeInput.toLowerCase()) &&
-      !employees.includes(name)
+    (emp) =>
+      emp.name.toLowerCase().includes(employeeInput.toLowerCase()) &&
+      !employees.some(e => e.name === emp.name)
   );
 
   const removeEmployee = (nameToRemove: string) => {
-    setEmployees(employees.filter(name => name !== nameToRemove));
+    setEmployees(employees.filter(e => e.name !== nameToRemove));
   };
 
   const addItemToCart = (product: Product, availableQty: number) => {
@@ -141,7 +145,7 @@ export default function StaffRequisitionPage() {
     }
     
     const initialQuantities: Record<string, number> = {};
-    employees.forEach(emp => initialQuantities[emp] = 1);
+    employees.forEach(emp => initialQuantities[emp.name] = 1);
     
     setSelectedItems([...selectedItems, {
       productId: product.id,
@@ -210,14 +214,14 @@ export default function StaffRequisitionPage() {
 
       const requestsData: any[] = [];
       
-      employees.forEach(empName => {
+      employees.forEach(emp => {
         selectedItems.forEach(item => {
-          const qty = item.quantities && item.quantities[empName] !== undefined ? item.quantities[empName] : 1;
+          const qty = item.quantities && item.quantities[emp.name] !== undefined ? item.quantities[emp.name] : 1;
           if (qty > 0) {
             requestsData.push({
               date: form.date,
-              employeeName: empName,
-              employeeRole: 'Staff',
+              employeeName: emp.name,
+              employeeRole: emp.position,
               supervisor: form.supervisorName,
               departmentArea: form.departmentArea,
               shift: form.shift,
@@ -344,7 +348,7 @@ export default function StaffRequisitionPage() {
                     <div className="relative">
                       <input 
                         type="text" 
-                        placeholder="Type employee name & press Add..." 
+                        placeholder="Type employee name..." 
                         value={employeeInput} 
                         onChange={e => handleEmployeeInputChange(e.target.value)}
                         onFocus={() => employeeInput.length > 0 && setShowEmployeeDropdown(true)}
@@ -353,29 +357,43 @@ export default function StaffRequisitionPage() {
                       />
                       {showEmployeeDropdown && filteredExistingEmployees.length > 0 && (
                         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-40 overflow-y-auto">
-                          {filteredExistingEmployees.map((name: string) => (
+                          {filteredExistingEmployees.map((emp) => (
                             <button
-                              key={name}
+                              key={emp.name}
                               type="button"
-                              onClick={() => selectExistingEmployee(name)}
-                              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors text-gray-900"
+                              onClick={() => selectExistingEmployee(emp)}
+                              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors text-gray-900 flex justify-between"
                             >
-                              {name}
+                              <span className="font-bold">{emp.name}</span>
+                              <span className="text-[10px] text-gray-400 uppercase font-black">{emp.position}</span>
                             </button>
                           ))}
                         </div>
                       )}
                     </div>
-                    <button onClick={addEmployee} type="button" className="px-5 py-2.5 bg-gray-100 text-gray-700 font-bold text-xs rounded-xl hover:bg-gray-200 transition-colors">
-                      Add
-                    </button>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        placeholder="Position (e.g. Staff)" 
+                        value={positionInput} 
+                        onChange={e => setPositionInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addEmployee())}
+                        className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all" 
+                      />
+                      <button onClick={addEmployee} type="button" className="px-5 py-2.5 bg-gray-900 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-primary transition-all shadow-lg hover:shadow-primary/20">
+                        Add
+                      </button>
+                    </div>
                     
                     {employees.length > 0 && (
                       <div className="flex flex-wrap gap-2 pt-2">
                         {employees.map(emp => (
-                          <div key={emp} className="flex items-center gap-1.5 bg-primary/10 text-primary px-3 py-1.5 rounded-lg text-xs font-bold border border-primary/20 animate-in zoom-in-95">
-                            {emp}
-                            <button onClick={() => removeEmployee(emp)} className="hover:text-red-500 transition-colors">
+                          <div key={emp.name} className="flex items-center gap-1.5 bg-primary/10 text-primary px-3 py-1.5 rounded-lg text-xs font-bold border border-primary/20 animate-in zoom-in-95">
+                            <div className="flex flex-col items-start leading-tight">
+                              <span>{emp.name}</span>
+                              <span className="text-[9px] opacity-60 uppercase">{emp.position}</span>
+                            </div>
+                            <button onClick={() => removeEmployee(emp.name)} className="hover:text-red-500 transition-colors ml-1">
                               <X className="h-3 w-3" />
                             </button>
                           </div>
@@ -433,16 +451,19 @@ export default function StaffRequisitionPage() {
                           ) : (
                             <div className="space-y-2">
                               {employees.map(emp => {
-                                const qty = item.quantities && item.quantities[emp] !== undefined ? item.quantities[emp] : 1;
+                                const qty = item.quantities && item.quantities[emp.name] !== undefined ? item.quantities[emp.name] : 1;
                                 return (
-                                  <div key={emp} className="flex items-center justify-between">
-                                    <span className="text-[11px] font-bold text-gray-700">{emp}</span>
+                                  <div key={emp.name} className="flex items-center justify-between">
+                                    <div className="flex flex-col">
+                                      <span className="text-[11px] font-bold text-gray-700">{emp.name}</span>
+                                      <span className="text-[9px] text-gray-400 uppercase font-bold tracking-wider">{emp.position}</span>
+                                    </div>
                                     <div className="w-20">
                                       <input 
                                         type="number" 
                                         min="0"
                                         value={qty} 
-                                        onChange={e => updateCartItemQuantity(item.productId, emp, parseInt(e.target.value) || 0)}
+                                        onChange={e => updateCartItemQuantity(item.productId, emp.name, parseInt(e.target.value) || 0)}
                                         className="w-full rounded-md border border-gray-200 px-2 py-1 text-xs text-center outline-none focus:border-primary font-bold bg-white"
                                       />
                                     </div>
@@ -641,7 +662,7 @@ export default function StaffRequisitionPage() {
                   
                   <div className="details grid grid-cols-2 gap-4 mb-4">
                     <div className="space-y-1">
-                      <p><strong>Employees:</strong> {employees.join(', ')}</p>
+                      <p><strong>Employees:</strong> {employees.map(e => `${e.name} [${e.position}]`).join(', ')}</p>
                       <p><strong>Department:</strong> {form.departmentArea || 'N/A'}</p>
                     </div>
                     <div className="space-y-1">
