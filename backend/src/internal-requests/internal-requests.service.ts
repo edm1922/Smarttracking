@@ -390,10 +390,10 @@ export class InternalRequestsService {
 
   async getUniqueEmployees() {
     const employees = await this.prisma.internalRequest.findMany({
-      select: { employeeName: true },
+      select: { employeeName: true, employeeRole: true },
       distinct: ['employeeName'],
       orderBy: { employeeName: 'asc' },
     });
-    return employees.map(e => e.employeeName);
+    return employees.map(e => ({ name: e.employeeName, position: e.employeeRole }));
   }
 }
