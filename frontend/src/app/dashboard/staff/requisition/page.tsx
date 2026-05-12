@@ -82,7 +82,10 @@ export default function StaffRequisitionPage() {
         api.get('/internal-requests/employees')
       ]);
       
-      setExistingEmployees(empRes.data || []);
+      const rawEmployees = empRes.data || [];
+      setExistingEmployees(rawEmployees.map((e: any) => 
+        typeof e === 'string' ? { name: e, position: 'Staff' } : e
+      ));
       
       const locs = locsRes.data;
       setLocations(locs);
@@ -130,9 +133,12 @@ export default function StaffRequisitionPage() {
   };
 
   const filteredExistingEmployees = existingEmployees.filter(
-    (emp) =>
-      emp.name.toLowerCase().includes(employeeInput.toLowerCase()) &&
-      !employees.some(e => e.name === emp.name)
+    (emp) => {
+      const name = typeof emp === 'string' ? emp : (emp?.name || '');
+      const search = (employeeInput || '').toLowerCase();
+      return name.toLowerCase().includes(search) &&
+             !employees.some(e => e.name === name);
+    }
   );
 
   const removeEmployee = (nameToRemove: string) => {
@@ -285,7 +291,12 @@ export default function StaffRequisitionPage() {
       const availableInLocation = p.stocks.find(s => s.location?.id === form.locationId)?.quantity || 0;
       return { ...p, totalStock: availableInLocation };
     })
-    .filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.sku.toLowerCase().includes(productSearch.toLowerCase()))
+    .filter(p => {
+      const search = (productSearch || '').toLowerCase();
+      const name = (p.name || '').toLowerCase();
+      const sku = (p.sku || '').toLowerCase();
+      return name.includes(search) || sku.includes(search);
+    })
     .sort((a, b) => b.totalStock! - a.totalStock!); // Sort highest quantity to lowest
 
   if (loading) {
@@ -689,7 +700,7 @@ export default function StaffRequisitionPage() {
                     </thead>
                     <tbody>
                       {selectedItems.map(item => {
-                        const totalQty = employees.reduce((sum, emp) => sum + (item.quantities && item.quantities[emp] !== undefined ? item.quantities[emp] : 1), 0);
+                        const totalQty = employees.reduce((sum, emp) => sum + (item.quantities && item.quantities[emp.name] !== undefined ? item.quantities[emp.name] : 1), 0);
                         
                         return (
                           <tr key={item.productId}>
