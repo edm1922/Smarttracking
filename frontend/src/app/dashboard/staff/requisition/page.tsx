@@ -268,7 +268,16 @@ export default function StaffRequisitionPage() {
   };
 
   const addItemToCart = (product: Product, availableQty: number, targetEmployeeNames?: string[]) => {
-    const targets = targetEmployeeNames && targetEmployeeNames.length > 0 ? targetEmployeeNames : employees.map(e => e.name);
+    let targets = targetEmployeeNames;
+    
+    // If no specific targets provided (manual add from explorer), use active selections
+    if (!targets || targets.length === 0) {
+      if (activeEmployeeNames.length > 0) {
+        targets = activeEmployeeNames;
+      } else {
+        targets = employees.map(e => e.name);
+      }
+    }
     
     setSelectedItems(prev => {
       const existingIndex = prev.findIndex(item => item.productId === product.id);
@@ -288,8 +297,18 @@ export default function StaffRequisitionPage() {
       } else {
         // New item, add to cart
         const initialQuantities: Record<string, number> = {};
+        
+        // Use current employees list
         employees.forEach(emp => {
           initialQuantities[emp.name] = targets.includes(emp.name) ? 1 : 0;
+        });
+        
+        // CRITICAL: Ensure all targets are in the initial map, 
+        // even if they were just added and aren't in the state yet
+        targets.forEach(name => {
+          if (initialQuantities[name] === undefined) {
+            initialQuantities[name] = 1;
+          }
         });
 
         return [...prev, {
