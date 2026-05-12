@@ -618,7 +618,7 @@ export class PayrollService {
     return this.prisma.payrollRequest.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
-      take: 10
+      take: 50
     });
   }
 
