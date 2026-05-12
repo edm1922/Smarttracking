@@ -75,7 +75,7 @@ export default function StaffRequisitionPage() {
   const [draftEntry, setDraftEntry] = useState<{ 
     name: string; 
     position: string; 
-    items: { productId: string; name: string; sku: string; availableQty: number; description: string | null }[] 
+    items: { productId: string; name: string; sku: string; availableQty: number; quantity: number; description: string | null }[] 
   } | null>(null);
   
   // Cart state
@@ -157,7 +157,7 @@ export default function StaffRequisitionPage() {
       // Find the product in our main products list to get the full object
       const product = products.find(p => p.id === item.productId);
       if (product) {
-        addItemToCart(product, item.availableQty, [draftEntry.name]);
+        addItemToCart(product, item.availableQty, [draftEntry.name], item.quantity);
       }
     });
     
@@ -182,16 +182,25 @@ export default function StaffRequisitionPage() {
         name: product.name,
         sku: product.sku,
         availableQty: available,
+        quantity: 1,
         description: product.description
       }]
     });
 
-    // Clear and focus back
+    // Clear and focus back to search
     setQuickItemInput('');
     setShowItemDropdown(false);
     setTimeout(() => {
       document.getElementById('draft-item-search')?.focus();
     }, 10);
+  };
+
+  const updateDraftItemQuantity = (productId: string, qty: number) => {
+    if (!draftEntry) return;
+    setDraftEntry({
+      ...draftEntry,
+      items: draftEntry.items.map(i => i.productId === productId ? { ...i, quantity: qty } : i)
+    });
   };
 
   const removeProductFromDraft = (productId: string) => {
@@ -267,7 +276,7 @@ export default function StaffRequisitionPage() {
     );
   };
 
-  const addItemToCart = (product: Product, availableQty: number, targetEmployeeNames?: string[]) => {
+  const addItemToCart = (product: Product, availableQty: number, targetEmployeeNames?: string[], quantity: number = 1) => {
     let targets = targetEmployeeNames;
     
     // If no specific targets provided (manual add from explorer), use active selections
@@ -287,8 +296,8 @@ export default function StaffRequisitionPage() {
         return prev.map((item, idx) => {
           if (idx === existingIndex) {
             const newQuantities = { ...(item.quantities || {}) };
-            targets.forEach(name => {
-              newQuantities[name] = 1; // Add for these employees
+            targets!.forEach(name => {
+              newQuantities[name] = (newQuantities[name] || 0) + quantity; 
             });
             return { ...item, quantities: newQuantities };
           }
@@ -300,14 +309,14 @@ export default function StaffRequisitionPage() {
         
         // Use current employees list
         employees.forEach(emp => {
-          initialQuantities[emp.name] = targets.includes(emp.name) ? 1 : 0;
+          initialQuantities[emp.name] = targets!.includes(emp.name) ? quantity : 0;
         });
         
         // CRITICAL: Ensure all targets are in the initial map, 
         // even if they were just added and aren't in the state yet
-        targets.forEach(name => {
+        targets!.forEach(name => {
           if (initialQuantities[name] === undefined) {
-            initialQuantities[name] = 1;
+            initialQuantities[name] = quantity;
           }
         });
 
@@ -633,16 +642,32 @@ export default function StaffRequisitionPage() {
                             )}
                           </div>
 
-                          <div className="flex flex-wrap gap-2">
-                            {draftEntry.items.map(item => (
-                              <div key={item.productId} className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-bold shadow-sm">
-                                <span className="text-gray-900">{item.name}</span>
-                                <button onClick={() => removeProductFromDraft(item.productId)} className="text-gray-400 hover:text-red-500">
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {draftEntry.items.map(item => (
+                            <div key={item.productId} className="flex items-center bg-gray-50 p-1.5 rounded-lg border border-gray-200 shadow-sm animate-in zoom-in-95">
+                              <div className="flex flex-col px-2">
+                                <span className="text-[10px] font-black text-gray-800 uppercase tracking-tight">{item.name}</span>
+                                <span className="text-[8px] text-gray-400 font-mono">{item.sku}</span>
+                              </div>
+                              
+                              <div className="flex items-center gap-1 border-l border-gray-200 pl-2 ml-1">
+                                <input 
+                                  type="number" 
+                                  min="1"
+                                  value={item.quantity}
+                                  onChange={(e) => updateDraftItemQuantity(item.productId, parseInt(e.target.value) || 1)}
+                                  className="w-10 bg-white border border-gray-200 rounded text-[10px] font-black text-center py-0.5 focus:ring-1 focus:ring-primary outline-none"
+                                />
+                                <button 
+                                  onClick={() => removeProductFromDraft(item.productId)}
+                                  className="p-1 hover:bg-red-50 rounded text-gray-400 hover:text-red-500 transition-colors"
+                                >
                                   <X className="h-3 w-3" />
                                 </button>
                               </div>
-                            ))}
-                          </div>
+                            </div>
+                          ))}
+                        </div>
 
                           <button 
                             onClick={confirmDraftEntry}
@@ -1055,7 +1080,7 @@ export default function StaffRequisitionPage() {
                     </thead>
                     <tbody>
                       {selectedItems.map(item => {
-                        const totalQty = employees.reduce((sum, emp) => sum + (item.quantities && item.quantities[emp.name] !== undefined ? item.quantities[emp.name] : 1), 0);
+                        const totalQty = employees.reduce((sum, emp) => sum + (item.quantities && item.quantities[emp.name] !== undefined ? item.quantities[emp.name] : 0), 0);
                         
                         return (
                           <tr key={item.productId}>
