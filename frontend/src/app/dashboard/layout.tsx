@@ -107,7 +107,6 @@ useEffect(() => {
       subItems: [
         { name: 'Stock Transmittal', href: '/dashboard/transmittal/product' },
         { name: 'PR Transmittal', href: '/dashboard/transmittal/purchase-request' },
-        { name: 'Unit Tracking Log', href: '/dashboard/transmittal/unit-tracking-log' },
       ]
     },
   ];

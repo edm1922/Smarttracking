@@ -7,8 +7,9 @@ import {
   ChevronRight, ChevronLeft, ChevronDown, ChevronUp, History,
   TrendingDown, TrendingUp, AlertTriangle, Box,
   QrCode, Clock, User, ArrowUpRight, Check, X, Truck, Activity, FileText, Printer, LayoutGrid, Trash2, ClipboardList,
-  ImageIcon, Eye
+  ImageIcon, Eye, FileSpreadsheet
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import api from '@/lib/api';
 import { useDebounce } from '@/hooks/useDebounce';
 import { TableSkeleton, CardSkeleton, PageHeaderSkeleton } from '@/components/ui/LoadingSkeletons';
@@ -62,6 +63,19 @@ export default function UnitTrackingPage() {
     remarks: ''
   });
 
+  const [enabledSignatories, setEnabledSignatories] = useState({ 
+    preparedBy: true, 
+    checkedBy: true, 
+    receivedBy: true, 
+    approvedBy: true 
+  });
+
+  const [stockHealthRange, setStockHealthRange] = useState({ 
+    start: new Date().toLocaleDateString('en-CA'),
+    end: new Date().toLocaleDateString('en-CA')
+  });
+  const [printMode, setPrintMode] = useState<'individual' | 'health_report'>('individual');
+  
   const productSummary = useMemo(() => {
     const summary: Record<string, any> = {};
     
@@ -73,6 +87,8 @@ export default function UnitTrackingPage() {
           totalInStock: 0,
           outToday: 0,
           specs: new Set(),
+          outSpecs: new Set(),
+          movementBreakdown: {} as Record<string, number>,
         };
       }
       summary[pName].totalInStock += p.totalQty;
@@ -86,22 +102,45 @@ export default function UnitTrackingPage() {
       });
     });
 
-    const today = new Date().toLocaleDateString();
-    requests.filter(r => r.status === 'APPROVED' && new Date(r.createdAt).toLocaleDateString() === today).forEach(req => {
+    const start = new Date(stockHealthRange.start);
+    const end = new Date(stockHealthRange.end);
+    end.setHours(23, 59, 59, 999);
+
+    requests.filter(r => {
+      const d = new Date(r.createdAt);
+      return r.status === 'APPROVED' && d >= start && d <= end;
+    }).forEach(req => {
        const pName = req.item.product?.name || req.item.name || 'Unit Item';
        if (summary[pName]) {
          summary[pName].outToday += req.qty;
+         
+         const specString = req.item.fieldValues?.map((fv: any) => {
+            const v = fv.value;
+            const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+            return val ? String(val) : '';
+         }).filter(Boolean).sort().join(', ') || 'Standard';
+
+         summary[pName].movementBreakdown[specString] = (summary[pName].movementBreakdown[specString] || 0) + req.qty;
+
+         // Track the specs of this specific request for UI highlighting
+         req.item.fieldValues?.forEach((fv: any) => {
+           const v = fv.value;
+           const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+           if (val) summary[pName].outSpecs.add(String(val));
+         });
        }
     });
 
     return Object.values(summary);
-  }, [inventory, requests]);
+  }, [inventory, requests, stockHealthRange]);
   
   const [logSearch, setLogSearch] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [viewingLog, setViewingLog] = useState<any>(null);
+  const [viewingStockDetail, setViewingStockDetail] = useState<any>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [productFilters, setProductFilters] = useState<Record<string, Record<string, string>>>({});
+
   
 
   const [page, setPage] = useState(1);
@@ -364,6 +403,67 @@ export default function UnitTrackingPage() {
   const totalProducts = inventory.length;
   const totalQRs = inventory.reduce((acc, p) => acc + p.items.length, 0);
 
+  const handleExportExcel = () => {
+    // 1. Create Header Info Rows
+    const headerInfo = [
+      ['MATERIAL TRANSMITTAL REPORT'],
+      ['Transmittal No:', transmittalHeader.transmittalNo],
+      ['Date Covered:', stockHealthRange.start === stockHealthRange.end ? stockHealthRange.start : `${stockHealthRange.start} to ${stockHealthRange.end}`],
+      ['Department:', transmittalHeader.department || 'N/A'],
+      ['Recipient:', transmittalHeader.recipient || 'N/A'],
+      ['Remarks:', transmittalHeader.remarks || 'None'],
+      [''], // Spacer
+      ['STOCK MOVEMENT DATA'],
+      ['Product Reference', 'Starting Stock', 'Movement Qty', 'Resulting Stock', 'Movement Breakdown']
+    ];
+
+    // 2. Prepare Product Data
+    const productData = productSummary.map(item => {
+      const breakdownStr = Object.entries(item.movementBreakdown)
+        .map(([spec, qty]) => `${spec}: ${qty}`)
+        .join(' | ');
+        
+      return [
+        item.name,
+        item.totalInStock + item.outToday,
+        -item.outToday,
+        item.totalInStock,
+        breakdownStr || 'No Movement'
+      ];
+    });
+
+    // 3. Create Signatories Section
+    const signatoryRows = [
+      [''], // Spacer
+      ['SIGNATORIES'],
+    ];
+
+    ['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy'].forEach(f => {
+      if ((enabledSignatories as any)[f]) {
+        signatoryRows.push([f.endsWith('By') ? f.slice(0, -2) + ' By' : f, (transmittalHeader as any)[f] || '________________']);
+      }
+    });
+
+    const combinedData = [...headerInfo, ...productData, ...signatoryRows];
+
+    const ws = XLSX.utils.aoa_to_sheet(combinedData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Transmittal Report");
+    
+    // Set column widths
+    const wscols = [
+      {wch: 30}, // Label / Product
+      {wch: 20}, // Value / Starting
+      {wch: 15}, // Movement
+      {wch: 15}, // Resulting
+      {wch: 60}, // Breakdown
+    ];
+    ws['!cols'] = wscols;
+
+    XLSX.writeFile(wb, `${transmittalHeader.transmittalNo}_${stockHealthRange.start}.xlsx`);
+    setIsBuildingTransmittal(false);
+  };
+
   if (loading) {
     return (
       <div className="space-y-10 animate-in fade-in duration-300">
@@ -389,9 +489,10 @@ export default function UnitTrackingPage() {
              </tbody>
            </table>
         </div>
-      </div>
+         </div>
     );
   }
+
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700 print:space-y-0">
@@ -633,9 +734,14 @@ export default function UnitTrackingPage() {
                     <ArrowUpRight className="h-8 w-8" />
                  </div>
                  <div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Pulled Out Today</p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                      Movement from {new Date(stockHealthRange.start).toLocaleDateString()} to {new Date(stockHealthRange.end).toLocaleDateString()}
+                    </p>
                     <p className="text-3xl font-black text-gray-900 tracking-tighter">
-                      {requests.filter(r => r.status === 'APPROVED' && new Date(r.createdAt).toLocaleDateString() === new Date().toLocaleDateString()).reduce((acc, curr) => acc + curr.qty, 0).toLocaleString()} Units
+                      {requests.filter(r => {
+                        const d = new Date(r.createdAt);
+                        return r.status === 'APPROVED' && d >= new Date(stockHealthRange.start) && d <= new Date(stockHealthRange.end + 'T23:59:59');
+                      }).reduce((acc, curr) => acc + curr.qty, 0).toLocaleString()} Units
                     </p>
                  </div>
               </div>
@@ -659,12 +765,40 @@ export default function UnitTrackingPage() {
                     <h2 className="text-xl font-black text-gray-900 tracking-tight">Master Stock Health</h2>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Aggregated by Reference Name</p>
                  </div>
-                 <button 
-                    onClick={() => window.print()}
-                    className="p-3 bg-gray-50 text-gray-400 rounded-xl hover:text-gray-900 transition-all"
-                 >
-                    <Printer className="h-5 w-5" />
-                 </button>
+                   <div className="flex items-center gap-3">
+                   <div className="flex items-center gap-4 bg-gray-50 px-5 py-2.5 rounded-2xl border border-gray-100 shadow-sm">
+                     <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-black text-gray-400 uppercase">From:</span>
+                        <input 
+                          type="date" 
+                          value={stockHealthRange.start}
+                          onChange={e => setStockHealthRange({...stockHealthRange, start: e.target.value})}
+                          className="bg-transparent border-none text-[11px] font-black uppercase outline-none focus:text-primary transition-colors"
+                        />
+                     </div>
+                     <div className="h-4 w-[1px] bg-gray-200" />
+                     <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-black text-gray-400 uppercase">To:</span>
+                        <input 
+                          type="date" 
+                          value={stockHealthRange.end}
+                          onChange={e => setStockHealthRange({...stockHealthRange, end: e.target.value})}
+                          className="bg-transparent border-none text-[11px] font-black uppercase outline-none focus:text-primary transition-colors"
+                        />
+                     </div>
+                   </div>
+                   <button 
+                      onClick={() => {
+                        setPrintMode('health_report');
+                        setIsBuildingTransmittal(true);
+                      }}
+                      className="p-3.5 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-all shadow-lg shadow-green-600/10 active:scale-95 flex items-center gap-2 px-6"
+                      title="Configure and Export to Excel"
+                   >
+                      <FileSpreadsheet className="h-5 w-5" />
+                      <span className="text-xs font-black uppercase tracking-widest">Build & Export Excel</span>
+                   </button>
+                 </div>
               </div>
 
               <div className="overflow-x-auto">
@@ -673,23 +807,41 @@ export default function UnitTrackingPage() {
                        <tr className="bg-gray-50/50 print:bg-transparent print:border-b-2 print:border-gray-900">
                           <th className="px-8 py-4 print:px-2 print:py-2 text-[10px] font-black text-gray-400 print:text-gray-900 uppercase tracking-widest">Actual Item (Reference)</th>
                           <th className="px-8 py-4 print:px-2 print:py-2 text-[10px] font-black text-gray-400 print:text-gray-900 uppercase tracking-widest">Specifications</th>
-                          <th className="px-8 py-4 print:px-2 print:py-2 text-[10px] font-black text-gray-400 print:text-gray-900 uppercase tracking-widest text-center">In Stock</th>
-                          <th className="px-8 py-4 print:px-2 print:py-2 text-[10px] font-black text-gray-400 print:text-gray-900 uppercase tracking-widest text-center">Pulled Out (Today)</th>
+                          <th className="px-8 py-4 print:px-2 print:py-2 text-[10px] font-black text-gray-400 print:text-gray-900 uppercase tracking-widest text-center">Starting Stock</th>
+                          <th className="px-8 py-4 print:px-2 print:py-2 text-[10px] font-black text-gray-400 print:text-gray-900 uppercase tracking-widest text-center">
+                              Movement ({stockHealthRange.start === stockHealthRange.end ? new Date(stockHealthRange.start).toLocaleDateString() : `${new Date(stockHealthRange.start).toLocaleDateString()} - ${new Date(stockHealthRange.end).toLocaleDateString()}`})
+                           </th>
+                          <th className="px-8 py-4 print:px-2 print:py-2 text-[10px] font-black text-gray-400 print:text-gray-900 uppercase tracking-widest text-center">Resulting Stock</th>
                        </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50 print:divide-gray-300">
                        {productSummary.map((item: any) => (
-                          <tr key={item.name} className="hover:bg-gray-50/30 transition-colors print:break-inside-avoid">
+                          <tr 
+                             key={item.name} 
+                             onDoubleClick={() => setViewingStockDetail(item)}
+                             className="hover:bg-gray-50/30 transition-colors cursor-pointer print:break-inside-avoid group"
+                             title="Double-click to view movement details"
+                          >
                              <td className="px-8 py-6 print:px-2 print:py-3 align-top">
                                 <span className="text-sm print:text-xs font-black text-gray-900 uppercase">{item.name}</span>
                              </td>
                              <td className="px-8 py-6 print:px-2 print:py-3 align-top">
                                 <div className="flex flex-wrap gap-1 print:hidden">
-                                   {Array.from(item.specs).slice(0, 8).map((spec: any, i) => (
-                                      <span key={i} className="px-2 py-0.5 bg-gray-100 text-[9px] font-bold text-gray-500 rounded-md">
-                                         {spec}
-                                      </span>
-                                   ))}
+                                   {Array.from(item.specs).slice(0, 8).map((spec: any, i) => {
+                                      const isMoved = item.outSpecs?.has(spec);
+                                      return (
+                                         <span 
+                                           key={i} 
+                                           className={`px-2 py-0.5 text-[9px] font-bold rounded-md transition-all ${
+                                             isMoved 
+                                               ? 'bg-orange-500 text-white shadow-sm ring-2 ring-orange-500/20' 
+                                               : 'bg-gray-100 text-gray-500'
+                                           }`}
+                                         >
+                                            {spec}
+                                         </span>
+                                      );
+                                   })}
                                    {item.specs.size > 8 && (
                                       <span className="text-[9px] font-bold text-gray-400">+{item.specs.size - 8} more specs</span>
                                    )}
@@ -700,12 +852,24 @@ export default function UnitTrackingPage() {
                                 </div>
                              </td>
                              <td className="px-8 py-6 print:px-2 print:py-3 text-center align-top">
-                                <span className="text-sm print:text-xs font-black text-gray-900">{item.totalInStock}</span>
+                                <div className="flex flex-col items-center">
+                                   <span className="text-[10px] font-bold text-gray-400 uppercase leading-none mb-1">Starting</span>
+                                   <span className="text-sm print:text-xs font-black text-gray-900">{(item.totalInStock + item.outToday).toLocaleString()}</span>
+                                </div>
                              </td>
                              <td className="px-8 py-6 print:px-2 print:py-3 text-center align-top">
-                                <span className={`text-sm print:text-xs font-black ${item.outToday > 0 ? 'text-orange-600 print:text-gray-900' : 'text-gray-300 print:text-gray-400'}`}>
-                                   {item.outToday > 0 ? `-${item.outToday}` : '0'}
-                                </span>
+                                <div className="flex flex-col items-center">
+                                   <span className="text-[10px] font-bold text-gray-400 uppercase leading-none mb-1">Movement</span>
+                                   <span className={`text-sm print:text-xs font-black ${item.outToday > 0 ? 'text-orange-600 print:text-gray-900' : 'text-gray-300 print:text-gray-400'}`}>
+                                      {item.outToday > 0 ? `-${item.outToday.toLocaleString()}` : '0'}
+                                   </span>
+                                </div>
+                             </td>
+                             <td className="px-8 py-6 print:px-2 print:py-3 text-center align-top bg-gray-50/50 rounded-r-2xl">
+                                <div className="flex flex-col items-center">
+                                   <span className="text-[10px] font-black text-primary uppercase leading-none mb-1">Resulting</span>
+                                   <span className="text-sm print:text-xs font-black text-gray-900">{item.totalInStock.toLocaleString()}</span>
+                                </div>
                              </td>
                           </tr>
                        ))}
@@ -1047,7 +1211,10 @@ export default function UnitTrackingPage() {
 
               {selectedRequestIds.length > 0 && (
                 <button 
-                  onClick={() => setIsBuildingTransmittal(true)}
+                  onClick={() => {
+                    setPrintMode('individual');
+                    setIsBuildingTransmittal(true);
+                  }}
                   className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 animate-in zoom-in-95"
                 >
                   <FileText className="h-4 w-4" /> Build Transmittal ({selectedRequestIds.length})
@@ -1221,8 +1388,14 @@ export default function UnitTrackingPage() {
                   <FileText className="h-6 w-6" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black text-gray-900 tracking-tight">Transmittal Builder</h2>
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Configure transmittal details for {selectedRequestIds.length} items</p>
+                  <h2 className="text-xl font-black text-gray-900 tracking-tight">
+                    {printMode === 'health_report' ? 'Report Transmittal Builder' : 'Transmittal Builder'}
+                  </h2>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                    {printMode === 'health_report' 
+                      ? `Consolidating movement for ${productSummary.filter(p => p.outToday > 0).length} products`
+                      : `Configure transmittal details for ${selectedRequestIds.length} items`}
+                  </p>
                 </div>
               </div>
               <button 
@@ -1248,13 +1421,23 @@ export default function UnitTrackingPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Date</label>
-                    <input 
-                        type="date" 
-                        value={transmittalHeader.date}
-                        onChange={e => setTransmittalHeader({...transmittalHeader, date: e.target.value})}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold text-gray-900 focus:bg-white focus:ring-4 focus:ring-primary/5 transition-all outline-none"
-                    />
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">
+                      {printMode === 'health_report' ? 'Date Covered' : 'Date'}
+                    </label>
+                    {printMode === 'health_report' ? (
+                      <div className="w-full px-4 py-3 bg-gray-100/50 border border-transparent rounded-xl text-sm font-black text-primary uppercase tracking-tighter">
+                        {stockHealthRange.start === stockHealthRange.end 
+                          ? new Date(stockHealthRange.start).toLocaleDateString(undefined, { dateStyle: 'long' })
+                          : `${new Date(stockHealthRange.start).toLocaleDateString()} - ${new Date(stockHealthRange.end).toLocaleDateString()}`}
+                      </div>
+                    ) : (
+                      <input 
+                          type="date" 
+                          value={transmittalHeader.date}
+                          onChange={e => setTransmittalHeader({...transmittalHeader, date: e.target.value})}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold text-gray-900 focus:bg-white focus:ring-4 focus:ring-primary/5 transition-all outline-none"
+                      />
+                    )}
                   </div>
                   <div>
                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Department</label>
@@ -1281,14 +1464,28 @@ export default function UnitTrackingPage() {
                 <div className="pt-6 border-t border-gray-50 space-y-4">
                   <h3 className="text-[10px] font-black text-primary uppercase tracking-widest">Signatories</h3>
                   {['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy'].map(field => (
-                    <div key={field}>
-                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">{field.endsWith('By') ? field.slice(0, -2) + ' By' : field}</label>
+                    <div key={field} className="group relative">
+                        <div className="flex items-center justify-between mb-1.5 ml-1">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{field.endsWith('By') ? field.slice(0, -2) + ' By' : field}</label>
+                          <input 
+                            type="checkbox"
+                            checked={(enabledSignatories as any)[field]}
+                            onChange={e => setEnabledSignatories({...enabledSignatories, [field]: e.target.checked})}
+                            className="h-3 w-3 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                            title={`Enable/Disable ${field}`}
+                          />
+                        </div>
                         <input 
                             type="text" 
+                            disabled={!(enabledSignatories as any)[field]}
                             placeholder={field === 'checkedBy' ? 'Optional' : 'Name'}
                             value={(transmittalHeader as any)[field]}
                             onChange={e => setTransmittalHeader({...transmittalHeader, [field]: e.target.value})}
-                            className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold text-gray-900 focus:bg-white focus:ring-4 focus:ring-primary/5 transition-all outline-none"
+                            className={`w-full px-4 py-2 border rounded-xl text-xs font-bold transition-all outline-none ${
+                              (enabledSignatories as any)[field] 
+                                ? 'bg-gray-50 border-gray-100 text-gray-900 focus:bg-white focus:ring-4 focus:ring-primary/5' 
+                                : 'bg-gray-100/50 border-transparent text-gray-400 cursor-not-allowed opacity-50'
+                            }`}
                         />
                     </div>
                   ))}
@@ -1319,32 +1516,60 @@ export default function UnitTrackingPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {requests.filter(r => selectedRequestIds.includes(r.id)).map((req, idx) => (
-                        <tr key={req.id}>
-                          <td className="px-6 py-4 text-xs font-bold text-gray-400">{idx + 1}</td>
-                          <td className="px-6 py-4 text-xs font-mono font-bold text-gray-900">{req.item.slug}</td>
-                          <td className="px-6 py-4 text-xs font-black text-gray-900">{req.qty}</td>
-                          <td className="px-6 py-4">
-                            <span className="text-[9px] font-black uppercase text-gray-400">{req.status}</span>
-                          </td>
-                        </tr>
-                      ))}
+                      {printMode === 'individual' ? (
+                        requests.filter(r => selectedRequestIds.includes(r.id)).map((req, idx) => (
+                          <tr key={req.id}>
+                            <td className="px-6 py-4 text-xs font-bold text-gray-400">{idx + 1}</td>
+                            <td className="px-6 py-4 text-xs font-mono font-bold text-gray-900">{req.item.slug}</td>
+                            <td className="px-6 py-4 text-xs font-black text-gray-900">{req.qty}</td>
+                            <td className="px-6 py-4">
+                              <span className="text-[9px] font-black uppercase text-gray-400">{req.status}</span>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        productSummary.filter(p => p.outToday > 0).map((p, idx) => (
+                          <tr key={p.name}>
+                            <td className="px-6 py-4 text-xs font-bold text-gray-400">{idx + 1}</td>
+                            <td className="px-6 py-4 text-xs font-bold text-gray-900 uppercase">{p.name}</td>
+                            <td className="px-6 py-4 text-xs font-black text-gray-900">{p.outToday}</td>
+                            <td className="px-6 py-4">
+                              <span className="text-[9px] font-black uppercase text-orange-600">Report Consolidation</span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
                 
                 <div className="pt-6 flex justify-end gap-3">
                     <button 
-                        onClick={() => setSelectedRequestIds([])}
+                        onClick={() => {
+                          setSelectedRequestIds([]);
+                          if (printMode === 'health_report') setIsBuildingTransmittal(false);
+                        }}
                         className="px-6 py-3 bg-white border border-gray-100 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-50 transition-all"
                     >
-                        Clear Selection
+                        {printMode === 'health_report' ? 'Cancel' : 'Clear Selection'}
                     </button>
                     <button 
-                        onClick={handlePrintTransmittal}
-                        className="px-8 py-3 bg-gray-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-gray-900/10 hover:bg-primary transition-all flex items-center gap-2"
+                        onClick={printMode === 'health_report' ? handleExportExcel : handlePrintTransmittal}
+                        className={`px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl transition-all flex items-center gap-2 ${
+                          printMode === 'health_report' 
+                            ? 'bg-green-600 text-white shadow-green-600/20 hover:bg-green-700' 
+                            : 'bg-gray-900 text-white shadow-gray-900/20 hover:bg-primary'
+                        }`}
                     >
-                        <Printer className="h-4 w-4" /> Print Transmittal
+                        {printMode === 'health_report' ? (
+                          <>
+                            <FileSpreadsheet className="h-4 w-4" /> Export to Excel
+                          </>
+                        ) : (
+                          <>
+                            <Printer className="h-4 w-4" /> Print Transmittal
+                          </>
+                        )}
                     </button>
                 </div>
               </div>
@@ -1372,7 +1597,16 @@ export default function UnitTrackingPage() {
             <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">Recipient - End-User:</div><div className="text-lg font-bold border-b-2 border-gray-100 pb-1">{transmittalHeader.recipient || '____________________'}</div></div>
           </div>
           <div className="space-y-4">
-            <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">Date:</div><div className="text-lg font-bold border-b-2 border-gray-100 pb-1">{new Date(transmittalHeader.date).toLocaleDateString(undefined, { dateStyle: 'long' })}</div></div>
+            <div>
+              <div className="text-[10px] font-black text-gray-400 uppercase mb-1">Date:</div>
+              <div className="text-lg font-bold border-b-2 border-gray-100 pb-1">
+                {printMode === 'health_report' 
+                  ? (stockHealthRange.start === stockHealthRange.end 
+                      ? new Date(stockHealthRange.start).toLocaleDateString(undefined, { dateStyle: 'long' })
+                      : `${new Date(stockHealthRange.start).toLocaleDateString()} - ${new Date(stockHealthRange.end).toLocaleDateString()}`)
+                  : new Date(transmittalHeader.date).toLocaleDateString(undefined, { dateStyle: 'long' })}
+              </div>
+            </div>
             <div><div className="text-[10px] font-black text-gray-400 uppercase mb-1">Prepared By:</div><div className="text-lg font-bold border-b-2 border-gray-100 pb-1">{transmittalHeader.preparedBy}</div></div>
           </div>
         </div>
@@ -1381,20 +1615,60 @@ export default function UnitTrackingPage() {
           <thead>
             <tr className="border-y-4 border-gray-900 bg-gray-50">
               <th className="py-3 px-4 text-left text-[10px] font-black uppercase tracking-widest w-12">No.</th>
-              <th className="py-3 px-4 text-left text-[10px] font-black uppercase tracking-widest">Asset ID / Description</th>
+              <th className="py-3 px-4 text-left text-[10px] font-black uppercase tracking-widest">{printMode === 'individual' ? 'Asset ID / Description' : 'Product / Reference'}</th>
               <th className="py-3 px-4 text-left text-[10px] font-black uppercase tracking-widest w-32">Quantity</th>
               <th className="py-3 px-4 text-left text-[10px] font-black uppercase tracking-widest">Remarks</th>
             </tr>
           </thead>
           <tbody className="divide-y-2 divide-gray-100">
-            {requests.filter(r => selectedRequestIds.includes(r.id)).map((req, idx) => (
-              <tr key={req.id}>
-                <td className="py-4 px-4 text-xs font-bold text-gray-400">{idx + 1}</td>
-                <td className="py-4 px-4 text-xs font-bold uppercase">{req.item.slug}</td>
-                <td className="py-4 px-4 text-xs font-black">{req.qty}</td>
-                <td className="py-4 px-4 text-xs italic text-gray-400">Authorized Release</td>
-              </tr>
-            ))}
+            {printMode === 'individual' ? (
+              requests.filter(r => selectedRequestIds.includes(r.id)).map((req, idx) => (
+                <tr key={req.id}>
+                  <td className="py-4 px-4 text-xs font-bold text-gray-400">{idx + 1}</td>
+                  <td className="py-4 px-4 text-xs font-bold uppercase">{req.item.slug}</td>
+                  <td className="py-4 px-4 text-xs font-black">{req.qty}</td>
+                  <td className="py-4 px-4 text-xs italic text-gray-400">Authorized Release</td>
+                </tr>
+              ))
+            ) : (
+              productSummary.filter(p => p.outToday > 0 || p.totalInStock > 0).map((p, idx) => (
+                <tr key={p.name} className="border-b border-gray-100">
+                  <td className="py-4 px-4 text-[11px] font-black text-gray-900 uppercase">{p.name}</td>
+                  <td className="py-4 px-4 align-top">
+                    <div className="space-y-2">
+                       <div className="text-[9px] text-gray-400 font-bold uppercase tracking-widest border-b border-gray-50 pb-1">Available Specs:</div>
+                       <div className="flex flex-wrap gap-1">
+                          {Array.from(p.specs).map((s: any, i) => (
+                            <span key={i} className={`text-[8px] px-1.5 py-0.5 rounded ${p.outSpecs.has(s) ? 'bg-orange-100 text-orange-600 font-black' : 'bg-gray-50 text-gray-400 font-bold'}`}>
+                               {s}
+                            </span>
+                          ))}
+                       </div>
+                       
+                       {p.outToday > 0 && (
+                          <div className="mt-3 pt-2 border-t border-dashed border-gray-100">
+                             <div className="text-[9px] text-orange-600 font-black uppercase tracking-widest mb-1">Detailed Movement Breakdown:</div>
+                             <div className="space-y-1">
+                                {Object.entries(p.movementBreakdown).map(([specs, qty]: [string, any], i) => (
+                                   <div key={i} className="flex justify-between items-center text-[10px] bg-orange-50/50 p-2 rounded-lg border border-orange-100/50">
+                                      <span className="font-bold text-gray-700">{specs}</span>
+                                      <span className="font-black text-orange-600">-{qty} units</span>
+                                   </div>
+                                ))}
+                             </div>
+                          </div>
+                       )}
+                    </div>
+                  </td>
+                  <td className="py-4 px-4 text-center font-bold text-gray-500">{p.totalInStock + p.outToday}</td>
+                  <td className="py-4 px-4 text-center">
+                    <div className="text-sm font-black text-orange-600">-{p.outToday}</div>
+                    <div className="text-[8px] font-bold text-gray-400 uppercase mt-0.5">Consolidated</div>
+                  </td>
+                  <td className="py-4 px-4 text-center font-black text-gray-900">{p.totalInStock}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
 
@@ -1407,9 +1681,9 @@ export default function UnitTrackingPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-12 pt-12 border-t-2 border-gray-50">
-          {['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy'].map(field => (
-            <div key={field} className="space-y-8">
+        <div className="flex flex-wrap justify-center gap-x-12 gap-y-16 pt-12 border-t-2 border-gray-50">
+          {['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy'].filter(f => (enabledSignatories as any)[f]).map(field => (
+            <div key={field} className="min-w-[200px] space-y-8 flex-1">
               <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">{field.endsWith('By') ? field.slice(0, -2) + ' By' : field}:</div>
               <div className="border-b-2 border-gray-900 text-center pb-2">
                 <span className="text-sm font-black uppercase">{(transmittalHeader as any)[field] || '____________________'}</span>
@@ -1579,6 +1853,104 @@ export default function UnitTrackingPage() {
 
 
 
+
+      {/* Stock Movement Detail Modal */}
+      {viewingStockDetail && (
+        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-2xl overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 bg-orange-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-orange-600/20">
+                  <Activity className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-gray-900 tracking-tight">{viewingStockDetail.name}</h2>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                    Movement Details for {stockHealthRange.start === stockHealthRange.end ? new Date(stockHealthRange.start).toLocaleDateString() : `${new Date(stockHealthRange.start).toLocaleDateString()} - ${new Date(stockHealthRange.end).toLocaleDateString()}`}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setViewingStockDetail(null)}
+                className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-gray-900 hover:bg-gray-50 transition-all"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto">
+              {(() => {
+                const start = new Date(stockHealthRange.start);
+                const end = new Date(stockHealthRange.end);
+                end.setHours(23, 59, 59, 999);
+
+                const relevantRequests = requests.filter(r => {
+                  const d = new Date(r.createdAt);
+                  return r.status === 'APPROVED' && 
+                  (r.item.product?.name === viewingStockDetail.name || r.item.name === viewingStockDetail.name) &&
+                  d >= start && d <= end;
+                });
+
+                if (relevantRequests.length === 0) {
+                  return (
+                    <div className="text-center py-12">
+                      <History className="h-12 w-12 text-gray-200 mx-auto mb-4" />
+                      <p className="text-sm font-bold text-gray-400 italic">No specific movements found for this item on this date.</p>
+                    </div>
+                  );
+                }
+
+                // Group by specs
+                const breakdown: Record<string, { specs: string[], total: number }> = {};
+                relevantRequests.forEach(r => {
+                  const specString = r.item.fieldValues?.map((fv: any) => {
+                    const v = fv.value;
+                    const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+                    return val ? `${fv.field?.name || 'Spec'}: ${val}` : '';
+                  }).filter(Boolean).join(', ') || 'No Specs';
+                  
+                  if (!breakdown[specString]) {
+                    breakdown[specString] = { specs: specString.split(', '), total: 0 };
+                  }
+                  breakdown[specString].total += r.qty;
+                });
+
+                return (
+                  <div className="space-y-4">
+                    {Object.entries(breakdown).map(([key, data], idx) => (
+                      <div key={idx} className="flex items-center justify-between p-5 bg-gray-50 rounded-3xl border border-gray-100 group hover:border-orange-200 transition-all">
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Variation Breakdown</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {data.specs.map((s, i) => (
+                              <span key={i} className="px-2 py-0.5 bg-white border border-gray-200 text-[9px] font-bold text-gray-600 rounded-md">
+                                {s}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest">Moved Qty</p>
+                          <p className="text-2xl font-black text-gray-900">-{data.total}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+            
+            <div className="p-8 border-t border-gray-100 bg-gray-50/30 flex justify-end">
+              <button 
+                onClick={() => setViewingStockDetail(null)}
+                className="px-8 py-3 bg-gray-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-gray-900/10 hover:bg-orange-600 transition-all"
+              >
+                Close Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
