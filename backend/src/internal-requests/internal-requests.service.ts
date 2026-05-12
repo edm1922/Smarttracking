@@ -21,9 +21,10 @@ export class InternalRequestsService {
   ) {}
 
   async create(data: any) {
-    // Generate a simple request number
-    const count = await this.prisma.internalRequest.count();
-    const requestNo = `REQ-${new Date().getFullYear()}-${(count + 1).toString().padStart(4, '0')}`;
+    // Generate a unique request number with timestamp and random component to avoid collisions
+    const timestamp = Date.now().toString().slice(-6);
+    const random = Math.random().toString(36).substring(2, 5).toUpperCase();
+    const requestNo = `REQ-${new Date().getFullYear()}-${timestamp}-${random}`;
 
     return this.prisma.internalRequest.create({
       data: {
@@ -41,10 +42,13 @@ export class InternalRequestsService {
 
   async bulkCreate(requestsData: any[]) {
     const currentYear = new Date().getFullYear();
-    const startCount = await this.prisma.internalRequest.count();
+    const batchId = Date.now().toString().slice(-4);
     
     const formattedData = requestsData.map((data, index) => {
-      const requestNo = `REQ-${currentYear}-${(startCount + index + 1).toString().padStart(4, '0')}`;
+      // Use a combination of timestamp, index, and random to guarantee uniqueness in bulk
+      const random = Math.random().toString(36).substring(2, 4).toUpperCase();
+      const requestNo = `REQ-${currentYear}-${batchId}${index.toString().padStart(2, '0')}-${random}`;
+      
       return {
         ...data,
         date: data.date ? new Date(data.date) : new Date(),
