@@ -28,6 +28,103 @@ import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
+const BatchRow = React.memo(({ run, processingBatchIds, onStop, onResume, onDelete, isStaff }: any) => (
+  <tr className="hover:bg-gray-50/50 transition-colors cursor-pointer group relative">
+    <td className="px-10 py-6">
+      <p className="text-sm font-black text-gray-900">{run.label || run.client_name || 'Standard Run'}</p>
+      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Imported {new Date(run.created_at).toLocaleDateString()}</p>
+    </td>
+    <td className="px-10 py-6">
+      <p className="text-[10px] font-bold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg inline-block whitespace-nowrap">
+        {new Date(run.period_start).toLocaleDateString()} → {new Date(run.period_end).toLocaleDateString()}
+      </p>
+    </td>
+    <td className="px-10 py-6 text-right">
+      <div className="flex items-center justify-end gap-3">
+        {processingBatchIds.includes(run.id) && (
+          <div className="flex items-center gap-2 group/stop">
+            <Loader2 className="h-3 w-3 animate-spin text-primary group-hover/stop:hidden" />
+            <span className="text-[10px] font-black text-primary uppercase animate-pulse group-hover/stop:hidden">Syncing...</span>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                onStop(run.id);
+              }}
+              className="hidden group-hover/stop:flex items-center gap-1 bg-red-50 text-red-600 px-2 py-1 rounded-md border border-red-100 hover:bg-red-600 hover:text-white transition-all scale-90"
+              title="Stop Processing"
+            >
+              <X className="h-3 w-3" />
+              <span className="text-[10px] font-black uppercase">Stop</span>
+            </button>
+          </div>
+        )}
+        <span className={`text-sm font-black ${processingBatchIds.includes(run.id) ? 'text-primary' : 'text-gray-900'}`}>
+          {run._count?.documents || 0}
+        </span>
+      </div>
+    </td>
+    <td className="px-10 py-6 text-right">
+      <div className="flex items-center justify-end gap-2">
+        <button 
+          onClick={(e) => { e.stopPropagation(); onResume(run); }}
+          className="p-2 hover:bg-blue-50 text-primary rounded-lg transition-all"
+          title="Resume Upload"
+        >
+          <Upload className="h-4 w-4" />
+        </button>
+        {!isStaff && (
+          <button 
+            onClick={(e) => { e.stopPropagation(); onDelete(run.id); }}
+            className="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-all"
+            title="Revoke Batch"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+    </td>
+  </tr>
+));
+
+const EmployeeCard = React.memo(({ user, isStaff, onDelete }: any) => (
+  <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col items-center text-center print:break-inside-avoid print:shadow-none print:border-gray-300 relative overflow-hidden group">
+    {!isStaff && (
+      <button 
+        onClick={() => onDelete(user.id)}
+        className="absolute top-4 left-4 p-2 bg-red-50 text-red-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white z-10 print:hidden"
+        title="Delete Employee Access"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    )}
+    <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50/50 rounded-full -mr-12 -mt-12 blur-xl pointer-events-none"></div>
+
+    <div className="bg-white p-2 rounded-2xl border border-gray-100 shadow-sm mb-4">
+      <QRCodeSVG value="https://smarttracking-frontend.vercel.app/portal" size={80} level="H" className="text-gray-900" />
+    </div>
+
+    <h3 className="font-black text-gray-900 text-sm mb-0.5 leading-tight">{user.fullName}</h3>
+    <p className="text-[9px] font-black text-primary uppercase tracking-widest mb-4 bg-blue-50 px-2 py-0.5 rounded-full">{user.company_label || 'Company'} / {user.sys_id}</p>
+
+    <div className="w-full bg-gray-50 rounded-2xl p-4 text-left border border-gray-100/50 space-y-3">
+      <div className="flex justify-between items-center">
+        <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Username</span>
+        <code className="text-xs font-bold text-gray-900 bg-white px-2 py-1 rounded-md border border-gray-200">{user.username}</code>
+      </div>
+      <div className="flex justify-between items-center">
+        <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Password</span>
+        <code className="text-xs font-mono font-bold text-gray-600 bg-white px-2 py-1 rounded-md border border-gray-200">{user.sys_id?.replace(/-/g, '')}</code>
+      </div>
+    </div>
+
+    <p className="text-[8px] font-bold text-gray-400 mt-4 tracking-widest uppercase">https://smarttracking-frontend.vercel.app/portal</p>
+  </div>
+));
+
+BatchRow.displayName = 'BatchRow';
+EmployeeCard.displayName = 'EmployeeCard';
+
+
 export default function IntegratedPayrollAdmin() {
   const [activeTab, setActiveTab] = useState<'storage' | 'credentials' | 'sync'>('storage');
   const [uploading, setUploading] = useState(false);
@@ -38,7 +135,6 @@ export default function IntegratedPayrollAdmin() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCredentialLabel, setSelectedCredentialLabel] = useState('all');
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [latestRun, setLatestRun] = useState<any>(null);
   const [processingBatchIds, setProcessingBatchIds] = useState<string[]>([]);
 
   // Runs state
@@ -298,17 +394,7 @@ export default function IntegratedPayrollAdmin() {
     }
   };
 
-  const fetchLatestRun = async () => {
-    try {
-      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
-      const res = await fetch(`${apiUrl}/payroll/latest-run`);
-      const text = await res.text();
-      const data = text ? JSON.parse(text) : null;
-      if (res.ok && data) setLatestRun(data);
-    } catch (err) {
-      console.error('Failed to fetch latest run:', err);
-    }
-  };
+
 
   const fetchUsers = async () => {
     setLoadingUsers(true);
@@ -502,7 +588,6 @@ export default function IntegratedPayrollAdmin() {
     setUserRole(role);
     setUserId(id);
 
-    fetchLatestRun();
     fetchRuns();
     fetchCompanies();
     if (activeTab === 'credentials') fetchUsers();
@@ -1150,64 +1235,15 @@ export default function IntegratedPayrollAdmin() {
                           <tr><td colSpan={4} className="px-8 py-10 text-center text-gray-400 text-xs">No storage batches found.</td></tr>
                         ) : (
                           filteredHistoryRuns.map((run) => (
-                            <tr 
-                              key={run.id} 
-                              className="hover:bg-gray-50/50 transition-colors cursor-pointer group relative" 
-                            >
-                              <td className="px-10 py-6">
-                                <p className="text-sm font-black text-gray-900">{run.label || run.client_name || 'Standard Run'}</p>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Imported {new Date(run.created_at).toLocaleDateString()}</p>
-                              </td>
-                              <td className="px-10 py-6">
-                                <p className="text-[10px] font-bold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg inline-block whitespace-nowrap">
-                                  {new Date(run.period_start).toLocaleDateString()} → {new Date(run.period_end).toLocaleDateString()}
-                                </p>
-                              </td>
-                              <td className="px-10 py-6 text-right">
-                                <div className="flex items-center justify-end gap-3">
-                                  {processingBatchIds.includes(run.id) && (
-                                    <div className="flex items-center gap-2 group/stop">
-                                      <Loader2 className="h-3 w-3 animate-spin text-primary group-hover/stop:hidden" />
-                                      <span className="text-[10px] font-black text-primary uppercase animate-pulse group-hover/stop:hidden">Syncing...</span>
-                                      <button 
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleStopProcessing(run.id);
-                                        }}
-                                        className="hidden group-hover/stop:flex items-center gap-1 bg-red-50 text-red-600 px-2 py-1 rounded-md border border-red-100 hover:bg-red-600 hover:text-white transition-all scale-90"
-                                        title="Stop Processing"
-                                      >
-                                        <X className="h-3 w-3" />
-                                        <span className="text-[10px] font-black uppercase">Stop</span>
-                                      </button>
-                                    </div>
-                                  )}
-                                  <span className={`text-sm font-black ${processingBatchIds.includes(run.id) ? 'text-primary' : 'text-gray-900'}`}>
-                                    {run._count?.documents || 0}
-                                  </span>
-                                </div>
-                              </td>
-                               <td className="px-10 py-6 text-right">
-                                <div className="flex items-center justify-end gap-2">
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); handleResumeFromTable(run); }}
-                                    className="p-2 hover:bg-blue-50 text-primary rounded-lg transition-all"
-                                    title="Resume Upload"
-                                  >
-                                    <Upload className="h-4 w-4" />
-                                  </button>
-                                  {!isStaff && (
-                                    <button 
-                                      onClick={(e) => { e.stopPropagation(); handleDeleteBatch(run.id); }}
-                                      className="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-all"
-                                      title="Revoke Batch"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
+                            <BatchRow 
+                              key={run.id}
+                              run={run}
+                              processingBatchIds={processingBatchIds}
+                              onStop={handleStopProcessing}
+                              onResume={handleResumeFromTable}
+                              onDelete={handleDeleteBatch}
+                              isStaff={isStaff}
+                            />
                           ))
                         )}
                       </tbody>
@@ -1364,38 +1400,12 @@ export default function IntegratedPayrollAdmin() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-8 print:grid-cols-2 print:gap-4 print:p-0 print:mt-4">
                     {filteredUsers.map((user) => (
-                      <div key={user.id} className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col items-center text-center print:break-inside-avoid print:shadow-none print:border-gray-300 relative overflow-hidden group">
-                        {!isStaff && (
-                          <button 
-                            onClick={() => handleDeleteEmployee(user.id)}
-                            className="absolute top-4 left-4 p-2 bg-red-50 text-red-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white z-10 print:hidden"
-                            title="Delete Employee Access"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50/50 rounded-full -mr-12 -mt-12 blur-xl pointer-events-none"></div>
-
-                        <div className="bg-white p-2 rounded-2xl border border-gray-100 shadow-sm mb-4">
-                          <QRCodeSVG value="https://smarttracking-frontend.vercel.app/portal" size={80} level="H" className="text-gray-900" />
-                        </div>
-
-                        <h3 className="font-black text-gray-900 text-sm mb-0.5 leading-tight">{user.fullName}</h3>
-                        <p className="text-[9px] font-black text-primary uppercase tracking-widest mb-4 bg-blue-50 px-2 py-0.5 rounded-full">{user.company_label || 'Company'} / {user.sys_id}</p>
-
-                        <div className="w-full bg-gray-50 rounded-2xl p-4 text-left border border-gray-100/50 space-y-3">
-                          <div className="flex justify-between items-center">
-                            <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Username</span>
-                            <code className="text-xs font-bold text-gray-900 bg-white px-2 py-1 rounded-md border border-gray-200">{user.username}</code>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Password</span>
-                            <code className="text-xs font-mono font-bold text-gray-600 bg-white px-2 py-1 rounded-md border border-gray-200">{user.sys_id?.replace(/-/g, '')}</code>
-                          </div>
-                        </div>
-
-                        <p className="text-[8px] font-bold text-gray-400 mt-4 tracking-widest uppercase">https://smarttracking-frontend.vercel.app/portal</p>
-                      </div>
+                      <EmployeeCard 
+                        key={user.id}
+                        user={user}
+                        isStaff={isStaff}
+                        onDelete={handleDeleteEmployee}
+                      />
                     ))}
                   </div>
                 )}
