@@ -21,7 +21,7 @@ export default async function CredentialStripsPage() {
     sys_id: u.sys_id,
     name: u.fullName || 'Unknown Employee',
     username: u.username,
-    password: u.password
+    password: u.sys_id
   }));
 
   return (
