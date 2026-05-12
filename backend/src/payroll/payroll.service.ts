@@ -404,8 +404,11 @@ export class PayrollService {
     for (const line of lines) {
       const match = line.match(/^(CSC-?[\d-]+)\s+(.+)$/i);
       if (match) {
-        const raw_sys_id = match[1].toUpperCase();
-        const sys_id = raw_sys_id.replace(/-/g, '');
+        let sys_id = match[1].toUpperCase();
+        // Ensure it has dashes for the database if it was pasted without them
+        if (!sys_id.includes('-') && sys_id.startsWith('CSC')) {
+           sys_id = `CSC-${sys_id.substring(3, 7)}-${sys_id.substring(7)}`;
+        }
         const fullName = match[2].trim();
         
         const nameParts = fullName.split(',').map(p => p.trim());
@@ -414,15 +417,14 @@ export class PayrollService {
         const cleanLast = lastName.toLowerCase().replace(/[^a-z0-9]/g, '');
         const cleanFirstTwo = firstName.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 2);
         
-        // Preserve suffix from dashed format if possible for username consistency
-        const idSuffix = raw_sys_id.split('-').pop() || '';
+        const idSuffix = sys_id.split('-').pop() || '';
         const username = `${cleanLast}${cleanFirstTwo}${idSuffix}`;
         
         validEntries.push({
           sys_id,
           fullName,
           username,
-          password: sys_id
+          password: sys_id.replace(/-/g, '') // Password remains dash-less
         });
       }
     }
@@ -566,7 +568,11 @@ export class PayrollService {
         if (item.text) {
           const match = item.text.match(/CSC-?[\d-]+/i);
           if (match) {
-            ids.push(match[0].toUpperCase().replace(/-/g, ''));
+            let id = match[0].toUpperCase();
+            if (!id.includes('-') && id.startsWith('CSC')) {
+              id = `CSC-${id.substring(3, 7)}-${id.substring(7)}`;
+            }
+            ids.push(id);
           }
         }
       });
