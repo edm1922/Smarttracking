@@ -63,7 +63,6 @@ export class PayrollService {
       this.activeBatches.add(batch.id);
       this.logger.log(`Resuming batch ${batch.id}. Will skip already processed documents.`);
     } else {
-      // Create the batch record
       batch = await this.prisma.storageBatch.create({
         data: {
           client_name: clientName,
@@ -79,10 +78,9 @@ export class PayrollService {
 
     const sourcePdfDoc = await PDFDocument.load(pdfBuffer);
     const totalPages = sourcePdfDoc.getPageCount();
-    const results = [];
+    const results: any[] = [];
 
     try {
-      // Pre-fetch existing documents in this batch if resuming
       const existingSysIds = new Set<string>();
       if (resumeBatchId) {
         const existingDocs = await this.prisma.document.findMany({
@@ -93,106 +91,93 @@ export class PayrollService {
         this.logger.log(`Resume: Pre-fetched ${existingSysIds.size} existing employee IDs for batch ${batch.id}`);
       }
   
-      // Cache for user lookups to avoid redundant DB calls
       const userCache = new Map<string, any>();
-  
-      // Process each page individually
-      for (let i = 0; i < totalPages; i++) {
+      const PAGE_CONCURRENCY = 5;
+      
+      // Process pages in batches to avoid overwhelming resources
+      for (let i = 0; i < totalPages; i += PAGE_CONCURRENCY) {
         if (this.cancelledBatches.has(batch.id)) {
           this.logger.warn(`Batch ${batch.id} was cancelled by user. Stopping processing.`);
           this.cancelledBatches.delete(batch.id);
           break;
         }
 
-        const pageNumber = i + 1;
-        try {
-          // Extract this single page to a new PDF
-          const singlePagePdf = await PDFDocument.create();
-          const [copiedPage] = await singlePagePdf.copyPages(sourcePdfDoc, [i]);
-          singlePagePdf.addPage(copiedPage);
-          const pageBytes = await singlePagePdf.save();
-  
-          // Scan this specific page for IDs
-          const idsOnPage = await this.scanSinglePageForIds(Buffer.from(pageBytes));
-          
-          if (idsOnPage.length === 0) {
-            this.logger.warn(`No ID found on page ${pageNumber}, skipping.`);
-            continue;
-          }
-  
-          // For each ID found on this page, upload/map it
-          for (let employeeId of idsOnPage) {
-            employeeId = this.normalizeSysId(employeeId);
-  
-            // FIXED LOGIC: Skip if this ID already exists in this batch (Always skip duplicates)
-            if (existingSysIds.has(employeeId)) {
-              this.logger.log(`[Skip] ID ${employeeId} on Page ${pageNumber} (Already processed in this run)`);
-              results.push({ page: pageNumber, id: employeeId, status: 'skipped' });
-              continue;
+        const pageChunk = Array.from({ length: Math.min(PAGE_CONCURRENCY, totalPages - i) }, (_, index) => i + index);
+        
+        await Promise.all(pageChunk.map(async (pIdx) => {
+          const pageNumber = pIdx + 1;
+          try {
+            const singlePagePdf = await PDFDocument.create();
+            const [copiedPage] = await singlePagePdf.copyPages(sourcePdfDoc, [pIdx]);
+            singlePagePdf.addPage(copiedPage);
+            const pageBytes = await singlePagePdf.save();
+    
+            const idsOnPage = await this.scanSinglePageForIds(Buffer.from(pageBytes));
+            
+            if (idsOnPage.length === 0) {
+              results.push({ page: pageNumber, status: 'skipped', reason: 'No ID found' });
+              return;
             }
-            
-            this.logger.log(`[Process] Adding ID ${employeeId} Page ${pageNumber}`);
-  
-            const fileName = `${employeeId}_p${pageNumber}_${Date.now()}.pdf`;
-            const filePath = `documents/${batch.id}/${fileName}`;
-  
-            // Upload to Supabase
-            const { error: uploadError } = await this.supabaseAdmin
-              .storage
-              .from('payroll-documents')
-              .upload(filePath, pageBytes, {
-                contentType: 'application/pdf',
-                upsert: true
-              });
-  
-            if (uploadError) throw uploadError;
-  
-            const { data: { publicUrl } } = this.supabaseAdmin
-              .storage
-              .from('payroll-documents')
-              .getPublicUrl(filePath);
-  
-            // Get employee from cache or DB
-            const cacheKey = `${employeeId}_${label || ''}`;
-            let employee = userCache.get(cacheKey);
-            
-            if (!employee && !userCache.has(cacheKey)) {
-              employee = await this.prisma.user.findFirst({
-                where: { 
+    
+            for (let employeeId of idsOnPage) {
+              employeeId = this.normalizeSysId(employeeId);
+    
+              if (existingSysIds.has(employeeId)) {
+                results.push({ page: pageNumber, id: employeeId, status: 'skipped', reason: 'Duplicate' });
+                continue;
+              }
+              
+              const fileName = `${employeeId}_p${pageNumber}_${Date.now()}.pdf`;
+              const filePath = `documents/${batch.id}/${fileName}`;
+    
+              const { error: uploadError } = await this.supabaseAdmin
+                .storage
+                .from('payroll-documents')
+                .upload(filePath, pageBytes, {
+                  contentType: 'application/pdf',
+                  upsert: true
+                });
+    
+              if (uploadError) throw uploadError;
+    
+              const { data: { publicUrl } } = this.supabaseAdmin
+                .storage
+                .from('payroll-documents')
+                .getPublicUrl(filePath);
+    
+              const cacheKey = `${employeeId}_${label || ''}`;
+              let employee = userCache.get(cacheKey);
+              
+              if (!employee && !userCache.has(cacheKey)) {
+                employee = await this.prisma.user.findFirst({
+                  where: { 
+                    sys_id: employeeId,
+                    ...(label ? { company_label: label } : {})
+                  }
+                });
+                userCache.set(cacheKey, employee || null);
+              }
+    
+              await this.prisma.document.create({
+                data: {
+                  batch_id: batch.id,
+                  user_id: employee?.id || null,
                   sys_id: employeeId,
-                  ...(label ? { company_label: label } : {})
-                }
+                  storage_path: publicUrl,
+                  file_name: fileName,
+                  file_type: 'PAYSLIP_PAGE',
+                  remark: remark || null,
+                },
               });
-              userCache.set(cacheKey, employee || null); // Cache null if not found to avoid re-searching
+              
+              existingSysIds.add(employeeId);
+              results.push({ page: pageNumber, id: employeeId, status: 'success' });
             }
-  
-            await this.prisma.document.create({
-              data: {
-                batch_id: batch.id,
-                user_id: employee?.id || null,
-                sys_id: employeeId,
-                storage_path: publicUrl,
-                file_name: fileName,
-                file_type: 'PAYSLIP_PAGE',
-                remark: remark || null,
-              },
-            });
-            
-            // Add to existingSysIds in case there are duplicates within the same PDF
-            existingSysIds.add(employeeId);
-            
-            results.push({ page: pageNumber, id: employeeId, status: 'success' });
+          } catch (err) {
+            this.logger.error(`Error processing page ${pageNumber}: ${err.message}`);
+            results.push({ page: pageNumber, status: 'error', error: err.message });
           }
-        } catch (err) {
-          this.logger.error(`Error processing page ${pageNumber}: ${err.message}`);
-          results.push({ page: pageNumber, status: 'error', error: err.message });
-          
-          // If the batch was deleted mid-processing, stop to prevent orphaned files
-          if (err.message && err.message.includes('Foreign key constraint') && err.message.includes('batch_id')) {
-            this.logger.warn(`Batch ${batch.id} was deleted mid-processing. Aborting remaining pages.`);
-            break;
-          }
-        }
+        }));
       }
   
       const added = results.filter(r => r.status === 'success').length;
@@ -466,78 +451,99 @@ export class PayrollService {
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     const validEntries = [];
 
-      for (const line of lines) {
-        const match = line.match(/^(CSC-?[\d-]+)\s+(.+)$/i);
-        if (match) {
-          const sys_id = this.normalizeSysId(match[1]);
-          const fullName = match[2].trim();
-          
-          const nameParts = fullName.split(',').map(p => p.trim());
-          const lastName = nameParts[0] || '';
-          const firstName = nameParts[1] || '';
-          const cleanLast = lastName.toLowerCase().replace(/[^a-z0-9]/g, '');
-          const cleanFirstTwo = firstName.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 2);
-          
-          const idSuffix = sys_id.split('-').pop() || '';
-          const username = `${cleanLast}${cleanFirstTwo}${idSuffix}`;
-          
-          validEntries.push({
-            sys_id,
-            fullName,
-            username,
-            password: sys_id.replace(/-/g, '') // Password remains dash-less
-          });
-        }
+    for (const line of lines) {
+      const match = line.match(/^(CSC-?[\d-]+)\s+(.+)$/i);
+      if (match) {
+        const sys_id = this.normalizeSysId(match[1]);
+        const fullName = match[2].trim();
+        
+        const nameParts = fullName.split(',').map(p => p.trim());
+        const lastName = nameParts[0] || '';
+        const firstName = nameParts[1] || '';
+        const cleanLast = lastName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const cleanFirstTwo = firstName.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 2);
+        
+        const idSuffix = sys_id.split('-').pop() || '';
+        const username = `${cleanLast}${cleanFirstTwo}${idSuffix}`;
+        
+        validEntries.push({
+          sys_id,
+          fullName,
+          username,
+          password: sys_id.replace(/-/g, '') 
+        });
       }
+    }
+
+    if (validEntries.length === 0) {
+      return { success: true, count: 0, newCount: 0, message: 'No valid entries found.' };
+    }
+
+    // Optimization: Batch lookup existing users
+    const allSysIds = validEntries.map(e => e.sys_id);
+    const allUsernames = validEntries.map(e => e.username);
+    
+    const existingUsers = await this.prisma.user.findMany({
+      where: {
+        OR: [
+          { sys_id: { in: allSysIds } },
+          { username: { in: allUsernames } }
+        ]
+      }
+    });
+
+    const userMap = new Map<string, any>();
+    existingUsers.forEach(u => {
+      if (u.sys_id) userMap.set(u.sys_id, u);
+      if (u.username) userMap.set(u.username, u);
+    });
 
     let successCount = 0;
     let newCount = 0;
     let updateCount = 0;
 
-    for (const entry of validEntries) {
-      try {
-        const hashedPassword = await bcrypt.hash(entry.password, 10);
-        const normalizedSysId = this.normalizeSysId(entry.sys_id);
-        // Search by both formats to handle migration
-        const existing = await this.prisma.user.findFirst({
-          where: { 
-            OR: [
-              { sys_id: normalizedSysId },
-              { sys_id: entry.sys_id },
-              { username: entry.username } // Username is a good fallback
-            ]
-          }
-        });
+    // Concurrency-limited parallel hashing
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < validEntries.length; i += BATCH_SIZE) {
+      const chunk = validEntries.slice(i, i + BATCH_SIZE);
+      
+      await Promise.all(chunk.map(async (entry) => {
+        try {
+          const hashedPassword = await bcrypt.hash(entry.password, 10);
+          const normalizedSysId = entry.sys_id;
+          
+          const existing = userMap.get(normalizedSysId) || userMap.get(entry.username);
 
-        if (existing) {
-          await this.prisma.user.update({
-            where: { id: existing.id },
-            data: { 
-              sys_id: normalizedSysId, // Update to standardized format
-              fullName: entry.fullName, 
-              username: entry.username, 
-              password: hashedPassword,
-              company_label: label,
-            }
-          });
-          updateCount++;
-        } else {
-          await this.prisma.user.create({
-            data: {
-              sys_id: normalizedSysId,
-              fullName: entry.fullName,
-              username: entry.username,
-              password: hashedPassword,
-              role: 'EMPLOYEE',
-              company_label: label,
-            }
-          });
-          newCount++;
+          if (existing) {
+            await this.prisma.user.update({
+              where: { id: existing.id },
+              data: { 
+                sys_id: normalizedSysId,
+                fullName: entry.fullName, 
+                username: entry.username, 
+                password: hashedPassword,
+                company_label: label,
+              }
+            });
+            updateCount++;
+          } else {
+            await this.prisma.user.create({
+              data: {
+                sys_id: normalizedSysId,
+                fullName: entry.fullName,
+                username: entry.username,
+                password: hashedPassword,
+                role: 'EMPLOYEE',
+                company_label: label,
+              }
+            });
+            newCount++;
+          }
+          successCount++;
+        } catch (err) {
+          this.logger.error(`Failed to sync user ${entry.sys_id}: ${err.message}`);
         }
-        successCount++;
-      } catch (err) {
-        console.error('Failed to sync user', entry.sys_id, err);
-      }
+      }));
     }
 
     return {
