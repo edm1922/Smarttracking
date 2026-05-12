@@ -39,6 +39,7 @@ export default function IntegratedPayrollAdmin() {
   const [selectedCredentialLabel, setSelectedCredentialLabel] = useState('all');
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [latestRun, setLatestRun] = useState<any>(null);
+  const [processingBatchIds, setProcessingBatchIds] = useState<string[]>([]);
 
   // Runs state
   const [runs, setRuns] = useState<any[]>([]);
@@ -89,6 +90,35 @@ export default function IntegratedPayrollAdmin() {
     }
   };
 
+  const fetchProcessingStatus = async () => {
+    try {
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${apiUrl}/payroll/processing-status`);
+      if (res.ok) {
+        const ids = await res.json();
+        setProcessingBatchIds(ids);
+        
+        // If any processing batches are found, refresh runs to see partial progress
+        if (ids.length > 0) {
+          fetchRuns();
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch processing status:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchRuns();
+    fetchUsers();
+    fetchCompanies();
+    
+    // Initial fetch and setup polling
+    fetchProcessingStatus();
+    const interval = setInterval(fetchProcessingStatus, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleUpload = async () => {
     if (selectedFiles.length === 0 || !clientLabel || !periodStart || !periodEnd) return;
     if (!window.confirm("Are you sure you want to start this upload?")) return;
@@ -127,30 +157,21 @@ export default function IntegratedPayrollAdmin() {
           period_start: periodStart,
           period_end: periodEnd,
           release_date: releaseDate,
-          remark: remark,
-          resumeBatchId: resumableBatchId
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        if (res.status === 409) {
-          throw new Error('This batch is ALREADY being processed in the background. Please wait a few minutes and refresh the page to see the progress.');
-        }
-        throw new Error(data.error || data.message || 'Processing failed');
-      }
-
-      const message = data.skipped > 0 
-        ? `Successfully added ${data.added} new documents (${data.skipped} skipped).`
-        : `Successfully processed ${data.added || data.details?.length || 0} documents!`;
-        
-      setStatus({ type: 'success', message });
       setIsImportModalOpen(false);
       setSelectedFiles([]);
-      setRemark(''); // Clear remark after success
-      setReleaseDate(''); // Clear release date
-      setResumableBatchId(null); // Clear resumable state
+      setRemark('');
+      setReleaseDate('');
+      setResumableBatchId(null);
       fetchRuns();
+      fetchProcessingStatus();
+
+      setStatus({ 
+        type: 'success', 
+        message: 'Upload successful! Your file is now being processed in the background. You can track progress in the history list.' 
+      });
     } catch (err: any) {
       console.error('Upload error:', err);
 
@@ -1167,7 +1188,17 @@ export default function IntegratedPayrollAdmin() {
                                 </p>
                               </td>
                               <td className="px-10 py-6 text-right">
-                                <span className="text-sm font-black text-primary">{run._count?.documents || 0}</span>
+                                <div className="flex items-center justify-end gap-3">
+                                  {processingBatchIds.includes(run.id) && (
+                                    <div className="flex items-center gap-2">
+                                      <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                                      <span className="text-[10px] font-black text-primary uppercase animate-pulse">Syncing...</span>
+                                    </div>
+                                  )}
+                                  <span className={`text-sm font-black ${processingBatchIds.includes(run.id) ? 'text-primary' : 'text-gray-900'}`}>
+                                    {run._count?.documents || 0}
+                                  </span>
+                                </div>
                               </td>
                             </tr>
                           ))
