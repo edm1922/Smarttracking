@@ -62,6 +62,7 @@ export default function StaffRequisitionPage() {
   const [employees, setEmployees] = useState<{ name: string; position: string }[]>([]);
   const [existingEmployees, setExistingEmployees] = useState<{ name: string; position: string }[]>([]);
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   
   // Cart state
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
@@ -107,15 +108,28 @@ export default function StaffRequisitionPage() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    setHighlightedIndex(-1);
+  }, [employeeInput]);
+
   const addEmployee = () => {
     const trimmedName = employeeInput.trim();
+    if (!trimmedName) return;
     const trimmedPos = positionInput.trim() || 'Staff';
     if (trimmedName && !employees.some(e => e.name === trimmedName)) {
       setEmployees([...employees, { name: trimmedName, position: trimmedPos }]);
       setEmployeeInput('');
       setPositionInput('');
       setShowEmployeeDropdown(false);
+      setHighlightedIndex(-1);
     }
+  };
+
+  const pickEmployee = (emp: { name: string; position: string }) => {
+    setEmployeeInput(emp.name);
+    setPositionInput(emp.position);
+    setShowEmployeeDropdown(false);
+    setHighlightedIndex(-1);
   };
 
   const handleEmployeeInputChange = (value: string) => {
@@ -130,6 +144,7 @@ export default function StaffRequisitionPage() {
     setEmployeeInput('');
     setPositionInput('');
     setShowEmployeeDropdown(false);
+    setHighlightedIndex(-1);
   };
 
   const filteredExistingEmployees = existingEmployees.filter(
@@ -363,17 +378,46 @@ export default function StaffRequisitionPage() {
                         value={employeeInput} 
                         onChange={e => handleEmployeeInputChange(e.target.value)}
                         onFocus={() => employeeInput.length > 0 && setShowEmployeeDropdown(true)}
-                        onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addEmployee())}
+                        onBlur={() => setTimeout(() => setShowEmployeeDropdown(false), 200)}
+                        onKeyDown={e => {
+                          if (showEmployeeDropdown && filteredExistingEmployees.length > 0) {
+                            if (e.key === 'ArrowDown') {
+                              e.preventDefault();
+                              setHighlightedIndex(prev => (prev + 1) % filteredExistingEmployees.length);
+                            } else if (e.key === 'ArrowUp') {
+                              e.preventDefault();
+                              setHighlightedIndex(prev => (prev - 1 + filteredExistingEmployees.length) % filteredExistingEmployees.length);
+                            } else if (e.key === 'Enter') {
+                              if (highlightedIndex >= 0) {
+                                e.preventDefault();
+                                pickEmployee(filteredExistingEmployees[highlightedIndex]);
+                              } else {
+                                e.preventDefault();
+                                addEmployee();
+                              }
+                            } else if (e.key === 'Tab' && highlightedIndex === -1 && employeeInput.trim()) {
+                              // If user hits tab and something is in the field but nothing is highlighted, 
+                              // highlight the first suggestion
+                              e.preventDefault();
+                              setHighlightedIndex(0);
+                            }
+                          } else if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addEmployee();
+                          }
+                        }}
                         className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all" 
                       />
                       {showEmployeeDropdown && filteredExistingEmployees.length > 0 && (
                         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-40 overflow-y-auto">
-                          {filteredExistingEmployees.map((emp) => (
+                          {filteredExistingEmployees.map((emp, idx) => (
                             <button
                               key={emp.name}
                               type="button"
+                              tabIndex={-1}
                               onClick={() => selectExistingEmployee(emp)}
-                              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors text-gray-900 flex justify-between"
+                              onMouseEnter={() => setHighlightedIndex(idx)}
+                              className={`w-full text-left px-4 py-2 text-sm transition-colors text-gray-900 flex justify-between outline-none ${highlightedIndex === idx ? 'bg-primary/10 text-primary' : 'hover:bg-gray-50'}`}
                             >
                               <span className="font-bold">{emp.name}</span>
                               <span className="text-[10px] text-gray-400 uppercase font-black">{emp.position}</span>
