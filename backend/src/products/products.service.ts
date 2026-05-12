@@ -48,7 +48,7 @@ export class ProductsService {
       },
     };
 
-    const safeTake = Math.min(take ?? 20, 100);
+    const safeTake = Math.min(take ?? 20, 2000);
     const start = Date.now();
 
     if (stockFilter && stockFilter !== 'all') {
