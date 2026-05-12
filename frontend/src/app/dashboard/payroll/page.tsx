@@ -133,7 +133,12 @@ export default function IntegratedPayrollAdmin() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Processing failed');
+      if (!res.ok) {
+        if (res.status === 409) {
+          throw new Error('This batch is ALREADY being processed in the background. Please wait a few minutes and refresh the page to see the progress.');
+        }
+        throw new Error(data.error || data.message || 'Processing failed');
+      }
 
       const message = data.skipped > 0 
         ? `Successfully added ${data.added} new documents (${data.skipped} skipped).`
@@ -149,9 +154,11 @@ export default function IntegratedPayrollAdmin() {
     } catch (err: any) {
       console.error('Upload error:', err);
 
+      // Check if this was a background processing conflict (409)
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      
       // Check if we can resume by looking at the latest run
       try {
-        const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
         const latestRes = await fetch(`${apiUrl}/payroll/latest-run`);
         const latest = await latestRes.json();
 
@@ -167,7 +174,7 @@ export default function IntegratedPayrollAdmin() {
           setResumableBatchId(latest.id);
           setStatus({
             type: 'error',
-            message: "System limit reached. Kindly upload again to continue where you left off."
+            message: "System limit reached. IMPORTANT: The process might still be running in the background. Please REFRESH the page and check if the 'Files' count is still increasing. If it stops, you can then resume by uploading again."
           });
           setUploading(false);
           return;
