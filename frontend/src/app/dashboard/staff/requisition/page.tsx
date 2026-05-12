@@ -135,6 +135,22 @@ export default function StaffRequisitionPage() {
   const handleEmployeeInputChange = (value: string) => {
     setEmployeeInput(value);
     setShowEmployeeDropdown(value.length > 0);
+    
+    // Autofill position if exact match found in existing employees
+    const match = existingEmployees.find(e => e.name.toLowerCase() === value.toLowerCase());
+    if (match) {
+      setPositionInput(match.position);
+    }
+  };
+
+  const handleEditEmployee = (emp: { name: string; position: string }) => {
+    removeEmployee(emp.name);
+    setEmployeeInput(emp.name);
+    setPositionInput(emp.position);
+    // Small delay to ensure state updates before focus
+    setTimeout(() => {
+      document.getElementById('employee-name-input')?.focus();
+    }, 10);
   };
 
   const selectExistingEmployee = (emp: { name: string; position: string }) => {
@@ -373,6 +389,7 @@ export default function StaffRequisitionPage() {
                     <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Employee Names (Multiple)</label>
                     <div className="relative">
                       <input 
+                        id="employee-name-input"
                         type="text" 
                         placeholder="Type employee name..." 
                         value={employeeInput} 
@@ -443,12 +460,17 @@ export default function StaffRequisitionPage() {
                     {employees.length > 0 && (
                       <div className="flex flex-wrap gap-2 pt-2">
                         {employees.map(emp => (
-                          <div key={emp.name} className="flex items-center gap-1.5 bg-primary/10 text-primary px-3 py-1.5 rounded-lg text-xs font-bold border border-primary/20 animate-in zoom-in-95">
+                          <div 
+                            key={emp.name} 
+                            onDoubleClick={() => handleEditEmployee(emp)}
+                            title="Double-click to edit"
+                            className="flex items-center gap-1.5 bg-primary/10 text-primary px-3 py-1.5 rounded-lg text-xs font-bold border border-primary/20 animate-in zoom-in-95 cursor-pointer select-none hover:bg-primary/20 transition-all"
+                          >
                             <div className="flex flex-col items-start leading-tight">
                               <span>{emp.name}</span>
                               <span className="text-[9px] opacity-60 uppercase">{emp.position}</span>
                             </div>
-                            <button onClick={() => removeEmployee(emp.name)} className="hover:text-red-500 transition-colors ml-1">
+                            <button onClick={(e) => { e.stopPropagation(); removeEmployee(emp.name); }} className="hover:text-red-500 transition-colors ml-1">
                               <X className="h-3 w-3" />
                             </button>
                           </div>
