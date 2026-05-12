@@ -66,6 +66,11 @@ export class PayrollController {
     return this.payrollService.getLatestBatch();
   }
 
+  @Get('processing-status')
+  async getProcessingStatus() {
+    return this.payrollService.getProcessingStatus();
+  }
+
   @Delete('batch/:id')
   async deleteBatch(@Param('id') id: string) {
     return this.payrollService.deleteBatch(id);

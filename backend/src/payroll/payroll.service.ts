@@ -117,9 +117,9 @@ export class PayrollService {
           for (let employeeId of idsOnPage) {
             employeeId = this.normalizeSysId(employeeId);
   
-            // RESTORED LOGIC: Skip if this ID already exists in this batch
-            if (resumeBatchId && existingSysIds.has(employeeId)) {
-              this.logger.log(`[Resume] Skipping ID ${employeeId} on Page ${pageNumber} (Already in batch)`);
+            // FIXED LOGIC: Skip if this ID already exists in this batch (Always skip duplicates)
+            if (existingSysIds.has(employeeId)) {
+              this.logger.log(`[Skip] ID ${employeeId} on Page ${pageNumber} (Already processed in this run)`);
               results.push({ page: pageNumber, id: employeeId, status: 'skipped' });
               continue;
             }
@@ -205,6 +205,10 @@ export class PayrollService {
       this.activeBatches.delete(batch.id);
       this.logger.log(`Finished processing batch ${batch.id}. Lock released.`);
     }
+  }
+
+  getProcessingStatus() {
+    return Array.from(this.activeBatches);
   }
 
   async reviseDocuments(batchId: string, selectedSysIds: string[], remark: string, fileBuffer: Buffer) {
