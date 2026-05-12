@@ -23,16 +23,21 @@ export class PayrollService {
 
   private normalizeSysId(id: string): string {
     if (!id) return '';
-    let normalized = id.toUpperCase().trim();
-    // Standard format: CSC-XXXX-YYYY (e.g. CSC-1234-567)
-    // If it's a CSC ID without dashes, add them
-    if (!normalized.includes('-') && normalized.startsWith('CSC')) {
-      if (normalized.length >= 7) {
-        // Handle CSC1234567 -> CSC-1234-567
-        normalized = `CSC-${normalized.substring(3, 7)}-${normalized.substring(7)}`;
+    // Remove all non-alphanumeric characters and convert to uppercase
+    const clean = id.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    
+    if (clean.startsWith('CSC')) {
+      const numbers = clean.substring(3);
+      if (numbers.length > 4) {
+        // Format: CSC-XXXX-YYYY (e.g. CSC-1234-567)
+        return `CSC-${numbers.substring(0, 4)}-${numbers.substring(4)}`;
+      } else if (numbers.length > 0) {
+        // Format: CSC-XXXX (e.g. CSC-1001)
+        return `CSC-${numbers}`;
       }
+      return 'CSC';
     }
-    return normalized;
+    return clean;
   }
 
   async processMasterPdf(pdfBuffer: Buffer, batchData: any) {
@@ -73,6 +78,8 @@ export class PayrollService {
         where: { batch_id: batch.id },
         select: { sys_id: true, file_name: true }
       });
+      
+      this.logger.log(`Resume: Found ${existingDocs.length} existing documents in batch ${batch.id}`);
       
       existingDocs.forEach(d => {
         const id = this.normalizeSysId(d.sys_id);
@@ -118,10 +125,12 @@ export class PayrollService {
           employeeId = this.normalizeSysId(employeeId);
 
           if (resumeBatchId && processedPages.get(employeeId)?.has(pageNumber)) {
-            this.logger.log(`Page ${pageNumber}: ID ${employeeId} already exists in batch ${batch.id}. Skipping.`);
+            this.logger.log(`[Resume] Skipping ID ${employeeId} Page ${pageNumber} (Already processed)`);
             results.push({ page: pageNumber, id: employeeId, status: 'skipped' });
             continue;
           }
+          
+          this.logger.log(`[Process] Adding ID ${employeeId} Page ${pageNumber}`);
 
           const fileName = `${employeeId}_p${pageNumber}_${Date.now()}.pdf`;
           const filePath = `documents/${batch.id}/${fileName}`;
