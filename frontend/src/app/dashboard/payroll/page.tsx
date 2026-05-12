@@ -135,7 +135,11 @@ export default function IntegratedPayrollAdmin() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Processing failed');
 
-      setStatus({ type: 'success', message: `Successfully processed ${data.details?.length || 0} documents!` });
+      const message = data.skipped > 0 
+        ? `Successfully added ${data.added} new documents (${data.skipped} skipped).`
+        : `Successfully processed ${data.added || data.details?.length || 0} documents!`;
+        
+      setStatus({ type: 'success', message });
       setIsImportModalOpen(false);
       setSelectedFiles([]);
       setRemark(''); // Clear remark after success
