@@ -363,7 +363,7 @@ export default function StaffRequisitionPage() {
       
       employees.forEach(emp => {
         selectedItems.forEach(item => {
-          const qty = item.quantities && item.quantities[emp.name] !== undefined ? item.quantities[emp.name] : 1;
+          const qty = item.quantities && item.quantities[emp.name] !== undefined ? item.quantities[emp.name] : 0;
           if (qty > 0) {
             requestsData.push({
               date: form.date,
@@ -798,7 +798,7 @@ export default function StaffRequisitionPage() {
                           ) : (
                             <div className="space-y-2">
                               {employees.map(emp => {
-                                const qty = item.quantities && item.quantities[emp.name] !== undefined ? item.quantities[emp.name] : 1;
+                                const qty = item.quantities && item.quantities[emp.name] !== undefined ? item.quantities[emp.name] : 0;
                                 return (
                                   <div key={emp.name} className="flex items-center justify-between">
                                     <div className="flex flex-col">
