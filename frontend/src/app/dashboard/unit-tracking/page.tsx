@@ -10,6 +10,8 @@ import {
   ImageIcon, Eye, FileSpreadsheet
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import api from '@/lib/api';
 import { useDebounce } from '@/hooks/useDebounce';
 import { TableSkeleton, CardSkeleton, PageHeaderSkeleton } from '@/components/ui/LoadingSkeletons';
@@ -403,22 +405,94 @@ export default function UnitTrackingPage() {
   const totalProducts = inventory.length;
   const totalQRs = inventory.reduce((acc, p) => acc + p.items.length, 0);
 
-  const handleExportExcel = () => {
-    // 1. Create Header Info Rows
-    const headerInfo = [
-      ['MATERIAL TRANSMITTAL REPORT'],
+  const handleExportExcel = async () => {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Smarttracking System';
+    workbook.lastModifiedBy = 'Smarttracking System';
+    workbook.created = new Date();
+    workbook.modified = new Date();
+
+    const sheet = workbook.addWorksheet('Transmittal Report', {
+      pageSetup: { 
+        paperSize: 9, 
+        orientation: 'landscape',
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+        margins: { left: 0.7, right: 0.7, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 },
+        printTitlesRow: '9:9'
+      },
+      headerFooter: {
+        oddFooter: '&LPage &P of &N &RGenerated on &D &T | Smarttracking System'
+      },
+      views: [{ state: 'frozen', ySplit: 9 }]
+    });
+
+    // 1. Report Header (Title)
+    sheet.mergeCells('A1:E1');
+    const titleCell = sheet.getCell('A1');
+    titleCell.value = 'MATERIAL TRANSMITTAL REPORT';
+    titleCell.font = { name: 'Aptos', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    titleCell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF1E293B' } // Dark Slate 800
+    };
+    sheet.getRow(1).height = 40;
+
+    // 2. Metadata Section (Info)
+    const metaData = [
       ['Transmittal No:', transmittalHeader.transmittalNo],
       ['Date Covered:', stockHealthRange.start === stockHealthRange.end ? stockHealthRange.start : `${stockHealthRange.start} to ${stockHealthRange.end}`],
       ['Department:', transmittalHeader.department || 'N/A'],
       ['Recipient:', transmittalHeader.recipient || 'N/A'],
       ['Remarks:', transmittalHeader.remarks || 'None'],
-      [''], // Spacer
-      ['STOCK MOVEMENT DATA'],
-      ['Product Reference', 'Starting Stock', 'Movement Qty', 'Resulting Stock', 'Movement Breakdown']
     ];
 
-    // 2. Prepare Product Data
-    const productData = productSummary.map(item => {
+    metaData.forEach((row, i) => {
+      const rowIndex = i + 2;
+      sheet.getCell(`A${rowIndex}`).value = row[0];
+      sheet.getCell(`B${rowIndex}`).value = row[1];
+      
+      sheet.getCell(`A${rowIndex}`).font = { bold: true, size: 10, name: 'Aptos' };
+      sheet.getCell(`B${rowIndex}`).font = { size: 10, name: 'Aptos' };
+      sheet.getCell(`A${rowIndex}`).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF8FAFC' }
+      };
+      sheet.getRow(rowIndex).height = 20;
+    });
+
+    // Spacer
+    sheet.getRow(7).height = 10;
+
+    // 3. Stock Movement Header
+    sheet.mergeCells('A8:E8');
+    const tableTitle = sheet.getCell('A8');
+    tableTitle.value = 'STOCK MOVEMENT DATA';
+    tableTitle.font = { bold: true, size: 11, name: 'Aptos', color: { argb: 'FF334155' } };
+    tableTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+    sheet.getRow(8).height = 25;
+
+    // 4. Data Table
+    const headerRow = sheet.getRow(9);
+    headerRow.values = ['Product Reference', 'Starting Stock', 'Movement Qty', 'Resulting Stock', 'Movement Breakdown'];
+    headerRow.height = 30;
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10, name: 'Aptos' };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = {
+        top: { style: 'thin' },
+        bottom: { style: 'thin' },
+        left: { style: 'thin' },
+        right: { style: 'thin' }
+      };
+    });
+
+    const dataRows = productSummary.map(item => {
       const breakdownStr = Object.entries(item.movementBreakdown)
         .map(([spec, qty]) => `${spec}: ${qty}`)
         .join(' | ');
@@ -432,35 +506,131 @@ export default function UnitTrackingPage() {
       ];
     });
 
-    // 3. Create Signatories Section
-    const signatoryRows = [
-      [''], // Spacer
-      ['SIGNATORIES'],
-    ];
+    dataRows.forEach((row, i) => {
+      const excelRow = sheet.addRow(row);
+      excelRow.height = 25;
+      excelRow.eachCell((cell, colNumber) => {
+        cell.font = { name: 'Aptos', size: 10 };
+        cell.alignment = { vertical: 'middle', horizontal: colNumber === 1 || colNumber === 5 ? 'left' : 'right' };
+        cell.border = {
+          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+        };
+        
+        // Product Reference bold
+        if (colNumber === 1) cell.font = { bold: true, name: 'Aptos' };
+        
+        // Movement Qty Red if negative
+        if (colNumber === 3 && typeof cell.value === 'number' && cell.value < 0) {
+          cell.font = { color: { argb: 'FFEF4444' }, bold: true, name: 'Aptos' };
+        }
 
-    ['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy'].forEach(f => {
-      if ((enabledSignatories as any)[f]) {
-        signatoryRows.push([f.endsWith('By') ? f.slice(0, -2) + ' By' : f, (transmittalHeader as any)[f] || '________________']);
-      }
+        // Breakdown wrapping
+        if (colNumber === 5) {
+          cell.alignment = { wrapText: true, vertical: 'top', horizontal: 'left' };
+          excelRow.height = Math.max(25, (String(cell.value).length / 40) * 15);
+        }
+
+        // Alternating row colors
+        if (i % 2 === 0) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+        }
+      });
     });
 
-    const combinedData = [...headerInfo, ...productData, ...signatoryRows];
+    // Enable Autofilter
+    sheet.autoFilter = 'A9:E9';
 
-    const ws = XLSX.utils.aoa_to_sheet(combinedData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Transmittal Report");
+    // Conditional Formatting for Resulting Stock
+    const lastDataRow = 9 + dataRows.length;
+    sheet.addConditionalFormatting({
+      ref: `D10:D${lastDataRow}`,
+      rules: [
+        {
+          priority: 1,
+          type: 'cellIs',
+          operator: 'lessThan',
+          formulae: ['20'], // Low stock example
+          style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFFEE2E2' } }, font: { color: { argb: 'FF991B1B' }, bold: true } }
+        },
+        {
+          priority: 2,
+          type: 'cellIs',
+          operator: 'between',
+          formulae: ['20', '50'],
+          style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFFEF3C7' } }, font: { color: { argb: 'FF92400E' }, bold: true } }
+        },
+        {
+          priority: 3,
+          type: 'cellIs',
+          operator: 'greaterThan',
+          formulae: ['50'],
+          style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFDCFCE7' } }, font: { color: { argb: 'FF166534' }, bold: true } }
+        }
+      ]
+    });
+
+    // 5. Signatories Section
+    let currentSigRow = lastDataRow + 3;
+    sheet.getCell(`A${currentSigRow}`).value = 'SIGNATORIES';
+    sheet.getCell(`A${currentSigRow}`).font = { bold: true, size: 11, name: 'Aptos' };
+    sheet.getRow(currentSigRow).height = 25;
     
-    // Set column widths
-    const wscols = [
-      {wch: 30}, // Label / Product
-      {wch: 20}, // Value / Starting
-      {wch: 15}, // Movement
-      {wch: 15}, // Resulting
-      {wch: 60}, // Breakdown
-    ];
-    ws['!cols'] = wscols;
+    currentSigRow += 2;
+    const signatories = ['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy'].filter(f => (enabledSignatories as any)[f]);
+    
+    // Group signatories in pairs
+    for (let i = 0; i < signatories.length; i += 2) {
+      const sig1 = signatories[i];
+      const sig2 = signatories[i + 1];
+      
+      const label1 = sig1.replace(/By$/, ' By');
+      const name1 = (transmittalHeader as any)[sig1] || '____________________';
+      
+      sheet.getCell(`A${currentSigRow}`).value = label1.toUpperCase();
+      sheet.getCell(`A${currentSigRow}`).font = { size: 9, bold: true, color: { argb: 'FF64748B' } };
+      
+      sheet.getCell(`A${currentSigRow + 2}`).value = name1.toUpperCase();
+      sheet.getCell(`A${currentSigRow + 2}`).font = { size: 10, bold: true, name: 'Aptos' };
+      sheet.getCell(`A${currentSigRow + 2}`).alignment = { horizontal: 'center' };
+      sheet.getCell(`A${currentSigRow + 2}`).border = { bottom: { style: 'thin' } };
+      
+      sheet.getCell(`A${currentSigRow + 3}`).value = 'Signature / Date';
+      sheet.getCell(`A${currentSigRow + 3}`).font = { size: 8, italic: true, color: { argb: 'FF94A3B8' } };
+      sheet.getCell(`A${currentSigRow + 3}`).alignment = { horizontal: 'center' };
 
-    XLSX.writeFile(wb, `${transmittalHeader.transmittalNo}_${stockHealthRange.start}.xlsx`);
+      if (sig2) {
+        const label2 = sig2.replace(/By$/, ' By');
+        const name2 = (transmittalHeader as any)[sig2] || '____________________';
+        
+        sheet.getCell(`D${currentSigRow}`).value = label2.toUpperCase();
+        sheet.getCell(`D${currentSigRow}`).font = { size: 9, bold: true, color: { argb: 'FF64748B' } };
+        
+        sheet.getCell(`D${currentSigRow + 2}`).value = name2.toUpperCase();
+        sheet.getCell(`D${currentSigRow + 2}`).font = { size: 10, bold: true, name: 'Aptos' };
+        sheet.getCell(`D${currentSigRow + 2}`).alignment = { horizontal: 'center' };
+        sheet.getCell(`D${currentSigRow + 2}`).border = { bottom: { style: 'thin' } };
+        
+        sheet.getCell(`D${currentSigRow + 3}`).value = 'Signature / Date';
+        sheet.getCell(`D${currentSigRow + 3}`).font = { size: 8, italic: true, color: { argb: 'FF94A3B8' } };
+        sheet.getCell(`D${currentSigRow + 3}`).alignment = { horizontal: 'center' };
+      }
+      
+      currentSigRow += 6;
+    }
+
+    // Column Widths
+    sheet.getColumn(1).width = 35; // Reference
+    sheet.getColumn(2).width = 18; // Starting
+    sheet.getColumn(3).width = 18; // Movement
+    sheet.getColumn(4).width = 18; // Resulting
+    sheet.getColumn(5).width = 65; // Breakdown
+
+    // Remove Gridlines
+    sheet.views = [{ ...sheet.views[0], showGridLines: false }];
+
+    // Generate Buffer and Save
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(new Blob([buffer]), `${transmittalHeader.transmittalNo}_Transmittal_Report.xlsx`);
     setIsBuildingTransmittal(false);
   };
 

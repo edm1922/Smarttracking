@@ -1,0 +1,262 @@
+{
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\eslint.config.mjs": {
+    "mtime": 1776589822.4864285,
+    "hash": "dfa1f5f6a7037bf39dc510f30b180002"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\next-env.d.ts": {
+    "mtime": 1778603299.7618232,
+    "hash": "2a74d3909800ca5467fa83b0ab4a4890"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\next.config.ts": {
+    "mtime": 1777963688.0526793,
+    "hash": "045bf1259098277b6a0bcd5ef91f9f98"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\postcss.config.mjs": {
+    "mtime": 1776589822.5133355,
+    "hash": "239f3ebf717465dc636818a1a619398d"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\deploy-trigger.ts": {
+    "mtime": 1778000097.0841303,
+    "hash": "f633d699df72be51f569aae133a3efba"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\layout.tsx": {
+    "mtime": 1778225455.0521736,
+    "hash": "09647246eb6f8974e17ac0864038897d"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\page.tsx": {
+    "mtime": 1778594236.225258,
+    "hash": "ff8c7a6f6dc2f237191b8f5cad44f660"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\admin-portal\\layout.tsx": {
+    "mtime": 1777858570.8925133,
+    "hash": "a702a1aac68cbaf30ff3374c0649d956"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\admin-portal\\page.tsx": {
+    "mtime": 1777858570.8931162,
+    "hash": "194c052907836f8ba46600e38079109b"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\admin-portal\\analytics\\page.tsx": {
+    "mtime": 1778224443.9036725,
+    "hash": "d2418e46cade90eb528b01ce2ba93364"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\admin-portal\\users\\page.tsx": {
+    "mtime": 1778594236.2071345,
+    "hash": "a02d861a122f65f79bdb3915eafd340c"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\api\\batches\\route.ts": {
+    "mtime": 1777858570.8997405,
+    "hash": "61502baca8097e89cd8935d0c336d0ec"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\api\\batches\\[id]\\route.ts": {
+    "mtime": 1777858570.8987372,
+    "hash": "5f9c7e4733dfe3c7ea902406647b166c"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\api\\custom-fields\\route.ts": {
+    "mtime": 1777858570.9013748,
+    "hash": "3e16af724324d9673f1ea9249ed3ec12"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\api\\items\\route.ts": {
+    "mtime": 1777858570.902984,
+    "hash": "66234bcd809194ff646b1c8c37ceadee"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\AdminNotifications.tsx": {
+    "mtime": 1777415629.3942566,
+    "hash": "d6136f7c687d917dbde1c0403ca0a663"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\layout.tsx": {
+    "mtime": 1778594236.2081592,
+    "hash": "90fc9774e5c2e5dd7b987fde6de2c348"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\page.tsx": {
+    "mtime": 1777386707.1798098,
+    "hash": "188e40ec0c7cbf36fe0d73b2d686d38d"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\batches\\page.tsx": {
+    "mtime": 1777383897.846136,
+    "hash": "40e9c6eb8d31a1ff85fe68f64b454ac1"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\custom-fields\\page.tsx": {
+    "mtime": 1776929185.6030407,
+    "hash": "8e70899d3cc5e6f11d50ef07fd229a8e"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\items\\page.tsx": {
+    "mtime": 1777874691.10486,
+    "hash": "cc99eeeedb10d5c36227ad58df26b7da"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\locations\\page.tsx": {
+    "mtime": 1776610428.9018471,
+    "hash": "3084da78b038c842ae2ee3124d1dc6c1"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\logs\\page.tsx": {
+    "mtime": 1777257249.923673,
+    "hash": "f976c2af38e770abe39cd6c73c02c2d5"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\payroll\\page.tsx": {
+    "mtime": 1778625930.6397717,
+    "hash": "122c8ba3e17d073d94d05dee673bb7bf"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\payroll\\my-payslips\\page.tsx": {
+    "mtime": 1778194549.6425958,
+    "hash": "d8025ffb4b6ee9252974a8f1e156c69a"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\payroll\\strips\\page.tsx": {
+    "mtime": 1778594236.2129095,
+    "hash": "9805fc3a4f0068148559170dad0ad8d5"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\payroll\\strips\\StripsControls.tsx": {
+    "mtime": 1777858570.9305196,
+    "hash": "d984889439c2102dd1e756c90e1d677f"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\print\\page.tsx": {
+    "mtime": 1777874215.4293175,
+    "hash": "8aca33036a4a0ad87ee95eea9e614717"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\products\\page.tsx": {
+    "mtime": 1778222020.481953,
+    "hash": "03d3ba9494da777abf2375d58865f144"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\products\\requests\\page.tsx": {
+    "mtime": 1778227760.213527,
+    "hash": "d1d69517180d54dabce51bb519e53537"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\reports\\system-activity\\page.tsx": {
+    "mtime": 1777257249.9399989,
+    "hash": "18983d8971ddba4726b42f02b4308665"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\settings\\page.tsx": {
+    "mtime": 1776593977.8899326,
+    "hash": "24b70dc2b8a196b117e23df25d66f382"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\staff\\inventory\\page.tsx": {
+    "mtime": 1778594236.213434,
+    "hash": "679a8a893270b021f2009c8cb6018963"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\staff\\requisition\\page.tsx": {
+    "mtime": 1778594236.2164419,
+    "hash": "b9ed58d9af8862757f00016de46584f9"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\staff\\requisition\\pending\\page.tsx": {
+    "mtime": 1777330804.1369605,
+    "hash": "12a0e558a72cdb758fb7e0203ff2ab25"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\staff\\unit-requisition\\page.tsx": {
+    "mtime": 1778594236.2175932,
+    "hash": "3d9ba208fa05b26fec0b457dab3e17ab"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\staff-area\\page.tsx": {
+    "mtime": 1777534963.0930953,
+    "hash": "cf54e17adacb5cf20625ce4b972851e4"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\storage\\page.tsx": {
+    "mtime": 1777858570.9394531,
+    "hash": "1b5f5bd83226374934991dcb5dd430db"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\transmittal\\page.tsx": {
+    "mtime": 1776738112.1081867,
+    "hash": "0bce1f41bf31285b16d0a29f4b4c1e7b"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\transmittal\\product\\page.tsx": {
+    "mtime": 1778594236.2197142,
+    "hash": "65935ff66f994d4a22139c8b4ebd5b59"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\transmittal\\purchase-request\\page.tsx": {
+    "mtime": 1777281305.9616268,
+    "hash": "fbe4b3344a796a42386d3b00e3cff087"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\transmittal\\unit-tracking-log\\page.tsx": {
+    "mtime": 1777416761.6123724,
+    "hash": "31949045ac0ee1e6abe210d92fb269be"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\unit-tracking\\page.tsx": {
+    "mtime": 1778626971.9776077,
+    "hash": "1659f439ee3cea9c8723587250c8a611"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\dashboard\\users\\page.tsx": {
+    "mtime": 1778594236.2242682,
+    "hash": "2d68eb3f797d03091dcc5c69f5616ec4"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\i\\[slug]\\page.tsx": {
+    "mtime": 1777884528.8045573,
+    "hash": "0187402bf5ed74b0263be0db4d1002d5"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\login\\page.tsx": {
+    "mtime": 1777858570.9487069,
+    "hash": "1c665a701ee3a2d8fcb2c772299bfe51"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\portal\\page.tsx": {
+    "mtime": 1778054528.9838793,
+    "hash": "566450a60e08b50f994696466771b248"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\app\\portal\\dashboard\\page.tsx": {
+    "mtime": 1778594236.2264745,
+    "hash": "26fe635c6f9d16977df1df67074d77a9"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\components\\ErrorBoundary.tsx": {
+    "mtime": 1777964315.742228,
+    "hash": "0a04d0a9c52d5fffbaa1cc7f0bcdff56"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\components\\ui\\LoadingProgress.tsx": {
+    "mtime": 1777386699.121477,
+    "hash": "e70e5693dbc94c95b7800269c2891ea4"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\components\\ui\\LoadingSkeletons.tsx": {
+    "mtime": 1777257249.9762654,
+    "hash": "ea59da3de567eab58909d23972697d5c"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\hooks\\useDebounce.ts": {
+    "mtime": 1777257249.9789734,
+    "hash": "3fa933c42946973b3972441f8f41ce92"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\lib\\api.ts": {
+    "mtime": 1777270178.1301959,
+    "hash": "38544915ecf7afada74b79af967c1f8a"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\lib\\prisma.ts": {
+    "mtime": 1777993590.9746764,
+    "hash": "15a97667f2a4ddf73b1f921b7a09a1a2"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\lib\\supabaseAdmin.ts": {
+    "mtime": 1777995055.2803605,
+    "hash": "9815258f1dff1d41d16562c4c6000dce"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\lib\\payroll\\generatePayslipPDF.ts": {
+    "mtime": 1777858570.9662569,
+    "hash": "3c3adf0ecd98bee40e2171bf634cf1d7"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\src\\lib\\payroll\\supabase.ts": {
+    "mtime": 1777858570.9667728,
+    "hash": "f241a5600a4549b7f1599176f756fc76"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\AGENTS.md": {
+    "mtime": 1776589972.5160885,
+    "hash": "9e09241799026ac05be315a2f0b50055"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\CLAUDE.md": {
+    "mtime": 1776589972.5171497,
+    "hash": "5c27369b226fcf2be8a6cfe52224e767"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\README.md": {
+    "mtime": 1776589822.4587,
+    "hash": "f15aaa42d5d299d091b1171097ea56ad"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\public\\file.svg": {
+    "mtime": 1776589822.5210085,
+    "hash": "d09f95206c3fa0bb9bd9fefabfd0ea71"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\public\\globe.svg": {
+    "mtime": 1776589822.5401897,
+    "hash": "2aaafa6a49b6563925fe440891e32717"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\public\\next.svg": {
+    "mtime": 1776589822.555329,
+    "hash": "8e061864f388b47f33a1c3780831193e"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\public\\vercel.svg": {
+    "mtime": 1776589822.5675406,
+    "hash": "c0af2f507b369b085b35ef4bbe3bcf1e"
+  },
+  "C:\\Users\\EDRON\\Desktop\\Dev Apps\\QR tracker\\frontend\\public\\window.svg": {
+    "mtime": 1776589822.577799,
+    "hash": "a2760511c65806022ad20adf74370ff3"
+  }
+}
