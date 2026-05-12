@@ -71,6 +71,13 @@ export default function StaffRequisitionPage() {
   const [showItemDropdown, setShowItemDropdown] = useState(false);
   const [highlightedItemIndex, setHighlightedItemIndex] = useState(-1);
   
+  // Draft Entry state
+  const [draftEntry, setDraftEntry] = useState<{ 
+    name: string; 
+    position: string; 
+    items: { productId: string; name: string; sku: string; availableQty: number; description: string | null }[] 
+  } | null>(null);
+  
   // Cart state
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   const [viewItem, setViewItem] = useState<Product | null>(null);
@@ -123,13 +130,71 @@ export default function StaffRequisitionPage() {
     const trimmedName = employeeInput.trim();
     if (!trimmedName) return;
     const trimmedPos = positionInput.trim() || 'Staff';
-    if (trimmedName && !employees.some(e => e.name === trimmedName)) {
-      setEmployees([...employees, { name: trimmedName, position: trimmedPos }]);
-      setEmployeeInput('');
-      setPositionInput('');
-      setShowEmployeeDropdown(false);
-      setHighlightedIndex(-1);
+    
+    // Set as draft instead of adding directly
+    setDraftEntry({
+      name: trimmedName,
+      position: trimmedPos,
+      items: []
+    });
+    
+    setEmployeeInput('');
+    setPositionInput('');
+    setShowEmployeeDropdown(false);
+    setHighlightedIndex(-1);
+  };
+
+  const confirmDraftEntry = () => {
+    if (!draftEntry) return;
+    
+    // 1. Add employee to main list if not exists
+    if (!employees.some(e => e.name === draftEntry.name)) {
+      setEmployees([...employees, { name: draftEntry.name, position: draftEntry.position }]);
     }
+    
+    // 2. Add draft items to the main cart
+    draftEntry.items.forEach(item => {
+      // Find the product in our main products list to get the full object
+      const product = products.find(p => p.id === item.productId);
+      if (product) {
+        addItemToCart(product, item.availableQty, [draftEntry.name]);
+      }
+    });
+    
+    setDraftEntry(null);
+  };
+
+  const addProductToDraft = (product: Product) => {
+    if (!draftEntry) return;
+    if (draftEntry.items.some(i => i.productId === product.id)) return;
+    
+    const available = product.stocks.find(s => s.location?.id === form.locationId)?.quantity || 0;
+    
+    setDraftEntry({
+      ...draftEntry,
+      items: [...draftEntry.items, {
+        productId: product.id,
+        name: product.name,
+        sku: product.sku,
+        availableQty: available,
+        description: product.description
+      }]
+    });
+
+    // Clear and focus back
+    setQuickItemInput('');
+    setShowItemDropdown(false);
+    setTimeout(() => {
+      document.getElementById('draft-item-search')?.focus();
+    }, 10);
+  };
+
+  const removeProductFromDraft = (productId: string) => {
+    if (!draftEntry) return;
+    setDraftEntry({
+      ...draftEntry,
+      items: draftEntry.items.filter(i => i.productId !== productId)
+    });
   };
 
   const pickEmployee = (emp: { name: string; position: string }) => {
@@ -198,25 +263,40 @@ export default function StaffRequisitionPage() {
   };
 
   const addItemToCart = (product: Product, availableQty: number, targetEmployeeNames?: string[]) => {
-    if (selectedItems.some(item => item.productId === product.id)) {
-      return; // Already in cart
-    }
-    
-    const initialQuantities: Record<string, number> = {};
     const targets = targetEmployeeNames && targetEmployeeNames.length > 0 ? targetEmployeeNames : employees.map(e => e.name);
-
-    employees.forEach(emp => {
-      initialQuantities[emp.name] = targets.includes(emp.name) ? 1 : 0;
-    });
     
-    setSelectedItems([...selectedItems, {
-      productId: product.id,
-      productName: product.name,
-      sku: product.sku,
-      quantities: initialQuantities,
-      maxQuantity: availableQty,
-      description: product.description,
-    }]);
+    setSelectedItems(prev => {
+      const existingIndex = prev.findIndex(item => item.productId === product.id);
+      
+      if (existingIndex >= 0) {
+        // Item already in cart, update quantities for the target employees
+        return prev.map((item, idx) => {
+          if (idx === existingIndex) {
+            const newQuantities = { ...(item.quantities || {}) };
+            targets.forEach(name => {
+              newQuantities[name] = 1; // Add for these employees
+            });
+            return { ...item, quantities: newQuantities };
+          }
+          return item;
+        });
+      } else {
+        // New item, add to cart
+        const initialQuantities: Record<string, number> = {};
+        employees.forEach(emp => {
+          initialQuantities[emp.name] = targets.includes(emp.name) ? 1 : 0;
+        });
+
+        return [...prev, {
+          productId: product.id,
+          productName: product.name,
+          sku: product.sku,
+          quantities: initialQuantities,
+          maxQuantity: availableQty,
+          description: product.description,
+        }];
+      }
+    });
   };
 
   const updateCartItem = (productId: string, field: keyof SelectedItem, value: any) => {
@@ -481,6 +561,75 @@ export default function StaffRequisitionPage() {
                         Add
                       </button>
                     </div>
+
+                    {/* DRAFT ENTRY AREA */}
+                    {draftEntry && (
+                      <div className="mt-4 p-5 bg-blue-50/50 rounded-2xl border-2 border-primary/20 animate-in slide-in-from-top-2">
+                        <div className="flex items-center justify-between mb-4">
+                          <div>
+                            <span className="text-[10px] font-black text-primary uppercase tracking-widest block mb-0.5">Drafting Entry For</span>
+                            <h4 className="text-sm font-black text-gray-900">{draftEntry.name} <span className="text-gray-400 font-bold ml-2">— {draftEntry.position}</span></h4>
+                          </div>
+                          <button onClick={() => setDraftEntry(null)} className="p-1.5 hover:bg-red-50 text-red-500 rounded-lg transition-colors">
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center">
+                            <Plus className="h-3 w-3 mr-1.5" />
+                            Assign Items to {draftEntry.name.split(',')[0]}
+                          </label>
+                          <div className="relative">
+                            <input 
+                              id="draft-item-search"
+                              type="text" 
+                              placeholder="Search item to assign..."
+                              value={quickItemInput}
+                              onChange={(e) => { setQuickItemInput(e.target.value); setShowItemDropdown(true); }}
+                              onFocus={() => quickItemInput.length > 0 && setShowItemDropdown(true)}
+                              className="w-full rounded-xl border border-gray-200 px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all bg-white"
+                            />
+                            {showItemDropdown && filteredQuickProducts.length > 0 && (
+                              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-40 overflow-y-auto">
+                                {filteredQuickProducts.map((prod) => (
+                                  <button
+                                    key={prod.id}
+                                    type="button"
+                                    onClick={() => { addProductToDraft(prod); setQuickItemInput(''); setShowItemDropdown(false); }}
+                                    className="w-full text-left px-4 py-2.5 text-xs hover:bg-primary/5 transition-colors flex items-center justify-between border-b border-gray-50 last:border-0"
+                                  >
+                                    <div className="flex flex-col">
+                                      <span className="font-bold text-gray-900">{prod.name}</span>
+                                      <span className="text-[10px] text-gray-400 line-clamp-1">{prod.description || prod.sku}</span>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            {draftEntry.items.map(item => (
+                              <div key={item.productId} className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-bold shadow-sm">
+                                <span className="text-gray-900">{item.name}</span>
+                                <button onClick={() => removeProductFromDraft(item.productId)} className="text-gray-400 hover:text-red-500">
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+
+                          <button 
+                            onClick={confirmDraftEntry}
+                            className="w-full mt-2 py-3 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-primary-dark transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                            Confirm & Add to Requisition
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     
                     {employees.length > 0 && (
                       <div className="flex flex-wrap gap-2 pt-2">
@@ -528,6 +677,7 @@ export default function StaffRequisitionPage() {
                         </div>
                         <div className="relative">
                           <input 
+                            id="main-item-search"
                             type="text" 
                             placeholder={activeEmployeeNames.length > 0 ? `Search item for ${activeEmployeeNames.join(', ')}...` : "Search item for all employees..."}
                             value={quickItemInput}
@@ -568,6 +718,9 @@ export default function StaffRequisitionPage() {
                                       addItemToCart(prod, available, activeEmployeeNames);
                                       setQuickItemInput('');
                                       setShowItemDropdown(false);
+                                      setTimeout(() => {
+                                        document.getElementById('main-item-search')?.focus();
+                                      }, 10);
                                     }}
                                     onMouseEnter={() => setHighlightedItemIndex(idx)}
                                     className={`w-full text-left px-4 py-3 text-sm transition-colors flex items-center justify-between border-b border-gray-50 last:border-0 ${highlightedItemIndex === idx ? 'bg-primary/10 text-primary' : 'hover:bg-gray-50'}`}
