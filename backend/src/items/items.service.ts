@@ -80,11 +80,15 @@ export class ItemsService {
         include: { fieldValues: true, tags: true },
       });
 
+      // Extract quantity for audit logs if it's a unit tracking item
+      const unitValue = fieldValues?.find((fv: any) => fv.value?.useUnitQty)?.value;
+      const logQuantity = unitValue?.qty || 1;
+
       await this.logsService.create({
         userId,
         itemId: item.id,
         action: 'CREATE_ITEM',
-        changes: { name: item.name },
+        changes: { name: item.name, quantity: logQuantity },
       });
 
       createdItems.push(item);
@@ -520,7 +524,7 @@ export class ItemsService {
 
     const { fieldValues, name } = data;
 
-    return this.prisma.item.update({
+    const result = await this.prisma.item.update({
       where: { slug },
       data: {
         locked: true, // Automatically lock upon submission
@@ -544,6 +548,20 @@ export class ItemsService {
       },
       include: { fieldValues: true },
     });
+
+    // Log the submission
+    const unitValue = fieldValues?.find((fv: any) => fv.value?.useUnitQty)?.value;
+    const logQuantity = unitValue?.qty || 1;
+    const logUnit = unitValue?.unit || 'Units';
+
+    await this.logsService.create({
+      userId: 'anonymous', // Public form submission
+      itemId: item.id,
+      action: 'SUBMIT_CONTENT',
+      changes: { name: name || item.name, quantity: logQuantity, unit: logUnit },
+    });
+
+    return result;
   }
 
   async toggleLock(slug: string, userId: string, userRole: string) {

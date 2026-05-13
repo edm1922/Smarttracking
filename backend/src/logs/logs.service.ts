@@ -16,7 +16,7 @@ export class LogsService {
       ];
     }
 
-    const safeTake = Math.min(take ?? 20, 100);
+    const safeTake = Math.min(take ?? 20, 10000);
     const start = Date.now();
 
     const [data, total] = await Promise.all([
@@ -48,10 +48,11 @@ export class LogsService {
     return { data, total };
   }
 
-  async findAll(params: { skip?: number; take?: number; search?: string } = {}) {
-    const { skip = 0, take = 20, search } = params;
+  async findAll(params: { skip?: number; take?: number; search?: string; action?: string; startDate?: string; endDate?: string } = {}) {
+    const { skip = 0, take = 20, search, action, startDate, endDate } = params;
     
     const where: any = {};
+    
     if (search) {
       where.OR = [
         { action: { contains: search, mode: 'insensitive' } },
@@ -61,7 +62,27 @@ export class LogsService {
       ];
     }
 
-    const safeTake = Math.min(take ?? 20, 100);
+    if (action) {
+      if (action.includes(',')) {
+        where.action = { in: action.split(',').map(a => a.trim()) };
+      } else {
+        where.action = action;
+      }
+    }
+
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        where.createdAt.gte = new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
+
+    const safeTake = Math.min(take ?? 20, 10000);
     const start = Date.now();
 
     const [data, total] = await Promise.all([
@@ -83,7 +104,7 @@ export class LogsService {
             select: { slug: true, name: true },
           },
           product: {
-            select: { sku: true, name: true },
+            select: { sku: true, name: true, unit: true },
           },
         },
         orderBy: { createdAt: 'desc' },

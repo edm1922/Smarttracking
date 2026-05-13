@@ -12,11 +12,17 @@ export class LogsController {
     @Query('skip') skip?: string,
     @Query('take') take?: string,
     @Query('search') search?: string,
+    @Query('action') action?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
     return this.logsService.findAll({
       skip: skip ? parseInt(skip, 10) : 0,
       take: take ? parseInt(take, 10) : 20,
       search,
+      action,
+      startDate,
+      endDate,
     });
   }
 
