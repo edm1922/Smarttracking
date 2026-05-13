@@ -30,6 +30,7 @@ export default function UnitTrackingPage() {
 
   const [requests, setRequests] = useState<any[]>([]);
   const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
+  const [stockInLogs, setStockInLogs] = useState<any[]>([]);
 
   const custodianData = useMemo(() => {
     const groups: Record<string, any> = {};
@@ -88,9 +89,11 @@ export default function UnitTrackingPage() {
           name: pName,
           totalInStock: 0,
           outToday: 0,
+          inToday: 0,
           specs: new Set(),
           outSpecs: new Set(),
           movementBreakdown: {} as Record<string, number>,
+          inBreakdown: {} as Record<string, number>,
         };
       }
       summary[pName].totalInStock += p.totalQty;
@@ -108,6 +111,7 @@ export default function UnitTrackingPage() {
     const end = new Date(stockHealthRange.end);
     end.setHours(23, 59, 59, 999);
 
+    // Aggregate Pull Outs
     requests.filter(r => {
       const d = new Date(r.createdAt);
       return r.status === 'APPROVED' && d >= start && d <= end;
@@ -115,6 +119,11 @@ export default function UnitTrackingPage() {
        const pName = req.item.product?.name || req.item.name || 'Unit Item';
        if (summary[pName]) {
          summary[pName].outToday += req.qty;
+         const unitField = req.item.fieldValues?.find((fv: any) => {
+            const val = fv.value;
+            return val && typeof val === 'object' && val.unit;
+         });
+         summary[pName].unit = unitField?.value?.unit || req.item.product?.unit || 'Units';
          
          const specString = req.item.fieldValues?.map((fv: any) => {
             const v = fv.value;
@@ -133,8 +142,27 @@ export default function UnitTrackingPage() {
        }
     });
 
+    // Aggregate Stock Ins from Activity Logs
+    stockInLogs.forEach(log => {
+      const pName = log.product?.name || log.item?.name || 'Unit Item';
+      if (summary[pName]) {
+        const qty = log.changes?.quantity ?? (log.action === 'SUBMIT_CONTENT' ? 1 : 0);
+        const unit = log.changes?.unit || log.product?.unit || 'Units';
+        summary[pName].inToday += qty;
+        summary[pName].unit = unit; // Keep track of the unit
+        
+        const specString = log.item?.fieldValues?.map((fv: any) => {
+           const v = fv.value;
+           const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+           return val ? String(val) : '';
+        }).filter(Boolean).sort().join(', ') || 'Standard';
+
+        summary[pName].inBreakdown[specString] = (summary[pName].inBreakdown[specString] || 0) + qty;
+      }
+    });
+
     return Object.values(summary);
-  }, [inventory, requests, stockHealthRange]);
+  }, [inventory, requests, stockInLogs, stockHealthRange]);
   
   const [logSearch, setLogSearch] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
@@ -162,7 +190,7 @@ export default function UnitTrackingPage() {
     const loadAll = async () => {
       if (isFirstLoad.current) setLoading(true);
       const startTime = Date.now();
-      await Promise.all([fetchRequests(), fetchInventory()]);
+      await Promise.all([fetchRequests(), fetchInventory(), fetchStockInLogs()]);
       const elapsed = Date.now() - startTime;
       
       if (isFirstLoad.current) {
@@ -206,6 +234,28 @@ export default function UnitTrackingPage() {
       console.error('Failed to fetch unit inventory', err);
     }
   };
+
+  const fetchStockInLogs = async () => {
+    try {
+      const res = await api.get('/logs', { 
+        params: { 
+          action: 'STOCK_IN,SUBMIT_CONTENT', 
+          startDate: stockHealthRange.start, 
+          endDate: stockHealthRange.end,
+          take: 5000 
+        } 
+      });
+      setStockInLogs(res.data.data || []);
+    } catch (err) {
+      console.error('Failed to fetch stock in logs', err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'insights') {
+      fetchStockInLogs();
+    }
+  }, [stockHealthRange, activeTab]);
 
   useEffect(() => {
     setPage(1);
@@ -478,7 +528,7 @@ export default function UnitTrackingPage() {
 
     // 4. Data Table
     const headerRow = sheet.getRow(9);
-    headerRow.values = ['Product Reference', 'Starting Stock', 'Movement Qty', 'Resulting Stock', 'Movement Breakdown'];
+    headerRow.values = ['Product Reference', 'Starting Stock', 'Stock In (+)', 'Stock Out (-)', 'Resulting Stock', 'Movement Breakdown'];
     headerRow.height = 30;
     headerRow.eachCell((cell) => {
       cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10, name: 'Aptos' };
@@ -493,16 +543,21 @@ export default function UnitTrackingPage() {
     });
 
     const dataRows = productSummary.map(item => {
-      const breakdownStr = Object.entries(item.movementBreakdown)
-        .map(([spec, qty]) => `${spec}: ${qty}`)
+      const outBreakdown = Object.entries(item.movementBreakdown)
+        .map(([spec, qty]) => `${spec}: -${qty}`)
+        .join(' | ');
+      
+      const inBreakdown = Object.entries(item.inBreakdown)
+        .map(([spec, qty]) => `${spec}: +${qty}`)
         .join(' | ');
         
       return [
         item.name,
-        item.totalInStock + item.outToday,
+        item.totalInStock + item.outToday - item.inToday,
+        item.inToday,
         -item.outToday,
         item.totalInStock,
-        breakdownStr || 'No Movement'
+        [inBreakdown, outBreakdown].filter(Boolean).join(' || ') || 'No Movement'
       ];
     });
 
@@ -620,10 +675,11 @@ export default function UnitTrackingPage() {
 
     // Column Widths
     sheet.getColumn(1).width = 35; // Reference
-    sheet.getColumn(2).width = 18; // Starting
-    sheet.getColumn(3).width = 18; // Movement
-    sheet.getColumn(4).width = 18; // Resulting
-    sheet.getColumn(5).width = 65; // Breakdown
+    sheet.getColumn(2).width = 15; // Starting
+    sheet.getColumn(3).width = 15; // In
+    sheet.getColumn(4).width = 15; // Out
+    sheet.getColumn(5).width = 15; // Resulting
+    sheet.getColumn(6).width = 65; // Breakdown
 
     // Remove Gridlines
     sheet.views = [{ ...sheet.views[0], showGridLines: false }];
@@ -978,9 +1034,8 @@ export default function UnitTrackingPage() {
                           <th className="px-8 py-4 print:px-2 print:py-2 text-[10px] font-black text-gray-400 print:text-gray-900 uppercase tracking-widest">Actual Item (Reference)</th>
                           <th className="px-8 py-4 print:px-2 print:py-2 text-[10px] font-black text-gray-400 print:text-gray-900 uppercase tracking-widest">Specifications</th>
                           <th className="px-8 py-4 print:px-2 print:py-2 text-[10px] font-black text-gray-400 print:text-gray-900 uppercase tracking-widest text-center">Starting Stock</th>
-                          <th className="px-8 py-4 print:px-2 print:py-2 text-[10px] font-black text-gray-400 print:text-gray-900 uppercase tracking-widest text-center">
-                              Movement ({stockHealthRange.start === stockHealthRange.end ? new Date(stockHealthRange.start).toLocaleDateString() : `${new Date(stockHealthRange.start).toLocaleDateString()} - ${new Date(stockHealthRange.end).toLocaleDateString()}`})
-                           </th>
+                          <th className="px-8 py-4 print:px-2 print:py-2 text-[10px] font-black text-gray-400 print:text-gray-900 uppercase tracking-widest text-center">Stock In (+)</th>
+                          <th className="px-8 py-4 print:px-2 print:py-2 text-[10px] font-black text-gray-400 print:text-gray-900 uppercase tracking-widest text-center">Stock Out (-)</th>
                           <th className="px-8 py-4 print:px-2 print:py-2 text-[10px] font-black text-gray-400 print:text-gray-900 uppercase tracking-widest text-center">Resulting Stock</th>
                        </tr>
                     </thead>
@@ -1024,21 +1079,37 @@ export default function UnitTrackingPage() {
                              <td className="px-8 py-6 print:px-2 print:py-3 text-center align-top">
                                 <div className="flex flex-col items-center">
                                    <span className="text-[10px] font-bold text-gray-400 uppercase leading-none mb-1">Starting</span>
-                                   <span className="text-sm print:text-xs font-black text-gray-900">{(item.totalInStock + item.outToday).toLocaleString()}</span>
+                                   <span className="text-sm print:text-xs font-black text-gray-900">
+                                      {(item.totalInStock + item.outToday - item.inToday).toLocaleString()} 
+                                      <span className="ml-1 text-[10px] text-gray-400 font-bold">{item.unit || 'Units'}</span>
+                                   </span>
                                 </div>
                              </td>
                              <td className="px-8 py-6 print:px-2 print:py-3 text-center align-top">
                                 <div className="flex flex-col items-center">
-                                   <span className="text-[10px] font-bold text-gray-400 uppercase leading-none mb-1">Movement</span>
-                                   <span className={`text-sm print:text-xs font-black ${item.outToday > 0 ? 'text-orange-600 print:text-gray-900' : 'text-gray-300 print:text-gray-400'}`}>
+                                   <span className="text-[10px] font-bold text-gray-400 uppercase leading-none mb-1 text-green-600">Stock In</span>
+                                   <span className={`text-sm print:text-xs font-black ${item.inToday > 0 ? 'text-green-600' : 'text-gray-300'}`}>
+                                      {item.inToday > 0 ? `+${item.inToday.toLocaleString()}` : '0'}
+                                      {item.inToday > 0 && <span className="ml-1 text-[10px] opacity-70 font-bold">{item.unit || 'Units'}</span>}
+                                   </span>
+                                </div>
+                             </td>
+                             <td className="px-8 py-6 print:px-2 print:py-3 text-center align-top">
+                                <div className="flex flex-col items-center">
+                                   <span className="text-[10px] font-bold text-gray-400 uppercase leading-none mb-1 text-orange-600">Stock Out</span>
+                                   <span className={`text-sm print:text-xs font-black ${item.outToday > 0 ? 'text-orange-600' : 'text-gray-300'}`}>
                                       {item.outToday > 0 ? `-${item.outToday.toLocaleString()}` : '0'}
+                                      {item.outToday > 0 && <span className="ml-1 text-[10px] opacity-70 font-bold">{item.unit || 'Units'}</span>}
                                    </span>
                                 </div>
                              </td>
                              <td className="px-8 py-6 print:px-2 print:py-3 text-center align-top bg-gray-50/50 rounded-r-2xl">
                                 <div className="flex flex-col items-center">
                                    <span className="text-[10px] font-black text-primary uppercase leading-none mb-1">Resulting</span>
-                                   <span className="text-sm print:text-xs font-black text-gray-900">{item.totalInStock.toLocaleString()}</span>
+                                   <span className="text-sm print:text-xs font-black text-gray-900">
+                                      {item.totalInStock.toLocaleString()}
+                                      <span className="ml-1 text-[10px] text-gray-400 font-bold">{item.unit || 'Units'}</span>
+                                   </span>
                                 </div>
                              </td>
                           </tr>
