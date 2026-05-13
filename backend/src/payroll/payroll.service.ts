@@ -91,10 +91,9 @@ export class PayrollService {
         this.logger.log(`Resume: Pre-fetched ${existingSysIds.size} existing employee IDs for batch ${batch.id}`);
       }
   
+      const PAGE_CONCURRENCY = 3;
       const userCache = new Map<string, any>();
-      const PAGE_CONCURRENCY = 5;
       
-      // Process pages in batches to avoid overwhelming resources
       for (let i = 0; i < totalPages; i += PAGE_CONCURRENCY) {
         if (this.cancelledBatches.has(batch.id)) {
           this.logger.warn(`Batch ${batch.id} was cancelled by user. Stopping processing.`);
@@ -103,7 +102,10 @@ export class PayrollService {
         }
 
         const pageChunk = Array.from({ length: Math.min(PAGE_CONCURRENCY, totalPages - i) }, (_, index) => i + index);
-        
+        const docsBatch: any[] = [];
+        const idsToLookup = new Set<string>();
+        const chunkResults: any[] = [];
+
         await Promise.all(pageChunk.map(async (pIdx) => {
           const pageNumber = pIdx + 1;
           try {
@@ -115,7 +117,7 @@ export class PayrollService {
             const idsOnPage = await this.scanSinglePageForIds(Buffer.from(pageBytes));
             
             if (idsOnPage.length === 0) {
-              results.push({ page: pageNumber, status: 'skipped', reason: 'No ID found' });
+              chunkResults.push({ page: pageNumber, status: 'skipped', reason: 'No ID found' });
               return;
             }
     
@@ -123,7 +125,7 @@ export class PayrollService {
               employeeId = this.normalizeSysId(employeeId);
     
               if (existingSysIds.has(employeeId)) {
-                results.push({ page: pageNumber, id: employeeId, status: 'skipped', reason: 'Duplicate' });
+                chunkResults.push({ page: pageNumber, id: employeeId, status: 'skipped', reason: 'Duplicate' });
                 continue;
               }
               
@@ -144,40 +146,90 @@ export class PayrollService {
                 .storage
                 .from('payroll-documents')
                 .getPublicUrl(filePath);
-    
-              const cacheKey = `${employeeId}_${label || ''}`;
-              let employee = userCache.get(cacheKey);
-              
-              if (!employee && !userCache.has(cacheKey)) {
-                employee = await this.prisma.user.findFirst({
-                  where: { 
-                    sys_id: employeeId,
-                    ...(label ? { company_label: label } : {})
-                  }
-                });
-                userCache.set(cacheKey, employee || null);
-              }
-    
-              await this.prisma.document.create({
-                data: {
-                  batch_id: batch.id,
-                  user_id: employee?.id || null,
-                  sys_id: employeeId,
-                  storage_path: publicUrl,
-                  file_name: fileName,
-                  file_type: 'PAYSLIP_PAGE',
-                  remark: remark || null,
-                },
+
+              docsBatch.push({
+                batch_id: batch.id,
+                sys_id: employeeId,
+                storage_path: publicUrl,
+                file_name: fileName,
+                file_type: 'PAYSLIP_PAGE',
+                remark: remark || null,
+                pageNumber, // temporary for result tracking
               });
-              
-              existingSysIds.add(employeeId);
-              results.push({ page: pageNumber, id: employeeId, status: 'success' });
+              idsToLookup.add(employeeId);
             }
           } catch (err) {
             this.logger.error(`Error processing page ${pageNumber}: ${err.message}`);
-            results.push({ page: pageNumber, status: 'error', error: err.message });
+            chunkResults.push({ page: pageNumber, status: 'error', error: err.message });
           }
         }));
+
+        // Batch Database Operations for the chunk
+        if (docsBatch.length > 0) {
+          try {
+            // Lookup users for all IDs in this batch
+            const missingIds = Array.from(idsToLookup).filter(id => !userCache.has(id));
+            if (missingIds.length > 0) {
+              const foundUsers = await this.prisma.user.findMany({
+                where: { 
+                  sys_id: { in: missingIds },
+                  ...(label ? { company_label: label } : {})
+                }
+              });
+              foundUsers.forEach(u => {
+                if (u.sys_id) userCache.set(u.sys_id, u.id);
+              });
+              missingIds.forEach(id => {
+                if (!userCache.has(id)) userCache.set(id, null);
+              });
+            }
+
+            // Prepare for createMany (Prisma doesn't allow extra fields like pageNumber)
+            const prismaData = docsBatch.map(({ pageNumber, ...data }) => ({
+              ...data,
+              user_id: userCache.get(data.sys_id) || null
+            }));
+
+            await this.prisma.document.createMany({
+              data: prismaData
+            });
+
+            docsBatch.forEach(d => {
+              existingSysIds.add(this.normalizeSysId(d.sys_id));
+              chunkResults.push({ page: d.pageNumber, id: d.sys_id, status: 'success' });
+            });
+          } catch (dbErr) {
+            this.logger.error(`Database error in batch processing: ${dbErr.message}`);
+            // Fallback to individual creation if createMany fails (or just log error)
+            for (const doc of docsBatch) {
+              try {
+                await this.prisma.document.create({
+                  data: {
+                    batch_id: doc.batch_id,
+                    sys_id: doc.sys_id,
+                    user_id: userCache.get(doc.sys_id) || null,
+                    storage_path: doc.storage_path,
+                    file_name: doc.file_name,
+                    file_type: doc.file_type,
+                    remark: doc.remark,
+                  }
+                });
+                existingSysIds.add(this.normalizeSysId(doc.sys_id));
+                chunkResults.push({ page: doc.pageNumber, id: doc.sys_id, status: 'success' });
+              } catch (indivErr) {
+                this.logger.error(`Failed individual fallback for ${doc.sys_id}: ${indivErr.message}`);
+                chunkResults.push({ page: doc.pageNumber, status: 'error', error: indivErr.message });
+              }
+            }
+          }
+        }
+
+        results.push(...chunkResults);
+        
+        // Brief pause to allow DB connections to release
+        if (i + PAGE_CONCURRENCY < totalPages) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
       }
   
       const added = results.filter(r => r.status === 'success').length;
