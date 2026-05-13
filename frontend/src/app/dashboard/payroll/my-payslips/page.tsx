@@ -18,7 +18,9 @@ import {
   Loader2,
   RefreshCw,
   Plus,
-  Users
+  Users,
+  ArrowUpDown,
+  Filter
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -33,6 +35,7 @@ export default function IntegratedEmployeePayslips() {
   const [isAdminView, setIsAdminView] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showRawIds, setShowRawIds] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const router = useRouter();
   
   // Selection State
@@ -99,14 +102,19 @@ export default function IntegratedEmployeePayslips() {
 
   const filteredSlips = slips.filter(slip => {
     if (selectedRunId !== 'all' && slip.batch?.id !== selectedRunId) return false;
-    if (selectedLabel !== 'all' && (slip.batch?.label || 'General') !== selectedLabel) return false;
+    if (selectedLabel !== 'all' && (slip.batch?.label || slip.batch?.client_name || 'General') !== selectedLabel) return false;
     const search = searchTerm.toLowerCase();
-    const name = (slip.fullName || '').toLowerCase();
+    const name = (slip.user?.fullName || slip.sys_id || '').toLowerCase();
     const sysId = (slip.sys_id || '').toLowerCase();
     return name.includes(search) || sysId.includes(search);
+  }).sort((a, b) => {
+    const nameA = (a.user?.fullName || a.sys_id || '').toLowerCase();
+    const nameB = (b.user?.fullName || b.sys_id || '').toLowerCase();
+    if (sortOrder === 'asc') return nameA.localeCompare(nameB);
+    return nameB.localeCompare(nameA);
   });
 
-  const uniqueLabels = Array.from(new Set(runs.map(r => r.label || 'General')));
+  const uniqueLabels = Array.from(new Set(runs.map(r => r.label || r.client_name || 'General')));
 
   const needsSync = isAdminView && 
                     filteredSlips.length > 0 && 
@@ -249,13 +257,13 @@ export default function IntegratedEmployeePayslips() {
           </h1>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-wrap gap-3">
           <div className="relative group">
             <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
             <select 
               value={selectedRunId}
               onChange={(e) => setSelectedRunId(e.target.value)}
-              className="pl-12 pr-10 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-black focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all appearance-none min-w-[200px]"
+              className="pl-12 pr-10 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-black focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all appearance-none min-w-[180px]"
             >
               <option value="all">All Periods</option>
               {runs.map(run => (
@@ -266,15 +274,41 @@ export default function IntegratedEmployeePayslips() {
             </select>
           </div>
 
+          <div className="relative group">
+            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
+            <select 
+              value={selectedLabel}
+              onChange={(e) => setSelectedLabel(e.target.value)}
+              className="pl-12 pr-10 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-black focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all appearance-none min-w-[180px]"
+            >
+              <option value="all">All Clients</option>
+              {uniqueLabels.map(label => (
+                <option key={label} value={label}>{label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="relative group">
+            <ArrowUpDown className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
+            <select 
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
+              className="pl-12 pr-10 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-black focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all appearance-none min-w-[160px]"
+            >
+              <option value="asc">Name (A-Z)</option>
+              <option value="desc">Name (Z-A)</option>
+            </select>
+          </div>
+
           {isAdminView && (
-            <div className="relative group">
+            <div className="relative group flex-1 min-w-[200px]">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
               <input 
                 type="text"
                 placeholder="Search Name or ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-12 pr-6 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all w-full md:w-64"
+                className="pl-12 pr-6 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all w-full"
               />
             </div>
           )}
