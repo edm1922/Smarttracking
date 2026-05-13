@@ -393,11 +393,24 @@ export class InternalRequestsService {
   }
 
   async getUniqueEmployees() {
-    const employees = await this.prisma.internalRequest.findMany({
-      select: { employeeName: true, employeeRole: true },
-      distinct: ['employeeName'],
-      orderBy: { employeeName: 'asc' },
-    });
-    return employees.map(e => ({ name: e.employeeName, position: e.employeeRole }));
+    try {
+      const allRequests = await this.prisma.internalRequest.findMany({
+        select: { employeeName: true, employeeRole: true },
+        orderBy: { employeeName: 'asc' },
+      });
+      
+      // Manual distinct in memory
+      const seen = new Set();
+      const uniqueEmployees = allRequests.filter(e => {
+        if (seen.has(e.employeeName)) return false;
+        seen.add(e.employeeName);
+        return true;
+      });
+      
+      return uniqueEmployees.map(e => ({ name: e.employeeName, position: e.employeeRole }));
+    } catch (error) {
+      console.error('[InternalRequestsService] getUniqueEmployees error:', error);
+      throw error;
+    }
   }
 }

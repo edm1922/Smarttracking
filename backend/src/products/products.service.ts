@@ -51,89 +51,28 @@ export class ProductsService {
     const safeTake = Math.min(take ?? 20, 2000);
     const start = Date.now();
 
-    if (stockFilter && stockFilter !== 'all') {
-      // O(1) OPTIMIZATION: Use database aggregation with HAVING clause
-      // Push filtering to DB level instead of loading all products into memory
-      
-      // Build the base query with stock aggregation
-      const stockFilterSql = {
-        restock: Prisma.sql`HAVING COALESCE(SUM(ps."quantity"), 0) < p."threshold"`,
-        low: Prisma.sql`HAVING COALESCE(SUM(ps."quantity"), 0) = p."threshold"`,
-        high: Prisma.sql`HAVING COALESCE(SUM(ps."quantity"), 0) > p."threshold"`,
-      };
-
-      const havingClause = stockFilterSql[stockFilter as keyof typeof stockFilterSql];
-      if (!havingClause) {
-        // Invalid filter, use normal query
-        const [data, total] = await Promise.all([
-          this.prisma.product.findMany({ where, skip, take: safeTake, select, orderBy: { name: 'asc' } }),
-          this.prisma.product.count({ where }),
-        ]);
-        return { data, total };
-      }
-
-      // Use raw query with proper aggregation
-      const searchCondition = search 
-        ? Prisma.sql`AND (p.name ILIKE ${'%' + search + '%'} OR p.sku ILIKE ${'%' + search + '%'})`
-        : Prisma.empty;
-      const roleCondition = role !== 'admin' ? Prisma.sql`AND p."showInInventory" = true` : Prisma.empty;
-
-      const result = await this.prisma.$queryRaw<Array<any>>`
-        SELECT p.id, p.sku, p.name, p.description, p.unit, p.price, p.threshold, 
-               p."imageUrl", p."imageUrl2", p."showInInventory", p."createdAt",
-               COALESCE(SUM(ps."quantity"), 0)::int as "totalStock"
-        FROM "Product" p
-        LEFT JOIN "ProductStock" ps ON p.id = ps."productId"
-        WHERE 1=1 ${searchCondition} ${roleCondition}
-        GROUP BY p.id, p.sku, p.name, p.description, p.unit, p.price, p.threshold, 
-                 p."imageUrl", p."imageUrl2", p."showInInventory", p."createdAt"
-        ${havingClause}
-        ORDER BY p.name ASC
-        LIMIT ${safeTake} OFFSET ${skip}
-      `;
-
-      const totalResult = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
-        SELECT COUNT(*)::int as count
-        FROM (
-          SELECT p.id
-          FROM "Product" p
-          LEFT JOIN "ProductStock" ps ON p.id = ps."productId"
-          WHERE 1=1 ${searchCondition} ${roleCondition}
-          GROUP BY p.id
-          ${havingClause}
-        ) sub
-      `;
+    try {
+      const [data, total] = await Promise.all([
+        this.prisma.product.findMany({
+          where,
+          skip,
+          take: safeTake,
+          select,
+          orderBy: { name: 'asc' },
+        }),
+        this.prisma.product.count({ where }),
+      ]);
 
       const duration = Date.now() - start;
       if (duration > 300) {
-        console.warn(`[ProductsService] Slow findAll (StockFilter) query: ${duration}ms`);
+        console.warn(`[ProductsService] Slow findAll query: ${duration}ms`);
       }
 
-      const data = result.map((p) => ({
-        ...p,
-        stocks: [{ quantity: p.totalStock, locationId: null, location: null }],
-      }));
-
-      return { data, total: Number(totalResult[0]?.count || 0) };
+      return { data, total };
+    } catch (error) {
+      console.error('[ProductsService] findAll error:', error);
+      throw error;
     }
-
-    const [data, total] = await Promise.all([
-      this.prisma.product.findMany({
-        where,
-        skip,
-        take: safeTake,
-        select,
-        orderBy: { name: 'asc' },
-      }),
-      this.prisma.product.count({ where }),
-    ]);
-
-    const duration = Date.now() - start;
-    if (duration > 300) {
-      console.warn(`[ProductsService] Slow findAll query: ${duration}ms`);
-    }
-
-    return { data, total };
   }
 
   async create(data: {

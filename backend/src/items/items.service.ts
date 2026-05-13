@@ -554,8 +554,11 @@ export class ItemsService {
     const logQuantity = unitValue?.qty || 1;
     const logUnit = unitValue?.unit || 'Units';
 
+    // Use a real user ID for the log (required by foreign key constraint)
+    const systemUser = await this.prisma.user.findFirst({ where: { role: 'admin' } });
+    
     await this.logsService.create({
-      userId: 'anonymous', // Public form submission
+      userId: systemUser?.id || '7b026b2a-d53a-486d-9a15-3cc0229e43cf', 
       itemId: item.id,
       action: 'SUBMIT_CONTENT',
       changes: { name: name || item.name, quantity: logQuantity, unit: logUnit },
