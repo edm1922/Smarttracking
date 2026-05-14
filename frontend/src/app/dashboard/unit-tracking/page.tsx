@@ -145,11 +145,27 @@ export default function UnitTrackingPage() {
     // Aggregate Stock Ins from Activity Logs
     stockInLogs.forEach(log => {
       const pName = log.product?.name || log.item?.name || 'Unit Item';
-      if (summary[pName]) {
-        const qty = log.changes?.quantity ?? (log.action === 'SUBMIT_CONTENT' ? 1 : 0);
-        const unit = log.changes?.unit || log.product?.unit || 'Units';
+      
+      // Initialize summary entry if it doesn't exist (e.g. item was added and then fully released)
+      if (!summary[pName]) {
+        summary[pName] = {
+          name: pName,
+          totalInStock: 0,
+          outToday: 0,
+          inToday: 0,
+          specs: new Set(),
+          outSpecs: new Set(),
+          movementBreakdown: {} as Record<string, number>,
+          inBreakdown: {} as Record<string, number>,
+        };
+      }
+
+      const qty = log.changes?.quantity ?? (log.action === 'SUBMIT_CONTENT' || log.action === 'CREATE_ITEM' ? 1 : 0);
+      const unit = log.changes?.unit || log.product?.unit || log.item?.unit || 'Units';
+      
+      if (qty > 0) {
         summary[pName].inToday += qty;
-        summary[pName].unit = unit; // Keep track of the unit
+        summary[pName].unit = unit; 
         
         const specString = log.item?.fieldValues?.map((fv: any) => {
            const v = fv.value;
@@ -158,6 +174,13 @@ export default function UnitTrackingPage() {
         }).filter(Boolean).sort().join(', ') || 'Standard';
 
         summary[pName].inBreakdown[specString] = (summary[pName].inBreakdown[specString] || 0) + qty;
+        
+        // Add specs to the main specs set so they show up in the table
+        log.item?.fieldValues?.forEach((fv: any) => {
+           const v = fv.value;
+           const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+           if (val) summary[pName].specs.add(String(val));
+        });
       }
     });
 
@@ -239,10 +262,10 @@ export default function UnitTrackingPage() {
     try {
       const res = await api.get('/logs', { 
         params: { 
-          action: 'STOCK_IN,SUBMIT_CONTENT', 
+          action: 'STOCK_IN,SUBMIT_CONTENT,CREATE_ITEM', 
           startDate: stockHealthRange.start, 
           endDate: stockHealthRange.end,
-          take: 5000 
+          take: 10000 
         } 
       });
       setStockInLogs(res.data.data || []);
