@@ -101,7 +101,16 @@ export class LogsService {
             select: { username: true, role: true },
           },
           item: {
-            select: { slug: true, name: true },
+            select: { 
+              slug: true, 
+              name: true,
+              fieldValues: {
+                select: {
+                  value: true,
+                  field: { select: { name: true } }
+                }
+              }
+            },
           },
           product: {
             select: { sku: true, name: true, unit: true },
