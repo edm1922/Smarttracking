@@ -35,6 +35,9 @@ export default function UnitTrackingPage() {
   const custodianData = useMemo(() => {
     const groups: Record<string, any> = {};
     requests.filter(r => r.status === 'APPROVED').forEach(req => {
+      const pName = req.item.product?.name || req.item.name;
+      if (!pName || pName.trim() === '') return;
+      
       const username = req.user.username;
       if (!groups[username]) {
         groups[username] = {
@@ -44,7 +47,7 @@ export default function UnitTrackingPage() {
           lastActivity: req.createdAt
         };
       }
-      groups[username].items.add(req.item.product?.name || req.item.name || 'Unit Item');
+      groups[username].items.add(pName);
       groups[username].totalQty += req.qty;
       if (new Date(req.createdAt) > new Date(groups[username].lastActivity)) {
         groups[username].lastActivity = req.createdAt;
@@ -116,7 +119,9 @@ export default function UnitTrackingPage() {
       const d = new Date(r.createdAt);
       return r.status === 'APPROVED' && d >= start && d <= end;
     }).forEach(req => {
-       const pName = req.item.product?.name || req.item.name || 'Unit Item';
+       const pName = req.item.product?.name || req.item.name;
+       if (!pName || pName.trim() === '') return;
+       
        if (summary[pName]) {
          summary[pName].outToday += req.qty;
          const unitField = req.item.fieldValues?.find((fv: any) => {
@@ -144,7 +149,8 @@ export default function UnitTrackingPage() {
 
     // Aggregate Stock Ins from Activity Logs
     stockInLogs.forEach(log => {
-      const pName = log.product?.name || log.item?.name || 'Unit Item';
+      const pName = log.product?.name || log.item?.name;
+      if (!pName || pName.trim() === '') return;
       
       // Initialize summary entry if it doesn't exist (e.g. item was added and then fully released)
       if (!summary[pName]) {
@@ -160,7 +166,17 @@ export default function UnitTrackingPage() {
         };
       }
 
-      const qty = log.changes?.quantity ?? (log.action === 'SUBMIT_CONTENT' || log.action === 'CREATE_ITEM' ? 1 : 0);
+      const unitField = log.item?.fieldValues?.find((fv: any) => {
+         const val = fv.value;
+         return val && typeof val === 'object' && val.useUnitQty;
+      });
+      const liveQty = unitField && !isNaN(Number(unitField.value?.qty)) ? Number(unitField.value.qty) : undefined;
+      
+      let qty = liveQty ?? Number(log.changes?.quantity);
+      if (isNaN(qty) || (liveQty === undefined && log.changes?.quantity === undefined)) {
+         qty = (log.action === 'SUBMIT_CONTENT' || log.action === 'CREATE_ITEM' ? 1 : 0);
+      }
+
       const unit = log.changes?.unit || log.product?.unit || log.item?.unit || 'Units';
       
       if (qty > 0) {
