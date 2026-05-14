@@ -4,13 +4,17 @@ import { createClient } from '@supabase/supabase-js';
 import * as pdfReader from 'pdfreader';
 import { PDFDocument } from 'pdf-lib';
 import * as bcrypt from 'bcrypt';
+import { LogsService } from '../logs/logs.service';
 
 @Injectable()
 export class PayrollService {
   private readonly logger = new Logger(PayrollService.name);
   private supabaseAdmin;
 
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private prisma: PrismaService,
+    private logsService: LogsService,
+  ) {
     const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -397,6 +401,12 @@ export class PayrollService {
     }
 
     console.log(`[Portal Login] Success for user: ${user.sys_id}`);
+
+    await this.logsService.create({
+      userId: user.id,
+      action: 'LOGIN',
+      changes: { username: user.username }
+    });
 
     return {
       id: user.id,
