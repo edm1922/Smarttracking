@@ -148,11 +148,30 @@ export default function UnitTrackingPage() {
     });
 
     // Aggregate Stock Ins from Activity Logs
-    stockInLogs.forEach(log => {
+    const processedSlugs = new Set<string>();
+    
+    // Sort logs by date ascending to process the first entry of the day for each item first
+    const sortedLogs = [...stockInLogs].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+    sortedLogs.forEach(log => {
       const pName = log.product?.name || log.item?.name;
       if (!pName || pName.trim() === '') return;
+
+      const slug = log.item?.slug;
       
-      // Initialize summary entry if it doesn't exist (e.g. item was added and then fully released)
+      // Avoid double-counting the same item (QR code) in the same period
+      if (slug) {
+        if (processedSlugs.has(slug)) return;
+        
+        // Filter: Only count as stock-in if it's a known stock-in action OR an UPDATE that assigned a name for the first time
+        const isKnownStockIn = ['STOCK_IN', 'SUBMIT_CONTENT', 'CREATE_ITEM'].includes(log.action);
+        const isInitialAssignment = log.action === 'UPDATE_ITEM' && log.changes?.name?.old === null;
+        
+        if (!isKnownStockIn && !isInitialAssignment) return;
+        processedSlugs.add(slug);
+      }
+      
+      // Initialize summary entry if it doesn't exist
       if (!summary[pName]) {
         summary[pName] = {
           name: pName,
@@ -174,7 +193,7 @@ export default function UnitTrackingPage() {
       
       let qty = liveQty ?? Number(log.changes?.quantity);
       if (isNaN(qty) || (liveQty === undefined && log.changes?.quantity === undefined)) {
-         qty = (log.action === 'SUBMIT_CONTENT' || log.action === 'CREATE_ITEM' ? 1 : 0);
+         qty = (log.action === 'SUBMIT_CONTENT' || log.action === 'CREATE_ITEM' || log.action === 'UPDATE_ITEM' ? 1 : 0);
       }
 
       const unit = log.changes?.unit || log.product?.unit || log.item?.unit || 'Units';
@@ -194,7 +213,7 @@ export default function UnitTrackingPage() {
         // Add specs to the main specs set so they show up in the table
         log.item?.fieldValues?.forEach((fv: any) => {
            const v = fv.value;
-           const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+           const val = v && typeof fv.value === 'object' ? (v.main ?? v.qty) : v;
            if (val) summary[pName].specs.add(String(val));
         });
       }
@@ -278,7 +297,7 @@ export default function UnitTrackingPage() {
     try {
       const res = await api.get('/logs', { 
         params: { 
-          action: 'STOCK_IN,SUBMIT_CONTENT,CREATE_ITEM', 
+          action: 'STOCK_IN,SUBMIT_CONTENT,CREATE_ITEM,UPDATE_ITEM', 
           startDate: stockHealthRange.start, 
           endDate: stockHealthRange.end,
           take: 10000 
@@ -518,16 +537,11 @@ export default function UnitTrackingPage() {
     });
 
     // 1. Report Header (Title)
-    sheet.mergeCells('A1:E1');
+    sheet.mergeCells('A1:F1');
     const titleCell = sheet.getCell('A1');
-    titleCell.value = 'MATERIAL TRANSMITTAL REPORT';
-    titleCell.font = { name: 'Aptos', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+    titleCell.value = 'UNIFORM STOCK REPORT';
+    titleCell.font = { name: 'Arial', size: 18, bold: true, color: { argb: 'FF0F172A' } };
     titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    titleCell.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF1E293B' } // Dark Slate 800
-    };
     sheet.getRow(1).height = 40;
 
     // 2. Metadata Section (Info)
@@ -558,10 +572,10 @@ export default function UnitTrackingPage() {
     sheet.getRow(7).height = 10;
 
     // 3. Stock Movement Header
-    sheet.mergeCells('A8:E8');
+    sheet.mergeCells('A8:F8');
     const tableTitle = sheet.getCell('A8');
-    tableTitle.value = 'STOCK MOVEMENT DATA';
-    tableTitle.font = { bold: true, size: 11, name: 'Aptos', color: { argb: 'FF334155' } };
+    tableTitle.value = 'STOCK MOVEMENT';
+    tableTitle.font = { bold: true, size: 11, name: 'Arial', color: { argb: 'FF1E293B' } };
     tableTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
     sheet.getRow(8).height = 25;
 
@@ -569,9 +583,16 @@ export default function UnitTrackingPage() {
     const headerRow = sheet.getRow(9);
     headerRow.values = ['Product Reference', 'Starting Stock', 'Stock In (+)', 'Stock Out (-)', 'Resulting Stock', 'Movement Breakdown'];
     headerRow.height = 30;
-    headerRow.eachCell((cell) => {
-      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10, name: 'Aptos' };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+    headerRow.eachCell((cell, colNumber) => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10, name: 'Arial' };
+      
+      // Professional color-coded headers base on reference
+      let bgColor = 'FF334155'; // Default Slate
+      if (colNumber === 3) bgColor = 'FF065F46'; // Stock In - Green
+      if (colNumber === 4) bgColor = 'FF991B1B'; // Stock Out - Red
+      if (colNumber === 5) bgColor = 'FF1E40AF'; // Resulting Stock - Blue
+
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
       cell.border = {
         top: { style: 'thin' },
@@ -581,47 +602,64 @@ export default function UnitTrackingPage() {
       };
     });
 
-    const dataRows = productSummary.map(item => {
-      const outBreakdown = Object.entries(item.movementBreakdown)
-        .map(([spec, qty]) => `${spec}: -${qty}`)
-        .join(' | ');
-      
-      const inBreakdown = Object.entries(item.inBreakdown)
-        .map(([spec, qty]) => `${spec}: +${qty}`)
-        .join(' | ');
+
+    const dataRows = productSummary
+      .filter(item => item.inToday > 0 || item.outToday > 0)
+      .map(item => {
+        const outBreakdown = Object.entries(item.movementBreakdown)
+          .map(([spec, qty]) => `${spec}: -${qty}`)
+          .join(' | ');
         
-      return [
-        item.name,
-        item.totalInStock + item.outToday - item.inToday,
-        item.inToday,
-        -item.outToday,
-        item.totalInStock,
-        [inBreakdown, outBreakdown].filter(Boolean).join(' || ') || 'No Movement'
-      ];
-    });
+        const inBreakdown = Object.entries(item.inBreakdown)
+          .map(([spec, qty]) => `${spec}: +${qty}`)
+          .join(' | ');
+          
+        return [
+          item.name,
+          item.totalInStock + item.outToday - item.inToday,
+          item.inToday,
+          -item.outToday,
+          item.totalInStock,
+          [inBreakdown, outBreakdown].filter(Boolean).join(' || ') || 'No Movement'
+        ];
+      });
 
     dataRows.forEach((row, i) => {
       const excelRow = sheet.addRow(row);
       excelRow.height = 25;
       excelRow.eachCell((cell, colNumber) => {
-        cell.font = { name: 'Aptos', size: 10 };
-        cell.alignment = { vertical: 'middle', horizontal: colNumber === 1 || colNumber === 5 ? 'left' : 'right' };
+        cell.font = { name: 'Arial', size: 10 };
+        cell.alignment = { vertical: 'middle', horizontal: colNumber === 1 || colNumber === 6 ? 'left' : 'right' };
+        
+        // Full borders for a clean table look
         cell.border = {
-          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+          top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
         };
         
         // Product Reference bold
-        if (colNumber === 1) cell.font = { bold: true, name: 'Aptos' };
+        if (colNumber === 1) {
+          cell.font = { bold: true, name: 'Arial', size: 10 };
+          cell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+        }
         
-        // Movement Qty Red if negative
-        if (colNumber === 3 && typeof cell.value === 'number' && cell.value < 0) {
-          cell.font = { color: { argb: 'FFEF4444' }, bold: true, name: 'Aptos' };
+        // Stock Out Red if negative
+        if (colNumber === 4 && typeof cell.value === 'number' && cell.value < 0) {
+          cell.font = { color: { argb: 'FFEF4444' }, bold: true, name: 'Arial' };
+        }
+
+        // Stock In Bold Green-ish (Blue-ish in current palette)
+        if (colNumber === 3 && typeof cell.value === 'number' && cell.value > 0) {
+          cell.font = { color: { argb: 'FF2563EB' }, bold: true, name: 'Arial' };
         }
 
         // Breakdown wrapping
-        if (colNumber === 5) {
-          cell.alignment = { wrapText: true, vertical: 'top', horizontal: 'left' };
-          excelRow.height = Math.max(25, (String(cell.value).length / 40) * 15);
+        if (colNumber === 6) {
+          cell.alignment = { wrapText: true, vertical: 'top', horizontal: 'left', indent: 1 };
+          const lineCount = Math.max(1, String(cell.value).split('|').length);
+          excelRow.height = Math.max(25, lineCount * 15);
         }
 
         // Alternating row colors
@@ -632,36 +670,31 @@ export default function UnitTrackingPage() {
     });
 
     // Enable Autofilter
-    sheet.autoFilter = 'A9:E9';
+    sheet.autoFilter = {
+      from: 'A9',
+      to: {
+        row: 9,
+        column: 5
+      }
+    };
 
     // Conditional Formatting for Resulting Stock
     const lastDataRow = 9 + dataRows.length;
-    sheet.addConditionalFormatting({
-      ref: `D10:D${lastDataRow}`,
-      rules: [
-        {
-          priority: 1,
-          type: 'cellIs',
-          operator: 'lessThan',
-          formulae: ['20'], // Low stock example
-          style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFFEE2E2' } }, font: { color: { argb: 'FF991B1B' }, bold: true } }
-        },
-        {
-          priority: 2,
-          type: 'cellIs',
-          operator: 'between',
-          formulae: ['20', '50'],
-          style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFFEF3C7' } }, font: { color: { argb: 'FF92400E' }, bold: true } }
-        },
-        {
-          priority: 3,
-          type: 'cellIs',
-          operator: 'greaterThan',
-          formulae: ['50'],
-          style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFDCFCE7' } }, font: { color: { argb: 'FF166534' }, bold: true } }
-        }
-      ]
-    });
+    if (dataRows.length > 0) {
+      sheet.addConditionalFormatting({
+        ref: `E10:E${lastDataRow}`,
+        rules: [
+          {
+            priority: 1,
+            type: 'cellIs',
+            operator: 'lessThan',
+            formulae: ['20'],
+            style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFFEE2E2' } }, font: { color: { argb: 'FF991B1B' }, bold: true } }
+          }
+        ]
+      });
+    }
+
 
     // 5. Signatories Section
     let currentSigRow = lastDataRow + 3;
@@ -720,7 +753,7 @@ export default function UnitTrackingPage() {
     sheet.getColumn(5).width = 15; // Resulting
     sheet.getColumn(6).width = 65; // Breakdown
 
-    // Remove Gridlines
+    // Remove Gridlines for a cleaner look
     sheet.views = [{ ...sheet.views[0], showGridLines: false }];
 
     // Generate Buffer and Save
