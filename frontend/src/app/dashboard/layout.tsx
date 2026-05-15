@@ -101,6 +101,16 @@ useEffect(() => {
       ]
     },
     { 
+      name: 'RSQ', 
+      href: '/dashboard/rsq', 
+      icon: ClipboardList,
+      subItems: [
+        { name: 'Fabric Inventory', href: '/dashboard/rsq?tab=fabrics' },
+        { name: 'Tailoring Hub', href: '/dashboard/rsq?tab=requests' },
+        { name: 'Transaction History', href: '/dashboard/rsq?tab=transactions' },
+      ]
+    },
+    { 
       name: 'Transmittal', 
       href: '/dashboard/transmittal', 
       icon: FileText,
