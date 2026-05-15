@@ -670,6 +670,7 @@ model Product {
   InternalRequest    InternalRequest[]
   stocks             ProductStock[]
   ProductTransaction ProductTransaction[]
+  TailoringRequest   TailoringRequest[]
 
   @@schema("public")
 }
@@ -1026,4 +1027,74 @@ enum one_time_token_type {
   phone_change_token
 
   @@schema("auth")
+}
+
+model Fabric {
+  id                String              @id @default(uuid())
+  name              String              @unique
+  type              String
+  color             String?
+  unit              String              @default("Roll")
+  unitPrice         Float               @default(0)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  transactions      FabricTransaction[]
+  tailoringRequests TailoringRequest[]
+
+  @@schema("public")
+}
+
+model Tailor {
+  id                String             @id @default(uuid())
+  name              String             @unique
+  address           String?
+  contactPerson     String?
+  contactNumber     String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  tailoringRequests TailoringRequest[]
+
+  @@schema("public")
+}
+
+model FabricTransaction {
+  id            String   @id @default(uuid())
+  transactionNo String   @unique
+  fabricId      String
+  type          String // STOCK_IN, WITHDRAWAL, RETURN, INITIAL_BALANCE
+  quantity      Float
+  unit          String
+  remarks       String?
+  date          DateTime @default(now())
+  location      String?  @default("BODEGA")
+  createdAt     DateTime @default(now())
+  fabric        Fabric   @relation(fields: [fabricId], references: [id], onDelete: Cascade)
+
+  @@index([fabricId])
+  @@index([date])
+  @@schema("public")
+}
+
+model TailoringRequest {
+  id               String   @id @default(uuid())
+  rsqNo            String   @unique
+  fabricId         String?
+  productId        String? // Finished product link
+  tailorId         String
+  quantityOrdered  Float
+  quantityReceived Float    @default(0)
+  unit             String   @default("pcs")
+  orderDate        DateTime @default(now())
+  targetDate       DateTime?
+  status           String   @default("PENDING") // PENDING, IN_PRODUCTION, COMPLETED, CANCELLED
+  remarks          String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  fabric           Fabric?  @relation(fields: [fabricId], references: [id])
+  product          Product? @relation(fields: [productId], references: [id])
+  tailor           Tailor   @relation(fields: [tailorId], references: [id])
+
+  @@index([status])
+  @@index([orderDate])
+  @@schema("public")
 }
