@@ -1,36 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  Printer, Plus, Trash2, Search, Box,
-  User, Calendar, MapPin, Building2, FileText, ArrowLeft
-} from 'lucide-react';
-import Link from 'next/link';
+import { Printer } from 'lucide-react';
 import api from '@/lib/api';
-
-interface Product {
-  id: string;
-  sku: string;
-  name: string;
-  description: string | null;
-  unit: string;
-  stocks: { quantity: number; location: { name: string } }[];
-}
-
-interface TransmittalItem {
-  id: string;
-  productId: string;
-  logIds: string[];
-  name: string;
-  sku: string;
-  unit: string;
-  quantity: number;
-  requestedBy?: string;
-  dateRequested?: string;
-}
+import { TransmittalHeaderInfo, TransmittalItem } from '../types';
+import { TransmittalHeaderForm } from '../components/TransmittalHeaderForm';
+import { TransmittalItemSelector } from '../components/TransmittalItemSelector';
+import { TransmittalSelectedItems } from '../components/TransmittalSelectedItems';
+import { PrintableTransmittal } from '../components/PrintableTransmittal';
 
 export default function ProductTransmittalPage() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [selectionMode, setSelectionMode] = useState<'PRODUCT' | 'LOG' | 'RELEASE'>('PRODUCT');
   const [transmittalType, setTransmittalType] = useState<'MATERIAL' | 'EMPLOYEE'>('MATERIAL');
   const [logs, setLogs] = useState<any[]>([]);
@@ -45,7 +25,7 @@ export default function ProductTransmittalPage() {
   const [mounted, setMounted] = useState(false);
 
   // Transmittal Header Info
-  const [headerInfo, setHeaderInfo] = useState({
+  const [headerInfo, setHeaderInfo] = useState<TransmittalHeaderInfo>({
     transmittalNo: '',
     date: '',
     department: '',
@@ -81,8 +61,10 @@ export default function ProductTransmittalPage() {
           productId: p.id,
           name: p.name,
           sku: p.sku,
+          description: p.description,
           unit: p.unit || 'PCS',
-          quantity: 1
+          quantity: 1,
+          logIds: []
         })));
         localStorage.removeItem('pending_transmittal');
       }
@@ -124,8 +106,7 @@ export default function ProductTransmittalPage() {
     setHeaderInfo(prev => ({
       ...prev,
       transmittalNo: prev.transmittalNo || `TR-${Date.now().toString().slice(-6)}`,
-      date: prev.date || new Date().toLocaleDateString('en-CA'),
-      from: localStorage.getItem('username') || ''
+      date: prev.date || new Date().toLocaleDateString('en-CA')
     }));
 
     const loadPreset = () => {
@@ -177,7 +158,7 @@ export default function ProductTransmittalPage() {
 
   if (!mounted) return null;
 
-  const addItem = (product: Product) => {
+  const addItem = (product: any) => {
     if (transmittalType !== 'EMPLOYEE') {
       const existing = selectedItems.find(item => item.productId === product.id);
       if (existing) {
@@ -194,13 +175,13 @@ export default function ProductTransmittalPage() {
       logIds: [],
       name: product.name,
       sku: product.sku,
+      description: product.description,
       unit: product.unit || 'PCS',
       quantity: 1
     }]);
   };
 
   const addLogItem = (log: any) => {
-    // Parse requestedBy from remarks if possible
     let parsedRequester = '';
     if (log.remarks?.includes('Req by:')) {
       parsedRequester = log.remarks.split('Req by:')[1]?.trim();
@@ -239,6 +220,7 @@ export default function ProductTransmittalPage() {
       logIds: [log.id],
       name: log.product.name,
       sku: log.product.sku,
+      description: log.product.description,
       unit: log.product.unit || 'PCS',
       quantity: log.quantity,
       requestedBy: parsedRequester || 'System Personnel',
@@ -264,6 +246,7 @@ export default function ProductTransmittalPage() {
       logIds: [itemId],
       name: rel.productName,
       sku: rel.itemSlug || 'N/A',
+      description: rel.description,
       unit: 'PCS',
       quantity: rel.qty,
       requestedBy: rel.employeeName,
@@ -337,455 +320,111 @@ export default function ProductTransmittalPage() {
   });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in duration-500">
       {/* Builder Interface (Hidden when printing) */}
       <div className="no-print space-y-8">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Stock Transmittal Builder</h1>
-            <p className="text-sm text-gray-500">Create transmittals for stock issuance and movements</p>
+            <h1 className="text-3xl font-black text-gray-900 tracking-tight">Stock Transmittal Builder</h1>
+            <p className="text-sm font-bold text-gray-500 uppercase tracking-widest mt-2">Create transmittals for stock issuance and movements</p>
           </div>
           <button
             onClick={handlePrint}
             disabled={selectedItems.length === 0}
-            className="inline-flex items-center rounded-md bg-primary px-6 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary-dark transition-all disabled:opacity-50"
+            className="inline-flex items-center rounded-xl bg-primary px-8 py-4 text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-primary/20 hover:bg-primary-dark hover:-translate-y-0.5 transition-all active:translate-y-0 disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none"
           >
-            <Printer className="mr-2 h-4 w-4" />
+            <Printer className="mr-3 h-5 w-5" />
             Generate & Print
           </button>
         </div>
 
-        <div className="flex bg-white p-1 rounded-2xl border border-gray-100 shadow-sm w-fit no-print mb-4">
+        <div className="flex bg-white p-1.5 rounded-2xl border border-gray-100 shadow-lg shadow-gray-100/50 w-fit no-print">
           <button 
             onClick={() => { setTransmittalType('MATERIAL'); updateSubject(selectionMode, logFilter, 'MATERIAL'); }} 
-            className={`px-6 py-2 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${transmittalType === 'MATERIAL' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-400 hover:text-gray-600'}`}
+            className={`px-8 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${transmittalType === 'MATERIAL' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-400 hover:text-gray-600'}`}
           >
             Material Transmittal
           </button>
           <button 
             onClick={() => { setTransmittalType('EMPLOYEE'); updateSubject(selectionMode, logFilter, 'EMPLOYEE'); }} 
-            className={`px-6 py-2 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${transmittalType === 'EMPLOYEE' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-400 hover:text-gray-600'}`}
+            className={`px-8 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${transmittalType === 'EMPLOYEE' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-400 hover:text-gray-600'}`}
           >
             Employee Receiving
           </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Header Configuration */}
-          <div className="lg:col-span-1 bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center">
-              <FileText className="mr-2 h-4 w-4" />
-              Header Details
-            </h3>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 mb-1">Date</label>
-              <input type="date" value={headerInfo.date || ''} onChange={e => setHeaderInfo({ ...headerInfo, date: e.target.value })} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-1" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 mb-1">Department</label>
-              <input type="text" value={headerInfo.department || ''} onChange={e => setHeaderInfo({ ...headerInfo, department: e.target.value })} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-1" placeholder="e.g. INVENTORY" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 mb-1">End-User / Recipient</label>
-              <input type="text" value={headerInfo.endUser || ''} onChange={e => setHeaderInfo({ ...headerInfo, endUser: e.target.value })} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-1" placeholder="Name" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 mb-1">Position</label>
-              <input type="text" value={headerInfo.position || ''} onChange={e => setHeaderInfo({ ...headerInfo, position: e.target.value })} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-1" placeholder="Job Title" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 mb-1">Source / Supplier</label>
-              <input type="text" value={headerInfo.sourceSupplier || ''} onChange={e => setHeaderInfo({ ...headerInfo, sourceSupplier: e.target.value })} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-1" placeholder="Vendor" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 mb-1">Subject</label>
-              <input type="text" value={headerInfo.subject || ''} onChange={e => setHeaderInfo({ ...headerInfo, subject: e.target.value })} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-1" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 mb-1">Custom Sub-Header</label>
-              <input type="text" value={headerInfo.customSubHeader || ''} onChange={e => setHeaderInfo({ ...headerInfo, customSubHeader: e.target.value })} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-1" placeholder="Override subtitle..." />
-            </div>
-
-            <div className="pt-4">
-              <button 
-                onClick={savePreset}
-                className="w-full flex items-center justify-center space-x-2 py-2 rounded-lg border-2 border-dashed border-gray-200 text-gray-400 hover:border-primary hover:text-primary transition-all text-[10px] font-black uppercase"
-              >
-                <Box className="h-3 w-3" />
-                <span>Save Header Preset</span>
-              </button>
-            </div>
-
-            <div className="pt-4 border-t border-gray-100 space-y-3">
-              <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Signatories</h4>
-              <div className="space-y-4">
-                {['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy'].map(field => {
-                  const showField = field === 'preparedBy' ? 'showPrepared' : 
-                                  field === 'checkedBy' ? 'showChecked' :
-                                  field === 'receivedBy' ? 'showReceived' : 'showApproved';
-                  return (
-                    <div key={field} className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase">{field.replace(/By$/, ' By')}</label>
-                        <input 
-                          type="checkbox" 
-                          checked={(headerInfo as any)[showField]} 
-                          onChange={e => setHeaderInfo({ ...headerInfo, [showField]: e.target.checked })}
-                          className="h-3 w-3 rounded border-gray-300 text-primary focus:ring-primary"
-                        />
-                      </div>
-                      <input 
-                        type="text" 
-                        disabled={!(headerInfo as any)[showField]}
-                        value={(headerInfo as any)[field] || ''} 
-                        onChange={e => setHeaderInfo({ ...headerInfo, [field]: e.target.value })} 
-                        className={`w-full rounded-md border border-gray-200 px-3 py-1.5 text-xs outline-none focus:ring-1 ${!(headerInfo as any)[showField] ? 'bg-gray-50 text-gray-400' : ''}`} 
-                        placeholder="Name" 
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+          <div className="lg:sticky lg:top-8">
+            <TransmittalHeaderForm 
+              headerInfo={headerInfo} 
+              setHeaderInfo={setHeaderInfo} 
+              savePreset={savePreset} 
+            />
           </div>
 
-          {/* Item Selection */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center">
-                  <Box className="mr-2 h-4 w-4" />
-                  Select Items
-                </h3>
-                <div className="flex bg-gray-100 p-1 rounded-lg">
-                  <button onClick={() => { setSelectionMode('PRODUCT'); setTransmittalType('MATERIAL'); updateSubject('PRODUCT', logFilter, 'MATERIAL'); }} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${selectionMode === 'PRODUCT' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}>Stocks</button>
-                  <button onClick={() => { setSelectionMode('LOG'); setTransmittalType('MATERIAL'); updateSubject('LOG', logFilter, 'MATERIAL'); }} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${selectionMode === 'LOG' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}>Stock History</button>
-                  <button onClick={() => { setSelectionMode('RELEASE'); setTransmittalType('EMPLOYEE'); updateSubject('RELEASE', logFilter, 'EMPLOYEE'); }} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${selectionMode === 'RELEASE' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}>Employee Releases</button>
-                </div>
-              </div>
+          <div className="lg:col-span-2 space-y-8">
+            <TransmittalItemSelector 
+              selectionMode={selectionMode}
+              setSelectionMode={setSelectionMode}
+              transmittalType={transmittalType}
+              setTransmittalType={setTransmittalType}
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              logFilter={logFilter}
+              setLogFilter={setLogFilter}
+              startDate={startDate}
+              setStartDate={setStartDate}
+              endDate={endDate}
+              setEndDate={setEndDate}
+              filteredProducts={filteredProducts}
+              filteredLogs={filteredLogs}
+              pullRequests={pullRequests}
+              releases={releases}
+              addItem={addItem}
+              addLogItem={addLogItem}
+              addReleaseItem={addReleaseItem}
+              updateSubject={updateSubject}
+            />
 
-              <div className="flex items-center space-x-3">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search items or SKU..."
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 pl-10 pr-4 py-2 text-sm outline-none focus:ring-1"
-                  />
-                </div>
-                {selectionMode === 'LOG' && (
-                  <div className="flex items-center space-x-2">
-                    <div className="flex items-center space-x-1">
-                      <Calendar className="h-3 w-3 text-gray-400" />
-                      <input 
-                        type="date" 
-                        value={startDate} 
-                        onChange={e => setStartDate(e.target.value)}
-                        className="rounded-lg border border-gray-200 px-2 py-1.5 text-[10px] outline-none focus:ring-1 bg-white"
-                      />
-                    </div>
-                    <span className="text-gray-400 text-[10px]">to</span>
-                    <input 
-                      type="date" 
-                      value={endDate} 
-                      onChange={e => setEndDate(e.target.value)}
-                      className="rounded-lg border border-gray-200 px-2 py-1.5 text-[10px] outline-none focus:ring-1 bg-white"
-                    />
-                    {(startDate || endDate) && (
-                      <button 
-                        onClick={() => { setStartDate(''); setEndDate(''); }}
-                        className="text-[10px] text-red-500 font-bold hover:underline px-1"
-                      >
-                        Clear
-                      </button>
-                    )}
-                    <select value={logFilter} onChange={e => { 
-                      const val = e.target.value as 'IN' | 'OUT';
-                      setLogFilter(val);
-                      updateSubject('LOG', val);
-                    }} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-1 bg-white">
-                      <option value="OUT">Stock OUT</option>
-                      <option value="IN">Stock IN</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-2">
-                {selectionMode === 'PRODUCT' ? (
-                  filteredProducts.map(product => (
-                    <button key={product.id} onClick={() => addItem(product)} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-primary/5 hover:border-primary/20 transition-all text-left">
-                      <div>
-                        <div className="text-xs font-bold text-gray-900">{product.name}</div>
-                        <div className="text-[10px] font-mono text-gray-500">{product.sku}</div>
-                        {product.description && <div className="text-[10px] text-gray-400 italic mt-0.5 line-clamp-1">{product.description}</div>}
-                      </div>
-                      <Plus className="h-4 w-4 text-gray-400" />
-                    </button>
-                  ))
-                ) : selectionMode === 'LOG' ? (
-                  filteredLogs.map(log => (
-                    <button key={log.id} onClick={() => addLogItem(log)} className="flex flex-col p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-primary/5 hover:border-primary/20 transition-all text-left">
-                      <div className="flex items-center justify-between w-full mb-1">
-                        <div className="text-xs font-bold text-gray-900">{log.product.name}</div>
-                        <div className="text-[10px] font-black text-primary bg-primary/10 px-1.5 rounded">{log.quantity}</div>
-                      </div>
-                      <div className="text-[10px] text-gray-500 italic line-clamp-1">{log.remarks || 'No remarks'}</div>
-                    </button>
-                  ))
-                ) : (
-                  <div className="space-y-4">
-                    {/* Stock Out Logs with Requester */}
-                    <div className="space-y-2">
-                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Stock Out History</h4>
-                      {logs.filter(log => 
-                        log.type === 'OUT' && (
-                          (log.remarks || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (log.product?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
-                        )
-                      ).map(log => {
-                        let parsedRequester = '';
-                        if (log.remarks?.includes('Req by:')) {
-                          parsedRequester = log.remarks.split('Req by:')[1]?.trim();
-                        } else if (log.remarks?.includes('Legacy Quick Pull:')) {
-                          if (log.remarks.includes('| Req by:')) {
-                            parsedRequester = log.remarks.split('| Req by:')[1]?.trim();
-                          } else {
-                            parsedRequester = log.remarks.split('Legacy Quick Pull:')[1]?.split('(')[0]?.trim();
-                          }
-                        }
-
-                        return (
-                          <button key={`log-${log.id}`} onClick={() => addLogItem(log)} className="flex flex-col p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-primary/5 hover:border-primary/20 transition-all text-left w-full">
-                            <div className="flex items-center justify-between w-full mb-1">
-                              <div className="text-xs font-bold text-gray-900">{log.product?.name}</div>
-                              <div className="text-[10px] font-black text-primary bg-primary/10 px-1.5 rounded">{log.quantity}</div>
-                            </div>
-                            {parsedRequester ? (
-                              <div className="text-[10px] text-gray-900 font-black flex items-center">
-                                <User className="h-3 w-3 mr-1 text-primary" />
-                                Requested by: {parsedRequester}
-                              </div>
-                            ) : (
-                              <div className="text-[10px] text-gray-500 italic line-clamp-1">{log.remarks || 'No remarks'}</div>
-                            )}
-                            <div className="text-[9px] text-gray-400 uppercase font-black">{log.location?.name} • {new Date(log.createdAt).toLocaleDateString()}</div>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Unit Requests */}
-                    <div className="space-y-2">
-                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Unit Requests</h4>
-                      {pullRequests.filter(req => 
-                        (req.item?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        (req.user?.username || '').toLowerCase().includes(searchTerm.toLowerCase())
-                      ).map(req => (
-                        <button key={`pr-${req.id}`} onClick={() => addReleaseItem({ ...req, employeeName: req.user?.username, productName: req.item?.name, qty: req.qty, date: req.createdAt })} className="flex flex-col p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-primary/5 hover:border-primary/20 transition-all text-left w-full">
-                          <div className="flex items-center justify-between w-full mb-1">
-                            <div className="text-xs font-bold text-gray-900">{req.item?.name}</div>
-                            <div className="text-[10px] font-black text-primary bg-primary/10 px-1.5 rounded">{req.qty} {req.unit}</div>
-                          </div>
-                          <div className="text-[10px] text-gray-900 font-black flex items-center">
-                            <User className="h-3 w-3 mr-1 text-primary" />
-                            Requested by: {req.user?.username}
-                          </div>
-                          <div className="text-[9px] text-gray-400 uppercase font-black">{req.status} • {new Date(req.createdAt).toLocaleDateString()}</div>
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Manual Staff Releases */}
-                    <div className="space-y-2">
-                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Staff Issuance History</h4>
-                      {releases.filter(rel => 
-                        rel.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        rel.productName.toLowerCase().includes(searchTerm.toLowerCase())
-                      ).map(rel => (
-                        <button key={`rel-${rel.id}`} onClick={() => addReleaseItem(rel)} className="flex flex-col p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-primary/5 hover:border-primary/20 transition-all text-left w-full">
-                          <div className="flex items-center justify-between w-full mb-1">
-                            <div className="text-xs font-bold text-gray-900">{rel.productName}</div>
-                            <div className="text-[10px] font-black text-primary bg-primary/10 px-1.5 rounded">{rel.qty}</div>
-                          </div>
-                          <div className="text-[10px] text-gray-900 font-black flex items-center">
-                            <User className="h-3 w-3 mr-1 text-primary" />
-                            Issued to: {rel.employeeName}
-                          </div>
-                          <div className="text-[9px] text-gray-400 uppercase font-black">{rel.department} • {new Date(rel.date).toLocaleDateString()}</div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Selected Items Table */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="bg-gray-50 px-6 py-3 border-b border-gray-200 flex items-center justify-between">
-                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Selected Items for Transmittal</h3>
-                <span className="text-[10px] font-black text-primary bg-primary/5 px-2 py-0.5 rounded-full">{selectedItems.length} items</span>
-              </div>
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  {transmittalType === 'EMPLOYEE' ? (
-                    <tr>
-                      <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-12">No.</th>
-                      <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Requested by</th>
-                      <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Item requested</th>
-                      <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date requested</th>
-                      <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-24">Qty</th>
-                      <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest w-12">Action</th>
-                    </tr>
-                  ) : (
-                    <tr>
-                      <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Stock Item</th>
-                      <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-32">Quantity</th>
-                      <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest w-12">Action</th>
-                    </tr>
-                  )}
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {selectedItems.map((item, idx) => (
-                    <tr key={item.id}>
-                      {transmittalType === 'EMPLOYEE' ? (
-                        <>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-bold text-gray-500">{idx + 1}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-bold text-primary">{item.requestedBy || '-'}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-bold text-gray-900">{item.name}</div>
-                            <div className="text-[10px] font-mono text-gray-400 uppercase">{item.sku}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-medium text-gray-500">{item.dateRequested || '-'}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <input type="number" value={isNaN(item.quantity) ? '' : item.quantity} onChange={e => updateQuantity(item.id, parseInt(e.target.value) || 0)} className="w-20 rounded border border-gray-200 px-3 py-1 text-sm outline-none focus:ring-1" />
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-bold text-gray-900">{item.name}</div>
-                            <div className="text-[10px] font-mono text-gray-500">{item.sku}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <input type="number" value={isNaN(item.quantity) ? '' : item.quantity} onChange={e => updateQuantity(item.id, parseInt(e.target.value) || 0)} className="w-20 rounded border border-gray-200 px-3 py-1 text-sm outline-none focus:ring-1" />
-                          </td>
-                        </>
-                      )}
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <button onClick={() => removeItem(item.id)} className="text-red-500 hover:text-red-700 p-1"><Trash2 className="h-4 w-4" /></button>
-                      </td>
-                    </tr>
-                  ))}
-                  {selectedItems.length === 0 && (
-                    <tr><td colSpan={transmittalType === 'EMPLOYEE' ? 6 : 3} className="px-6 py-12 text-center text-sm text-gray-400 italic">No items selected.</td></tr>
-                  )}
-                </tbody>
-              </table>
+            <div className="h-[500px]">
+              <TransmittalSelectedItems 
+                transmittalType={transmittalType}
+                selectedItems={selectedItems}
+                removeItem={removeItem}
+                updateQuantity={updateQuantity}
+              />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Printable Form */}
-      <div className="hidden print:block bg-white p-12 text-gray-900">
-        <div className="flex justify-between items-start border-b-2 border-gray-900 pb-8 mb-12">
-          <div>
-            <h1 className="text-4xl font-black uppercase tracking-tighter text-gray-900 mb-1">{headerInfo.subject || 'Material Transmittal'}</h1>
-            <p className="text-sm font-bold text-gray-500">{headerInfo.customSubHeader || headerInfo.subTitle}</p>
-          </div>
-          <div className="text-right">
-            <div className="text-xs font-bold text-gray-400 uppercase mb-1">Transmittal No.</div>
-            <div className="text-xl font-black font-mono">{headerInfo.transmittalNo}</div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-8 mb-8">
-          <div className="space-y-3">
-            <div><div className="text-[9px] font-black text-gray-400 uppercase mb-0.5">Department:</div><div className="text-sm font-bold border-b border-gray-100 pb-0.5">{headerInfo.department || '____________________'}</div></div>
-            <div><div className="text-[9px] font-black text-gray-400 uppercase mb-0.5">End-User / Recipient:</div><div className="text-sm font-bold border-b border-gray-100 pb-0.5">{headerInfo.endUser || '____________________'}</div></div>
-            <div><div className="text-[9px] font-black text-gray-400 uppercase mb-0.5">Position:</div><div className="text-sm font-bold border-b border-gray-100 pb-0.5">{headerInfo.position || '____________________'}</div></div>
-          </div>
-          <div className="space-y-3">
-            <div><div className="text-[9px] font-black text-gray-400 uppercase mb-0.5">Date:</div><div className="text-sm font-bold border-b border-gray-100 pb-0.5">{new Date(headerInfo.date).toLocaleDateString(undefined, { dateStyle: 'long' })}</div></div>
-            <div><div className="text-[9px] font-black text-gray-400 uppercase mb-0.5">Source / Supplier:</div><div className="text-sm font-bold border-b border-gray-100 pb-0.5">{headerInfo.sourceSupplier || '____________________'}</div></div>
-            <div><div className="text-[9px] font-black text-gray-400 uppercase mb-0.5">Subject:</div><div className="text-sm font-bold border-b border-gray-100 pb-0.5">{headerInfo.subject}</div></div>
-          </div>
-        </div>
-
-        <table className="w-full border-collapse mb-4 border border-gray-900">
-          <thead>
-            <tr className="border-b-2 border-gray-900 bg-gray-50">
-              {transmittalType === 'EMPLOYEE' ? (
-                <>
-                  <th className="py-1 px-3 text-left text-[8px] font-black uppercase tracking-widest w-8 border-r border-gray-900">No.</th>
-                  <th className="py-1 px-3 text-left text-[8px] font-black uppercase tracking-widest border-r border-gray-900">Requested by</th>
-                  <th className="py-1 px-3 text-left text-[8px] font-black uppercase tracking-widest border-r border-gray-900">Item requested</th>
-                  <th className="py-1 px-3 text-left text-[8px] font-black uppercase tracking-widest border-r border-gray-900">Date requested</th>
-                  <th className="py-1 px-3 text-left text-[8px] font-black uppercase tracking-widest w-16">Qty</th>
-                </>
-              ) : (
-                <>
-                  <th className="py-1 px-3 text-left text-[8px] font-black uppercase tracking-widest w-8 border-r border-gray-900">No.</th>
-                  <th className="py-1 px-3 text-left text-[8px] font-black uppercase tracking-widest border-r border-gray-900">Description</th>
-                  <th className="py-1 px-3 text-left text-[8px] font-black uppercase tracking-widest w-16 border-r border-gray-900">Qty</th>
-                  <th className="py-1 px-3 text-left text-[8px] font-black uppercase tracking-widest">Part No. / SKU</th>
-                </>
-              )}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-900">
-            {selectedItems.map((item, idx) => (
-              <tr key={item.id} className="border-b border-gray-900">
-                {transmittalType === 'EMPLOYEE' ? (
-                  <>
-                    <td className="py-1 px-3 text-[9px] font-bold border-r border-gray-900 text-center">{idx + 1}</td>
-                    <td className="py-1 px-3 text-[9px] font-black border-r border-gray-900 uppercase">{item.requestedBy || '-'}</td>
-                    <td className="py-1 px-3 text-[9px] font-bold border-r border-gray-900 uppercase">{item.name}</td>
-                    <td className="py-1 px-3 text-[9px] font-bold border-r border-gray-900">{item.dateRequested || '-'}</td>
-                    <td className="py-1 px-3 text-[9px] font-black text-center">{item.quantity} {item.unit || 'PCS'}</td>
-                  </>
-                ) : (
-                  <>
-                    <td className="py-1 px-3 text-[9px] font-bold border-r border-gray-900">{idx + 1}</td>
-                    <td className="py-1 px-3 text-[9px] font-bold border-r border-gray-900 uppercase">{item.name}</td>
-                    <td className="py-1 px-3 text-[9px] font-black border-r border-gray-900">{item.quantity} {item.unit || 'PCS'}</td>
-                    <td className="py-1 px-3 text-[9px] font-mono">{item.sku || '-'}</td>
-                  </>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div className="grid grid-cols-2 gap-x-8 gap-y-4 pt-4">
-          {['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy'].filter(field => {
-            const showField = field === 'preparedBy' ? 'showPrepared' : 
-                            field === 'checkedBy' ? 'showChecked' :
-                            field === 'receivedBy' ? 'showReceived' : 'showApproved';
-            return (headerInfo as any)[showField];
-          }).map(field => (
-            <div key={field} className="flex flex-col items-start pt-1">
-              <div className="w-full text-[8px] font-black text-gray-400 uppercase mb-2">{field.replace(/By$/, ' By')}:</div>
-              <div className="w-full">
-                <div className="text-[9px] font-black mb-0.5 uppercase text-center">{(headerInfo as any)[field] || '____________________'}</div>
-                <div className="border-b border-gray-900 w-full mb-0.5"></div>
-                <div className="text-center text-[7px] font-bold text-gray-400 uppercase italic tracking-tighter">Signature / Date</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <PrintableTransmittal 
+        headerInfo={headerInfo}
+        transmittalType={transmittalType}
+        selectedItems={selectedItems}
+      />
 
       <style jsx global>{`
         @media print {
           @page { size: A4; margin: 0; }
-          body { background: white; }
+          body { background: white !important; }
           .no-print { display: none !important; }
           main { padding: 0 !important; margin: 0 !important; }
+          #__next { padding: 0 !important; }
+          .print-container { padding: 0 !important; }
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #e5e7eb;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #d1d5db;
         }
       `}</style>
     </div>

@@ -7,6 +7,9 @@ import {
   Truck
 } from 'lucide-react';
 import api from '@/lib/api';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { useUrlFilters } from '@/hooks/useUrlFilters';
 
 interface Item {
   id: string;
@@ -31,12 +34,13 @@ export default function QRItemsPage() {
   const [batches, setBatches] = useState<any[]>([]);
   const [customFields, setCustomFields] = useState<any[]>([]);
   
+  const { getFilter, setFilter } = useUrlFilters();
   const [loading, setLoading] = useState(true);
   const [togglingLock, setTogglingLock] = useState<string[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(getFilter('search'));
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
-  const [formData, setFormData] = useState({
+  const defaultFormData = {
     name: '',
     description: '',
     status: 'Available',
@@ -44,7 +48,13 @@ export default function QRItemsPage() {
     batchId: '',
     tagIds: [] as string[],
     copies: 1,
-  });
+  };
+
+  const [formData, setFormData] = useState(defaultFormData);
+  const [initialFormData, setInitialFormData] = useState(defaultFormData);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentProgress, setCurrentProgress] = useState(0);
@@ -81,7 +91,7 @@ export default function QRItemsPage() {
   const handleOpenModal = (item: Item | null = null) => {
     if (item) {
       setEditingItem(item);
-      setFormData({
+      const data = {
         name: item.name || '',
         description: item.description || '',
         status: item.status,
@@ -89,12 +99,23 @@ export default function QRItemsPage() {
         batchId: (item as any).batchId || '',
         tagIds: item.tags?.map(t => (t as any).tagId) || [],
         copies: 1,
-      });
+      };
+      setFormData(data);
+      setInitialFormData(data);
     } else {
       setEditingItem(null);
-      setFormData({ name: '', description: '', status: 'Available', categoryId: '', batchId: '', tagIds: [], copies: 1 });
+      setFormData(defaultFormData);
+      setInitialFormData(defaultFormData);
     }
     setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    if (JSON.stringify(formData) !== JSON.stringify(initialFormData)) {
+      setIsConfirmOpen(true);
+    } else {
+      setIsModalOpen(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -144,18 +165,31 @@ export default function QRItemsPage() {
     }
   };
 
-  const handleDelete = async (slug: string) => {
-    if (!confirm('Are you sure you want to delete this QR code and all its associated data?')) return;
+  const handleDelete = (item: Item) => {
+    setItemToDelete(item);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!itemToDelete) return;
     try {
-      await api.delete(`/items/${slug}`);
+      await api.delete(`/items/${itemToDelete.slug}`);
+      setIsDeleteConfirmOpen(false);
+      setItemToDelete(null);
       fetchData();
     } catch (err) {
       alert('Failed to delete item');
     }
   };
 
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [selectedBatchId, setSelectedBatchId] = useState('all');
+  const [filterStatus, setFilterStatus] = useState(getFilter('status', 'all'));
+  const [selectedBatchId, setSelectedBatchId] = useState(getFilter('batch', 'all'));
+
+  useEffect(() => {
+    setFilter('search', searchTerm || null);
+    setFilter('status', filterStatus !== 'all' ? filterStatus : null);
+    setFilter('batch', selectedBatchId !== 'all' ? selectedBatchId : null);
+  }, [searchTerm, filterStatus, selectedBatchId]);
 
   const filteredItems = items.filter(item => {
     const matchesSearch = item.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -237,9 +271,21 @@ export default function QRItemsPage() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {loading ? (
-              <tr><td colSpan={5} className="px-6 py-10 text-center text-sm text-gray-500">Syncing with system...</td></tr>
+              <tr><td colSpan={5} className="px-6 py-20 text-center"><div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></td></tr>
             ) : filteredItems.length === 0 ? (
-              <tr><td colSpan={5} className="px-6 py-10 text-center text-sm text-gray-500">No QR codes found.</td></tr>
+              <tr>
+                <td colSpan={5} className="p-0">
+                  <EmptyState 
+                    icon={QrCode}
+                    title={searchTerm ? "No matches found" : "No QR Codes Generated"}
+                    description={searchTerm ? `We couldn't find any QR codes matching "${searchTerm}". Try a different term.` : "Start by generating your first unique QR code to track assets or capture data."}
+                    action={searchTerm ? undefined : {
+                      label: "Generate New QR",
+                      onClick: () => handleOpenModal()
+                    }}
+                  />
+                </td>
+              </tr>
             ) : (
               filteredItems.map((item) => (
                 <tr key={item.id} className={`hover:bg-gray-50 transition-colors ${item.status === 'Released' ? 'bg-purple-50/30' : ''}`}>
@@ -309,9 +355,9 @@ export default function QRItemsPage() {
                         <Edit2 className="h-4 w-4" />
                       </a>
                       <button 
-                        onClick={() => handleDelete(item.slug)} 
+                        onClick={() => handleDelete(item)} 
                         title="Delete QR"
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md"
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -364,7 +410,7 @@ export default function QRItemsPage() {
                 </p>
               </div>
               <div className="flex justify-end space-x-3 pt-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2 text-sm font-bold text-gray-500 hover:text-gray-900">Cancel</button>
+                <button type="button" onClick={handleCloseModal} className="px-6 py-2 text-sm font-bold text-gray-500 hover:text-gray-900">Cancel</button>
                 <button type="submit" className="px-6 py-2 text-sm font-bold text-white bg-primary hover:bg-primary-dark rounded-lg shadow-md transition-all active:scale-95">Generate QR</button>
               </div>
             </form>
@@ -417,6 +463,35 @@ export default function QRItemsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={isConfirmOpen}
+        title="Unsaved Changes"
+        message="You have unsaved information in this form. Are you sure you want to discard it?"
+        confirmText="Discard Changes"
+        cancelText="Keep Editing"
+        onConfirm={() => {
+          setIsConfirmOpen(false);
+          setIsModalOpen(false);
+        }}
+        onCancel={() => setIsConfirmOpen(false)}
+        isDestructive={true}
+      />
+
+      <ConfirmModal
+        isOpen={isDeleteConfirmOpen}
+        title="Delete QR Code"
+        message={`Are you sure you want to delete QR code ${itemToDelete?.slug}? This will permanently remove all associated data capture history.`}
+        confirmText="Delete QR Data"
+        cancelText="Keep Item"
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setIsDeleteConfirmOpen(false);
+          setItemToDelete(null);
+        }}
+        isDestructive={true}
+        requireConfirmationText="DELETE"
+      />
     </div>
   );
 }

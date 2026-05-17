@@ -76,8 +76,39 @@ export default function EmployeeDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="h-12 w-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-gray-50 text-gray-900">
+        <nav className="bg-white border-b border-gray-100 sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 bg-gray-200 rounded-xl animate-pulse"></div>
+              <div className="space-y-2">
+                <div className="h-4 w-32 bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-2 w-24 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+            </div>
+            <div className="flex items-center gap-6">
+              <div className="hidden md:flex flex-col items-end space-y-2">
+                <div className="h-3 w-24 bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-2 w-16 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+              <div className="h-10 w-10 bg-gray-200 rounded-xl animate-pulse"></div>
+            </div>
+          </div>
+        </nav>
+        <main className="max-w-7xl mx-auto px-6 py-10 animate-pulse">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="space-y-8">
+              <div className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm h-64"></div>
+              <div className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm h-48"></div>
+            </div>
+            <div className="lg:col-span-2 space-y-6">
+              <div className="h-8 w-48 bg-gray-200 rounded mb-4"></div>
+              <div className="bg-white border border-gray-100 p-6 rounded-3xl h-24"></div>
+              <div className="bg-white border border-gray-100 p-6 rounded-3xl h-24"></div>
+              <div className="bg-white border border-gray-100 p-6 rounded-3xl h-24"></div>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }

@@ -29,6 +29,8 @@ import {
 } from 'recharts';
 import api from '@/lib/api';
 
+import { AnalyticsSkeleton } from '@/components/ui/LoadingSkeletons';
+
 export default function AnalyticsPage() {
   const [trafficData, setTrafficData] = useState<any>(null);
   const [usageData, setUsageData] = useState<any>(null);
@@ -57,12 +59,7 @@ export default function AnalyticsPage() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <RefreshCcw className="h-10 w-10 text-indigo-500 animate-spin" />
-        <p className="text-slate-400 font-bold animate-pulse">Synchronizing System Data...</p>
-      </div>
-    );
+    return <AnalyticsSkeleton />;
   }
 
   const COLORS = ['#6366f1', '#a855f7', '#ec4899', '#f43f5e', '#f97316', '#eab308'];

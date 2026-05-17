@@ -41,6 +41,16 @@ export class RsqController {
     return this.rsqService.createFabricTransaction(data);
   }
 
+  @Get('next-sequence')
+  getNextSequence() {
+    return this.rsqService.getNextSequences();
+  }
+
+  @Post('batch')
+  createBatch(@Body('items') items: any[]) {
+    return this.rsqService.createBatchTransactions(items);
+  }
+
   @Patch('requests/:id/status')
   updateStatus(
     @Param('id') id: string,
@@ -49,4 +59,10 @@ export class RsqController {
   ) {
     return this.rsqService.updateRequestStatus(id, status, quantityReceived);
   }
+
+  @Post('transactions/bulk-delete')
+  deleteTransactions(@Body('ids') ids: string[]) {
+    return this.rsqService.deleteTransactions(ids);
+  }
 }
+

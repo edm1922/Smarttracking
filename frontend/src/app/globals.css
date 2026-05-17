@@ -44,11 +44,33 @@ input::placeholder, textarea::placeholder {
 
 /* Enterprise-style table */
 .table-container {
-  @apply w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm;
+  @apply w-full overflow-auto rounded-xl border border-gray-200 bg-white shadow-sm relative;
+  max-height: 75vh;
 }
 
-.table-header {
-  @apply bg-gray-50 border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wider text-gray-500;
+.table-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.table-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 20px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+.table-container thead {
+  @apply sticky top-0 z-20 shadow-[0_1px_0_0_rgba(0,0,0,0.05)];
+}
+
+.table-container thead th {
+  @apply bg-gray-50 border-b border-gray-200 text-left text-xs font-bold uppercase tracking-wider text-gray-500 py-4 px-6;
 }
 
 .table-row {

@@ -61,10 +61,11 @@ export class StaffInventoryService {
   }
 
   async release(userId: string, data: { 
-    employeeName: string; 
     shift: string; 
     department: string; 
     supervisor: string; 
+    remarks?: string;
+    date?: string; 
     productName: string; 
     specs: string;
     itemSlug?: string; 
@@ -95,10 +96,11 @@ export class StaffInventoryService {
     const result = await this.prisma.staffRelease.create({
       data: {
         staffId: userId,
-        employeeName: data.employeeName,
         shift: data.shift,
         department: data.department,
         supervisor: data.supervisor,
+        remarks: data.remarks,
+        date: data.date ? new Date(data.date) : new Date(),
         productName: data.productName,
         specs: data.specs,
         itemSlug: data.itemSlug,
@@ -109,7 +111,7 @@ export class StaffInventoryService {
     await this.logActivity(
       userId, 
       'ITEM_RELEASE', 
-      `Released ${data.qty} of ${data.productName} to ${data.employeeName}`,
+      `Released ${data.qty} of ${data.productName} (Group: ${data.shift} - ${data.department})`,
       data.productName,
       data.specs,
       data.qty,
@@ -133,7 +135,7 @@ export class StaffInventoryService {
         });
 
         if (!stock || stock.qty < rel.qty) {
-          throw new BadRequestException(`Insufficient stock for ${rel.productName} to release to ${rel.employeeName}`);
+          throw new BadRequestException(`Insufficient stock for ${rel.productName} to release`);
         }
 
         await tx.staffInventory.update({
@@ -144,10 +146,11 @@ export class StaffInventoryService {
         await tx.staffRelease.create({
           data: {
             staffId: userId,
-            employeeName: rel.employeeName,
             shift: rel.shift,
             department: rel.department,
             supervisor: rel.supervisor,
+            remarks: rel.remarks,
+            date: rel.date ? new Date(rel.date) : new Date(),
             productName: rel.productName,
             specs: rel.specs,
             itemSlug: rel.itemSlug,

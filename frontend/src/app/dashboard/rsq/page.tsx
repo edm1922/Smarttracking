@@ -1,40 +1,108 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { 
-  ClipboardList, 
   Plus, 
   Search, 
-  Filter, 
   Printer, 
-  ChevronRight, 
-  ArrowUpRight, 
-  ArrowDownLeft, 
+  Layers, 
   History, 
-  Layers,
-  Scissors,
+  X, 
+  Trash2, 
+  Calendar, 
+  DollarSign, 
+  Info,
+  ChevronDown,
+  Check,
+  ChevronRight,
+  ChevronLeft,
+  Filter,
   CheckCircle2,
-  Clock,
-  X
+  FileText
 } from 'lucide-react';
 import { RSQSlipPrint } from './components/RSQSlipPrint';
 import { TransactionSlipPrint } from './components/TransactionSlipPrint';
 
+// Parse Remarks formatted: "RSQ: RSQ-00588 | Month: MAY 2026 | Remarks: Custom text"
+const parseRemarks = (remarksString: string) => {
+  if (!remarksString) return { rsqNo: '', month: '', remarks: '' };
+  const rsqMatch = remarksString.match(/RSQ:\s*([^\s|]+)/);
+  const monthMatch = remarksString.match(/Month:\s*([^|]+)/);
+  const remarksMatch = remarksString.match(/Remarks:\s*(.*)/);
+
+  return {
+    rsqNo: rsqMatch ? rsqMatch[1] : '',
+    month: monthMatch ? monthMatch[1].trim() : '',
+    remarks: remarksMatch ? remarksMatch[1].trim() : (remarksString.includes('|') ? '' : remarksString)
+  };
+};
+
+const parseTransactionRow = (trn: any) => {
+  const parts = trn.transactionNo?.split('_') || [trn.transactionNo || ''];
+  let batchNo = parts[0] || '—';
+  let seriesNo = parts[1] || '—';
+
+  // Parse remarks
+  const remarksString = trn.remarks || '';
+  const rsqMatch = remarksString.match(/RSQ:\s*([^\s|]+)/);
+  const monthMatch = remarksString.match(/Month:\s*([^|]+)/);
+  const remarksMatch = remarksString.match(/Remarks:\s*(.*)/);
+
+  // If this is an initial balance record, display clean labels
+  if (trn.type === 'INITIAL_BALANCE' || trn.type === 'BEGINNING' || batchNo.startsWith('INIT')) {
+    batchNo = 'BEGINNING';
+    seriesNo = '—';
+  }
+
+  // Fallback Month Calculation
+  let month = '—';
+  if (monthMatch) {
+    month = monthMatch[1].trim();
+  } else if (trn.date) {
+    const d = new Date(trn.date);
+    const monthsList = [
+      'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
+      'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'
+    ];
+    month = `${monthsList[d.getMonth()]} ${d.getFullYear()}`;
+  }
+
+  return {
+    id: trn.id,
+    batchNo,
+    seriesNo,
+    rsqNo: rsqMatch ? rsqMatch[1] : '—',
+    applicableMonth: month,
+    remarks: remarksMatch ? remarksMatch[1].trim() : (remarksString.includes('|') ? '' : remarksString),
+    apparel: trn.fabric?.name || '—',
+    apparelGroup: trn.fabric?.type || '—',
+    type: trn.type === 'INITIAL_BALANCE' ? 'BEGINNING' : trn.type,
+    date: trn.date,
+    quantity: trn.quantity,
+    unit: trn.unit || trn.fabric?.unit || 'pcs',
+    price: trn.fabric?.unitPrice || 0,
+    amount: trn.quantity * (trn.fabric?.unitPrice || 0),
+    rawRemarks: remarksString,
+    fabric: trn.fabric,
+  };
+};
+
 export default function RSQPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const activeTab = searchParams.get('tab') || 'fabrics';
-  
+  const activeTab = searchParams.get('tab') || 'transactions';
+
   const [fabrics, setFabrics] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [tailors, setTailors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [modal, setModal] = useState<'fabric' | 'request' | 'transaction' | null>(null);
-  
+  // Modal control
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+  const [isFabricModalOpen, setIsFabricModalOpen] = useState(false);
+
   // Print State
   const [printRsq, setPrintRsq] = useState<any>(null);
   const [printTrn, setPrintTrn] = useState<any>(null);
@@ -47,19 +115,20 @@ export default function RSQPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      if (activeTab === 'fabrics') {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/fabrics`);
-        const data = await res.json();
-        setFabrics(data);
-      } else if (activeTab === 'requests') {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/requests`);
-        const data = await res.json();
-        setRequests(data);
-      } else if (activeTab === 'transactions') {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/transactions`);
-        const data = await res.json();
-        setTransactions(data);
-      }
+      // Fetch fabrics (needed for both inventory calculations and auto-completions)
+      const fabRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/fabrics`);
+      const fabData = await fabRes.json();
+      setFabrics(fabData);
+
+      // Fetch active job requests (needed for checking matching printouts)
+      const reqRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/requests`);
+      const reqData = await reqRes.json();
+      setRequests(reqData);
+
+      // Fetch transactions
+      const txRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/transactions`);
+      const txData = await txRes.json();
+      setTransactions(txData);
     } catch (error) {
       console.error('Error fetching RSQ data:', error);
     } finally {
@@ -72,15 +141,23 @@ export default function RSQPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/tailors`);
       const data = await res.json();
       setTailors(data);
-    } catch (e) {}
+    } catch (e) {
+      console.error('Error fetching tailors:', e);
+    }
   };
 
-  const handlePrintRSQ = (rsq: any) => {
-    setPrintRsq(rsq);
-    setTimeout(() => {
-      window.print();
-      setPrintRsq(null);
-    }, 500);
+  const handlePrintRSQ = (rsqNo: string) => {
+    // Find the matching Tailoring Request in active state
+    const matchedReq = requests.find(r => r.rsqNo === rsqNo);
+    if (matchedReq) {
+      setPrintRsq(matchedReq);
+      setTimeout(() => {
+        window.print();
+        setPrintRsq(null);
+      }, 500);
+    } else {
+      alert(`Could not find a tailoring request record for ${rsqNo} to print.`);
+    }
   };
 
   const handlePrintTrn = (trn: any) => {
@@ -92,32 +169,34 @@ export default function RSQPage() {
   };
 
   const tabs = [
+    { id: 'transactions', label: 'Transactions Sheet', icon: History },
     { id: 'fabrics', label: 'Fabric Inventory', icon: Layers },
-    { id: 'requests', label: 'Tailoring Hub', icon: Scissors },
-    { id: 'transactions', label: 'Transaction History', icon: History },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Hide layout when printing specific slips */}
+      {/* Hide layout during browser print operations */}
       <div className={`no-print ${printRsq || printTrn ? 'hidden' : ''} space-y-6`}>
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        
+        {/* Modern Glassmorphic Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/70 backdrop-blur-md p-6 rounded-3xl border border-gray-100 shadow-sm">
           <div>
             <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Fabric & Tailoring (RSQ)</h1>
-            <p className="text-sm text-gray-500 font-medium uppercase tracking-widest mt-1">Raw Material Management & Job Orders</p>
+            <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Raw Material Movements & Job Production Sheets</p>
           </div>
           <div className="flex items-center gap-3">
             <button 
-              className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
+              className="flex items-center gap-2 bg-primary text-white px-5 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all hover:scale-[1.02] active:scale-[0.98]"
               onClick={() => {
-                if (activeTab === 'fabrics') setModal('fabric');
-                else if (activeTab === 'requests') setModal('request');
-                else setModal('transaction');
+                if (activeTab === 'fabrics') {
+                  setIsFabricModalOpen(true);
+                } else {
+                  setIsBatchModalOpen(true);
+                }
               }}
             >
               <Plus className="h-4 w-4" />
-              {activeTab === 'fabrics' ? 'Add Fabric' : activeTab === 'requests' ? 'New RSQ' : 'Log Movement'}
+              {activeTab === 'fabrics' ? 'Add Fabric' : 'Add Transaction Batch'}
             </button>
           </div>
         </div>
@@ -144,303 +223,515 @@ export default function RSQPage() {
           })}
         </div>
 
-        {/* Main Content */}
+        {/* Main Content Pane */}
         <div className="bg-white rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/50 min-h-[600px] overflow-hidden">
           {loading ? (
             <div className="flex flex-col items-center justify-center h-[600px] gap-4">
               <div className="h-12 w-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Loading Data...</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest animate-pulse">Loading Live Sheet Data...</p>
             </div>
           ) : (
             <div className="p-8">
-              {activeTab === 'fabrics' && <FabricList data={fabrics} />}
-              {activeTab === 'requests' && <RequestList data={requests} onPrint={handlePrintRSQ} />}
-              {activeTab === 'transactions' && <TransactionList data={transactions} onPrint={handlePrintTrn} />}
+              {activeTab === 'transactions' && (
+                <TransactionSheetList 
+                  data={transactions} 
+                  requests={requests}
+                  onPrintRSQ={handlePrintRSQ}
+                  onPrintTrn={handlePrintTrn} 
+                  onRefresh={fetchData}
+                />
+              )}
+              {activeTab === 'fabrics' && (
+                <FabricList 
+                  data={fabrics} 
+                />
+              )}
             </div>
           )}
         </div>
       </div>
 
-      {/* Print Areas */}
+      {/* Branded High-Fidelity 4-Copy Printout Slip */}
       {printRsq && <RSQSlipPrint rsq={printRsq} />}
       {printTrn && <TransactionSlipPrint transaction={printTrn} />}
 
       {/* Modals */}
-      {modal === 'fabric' && (
-        <AddFabricModal 
-          onClose={() => setModal(null)} 
-          onSuccess={() => { setModal(null); fetchData(); }} 
-        />
-      )}
-      {modal === 'request' && (
-        <NewRSQModal 
-          onClose={() => setModal(null)} 
+      {isBatchModalOpen && (
+        <BatchTransactionModal 
+          onClose={() => setIsBatchModalOpen(false)} 
           fabrics={fabrics} 
           tailors={tailors}
-          onSuccess={() => { setModal(null); fetchData(); }} 
+          onSuccess={() => { setIsBatchModalOpen(false); fetchData(); }} 
         />
       )}
-      {modal === 'transaction' && (
-        <TransactionModal 
-          onClose={() => setModal(null)} 
-          fabrics={fabrics} 
-          onSuccess={() => { setModal(null); fetchData(); }} 
+      {isFabricModalOpen && (
+        <AddFabricModal 
+          onClose={() => setIsFabricModalOpen(false)} 
+          onSuccess={() => { setIsFabricModalOpen(false); fetchData(); }} 
         />
       )}
     </div>
   );
 }
 
-// Modals
+// 1. Unified Transactions Sheet List (Excel Layout)
+function TransactionSheetList({ 
+  data, 
+  requests, 
+  onPrintRSQ, 
+  onPrintTrn,
+  onRefresh
+}: { 
+  data: any[], 
+  requests: any[], 
+  onPrintRSQ: (rsqNo: string) => void, 
+  onPrintTrn: (trn: any) => void,
+  onRefresh?: () => void
+}) {
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [monthFilter, setMonthFilter] = useState('');
 
-function NewRSQModal({ onClose, fabrics, tailors, onSuccess }: any) {
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    tailorId: '',
-    fabricId: '',
-    quantityOrdered: '',
-    remarks: '',
-    targetDate: ''
+  // Checklist Selection State
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Double Click / Movement Details Modal State
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  // Process rows
+  const parsedRows = data.map(parseTransactionRow);
+
+  // Available filters
+  const uniqueMonths = Array.from(new Set(parsedRows.map((r: any) => r.applicableMonth).filter(Boolean)));
+
+  const filtered = parsedRows.filter((row: any) => {
+    const matchesSearch = 
+      row.batchNo.toLowerCase().includes(search.toLowerCase()) ||
+      row.rsqNo.toLowerCase().includes(search.toLowerCase()) ||
+      row.apparel.toLowerCase().includes(search.toLowerCase()) ||
+      row.remarks.toLowerCase().includes(search.toLowerCase());
+
+    const matchesType = !typeFilter || row.type === typeFilter;
+    const matchesMonth = !monthFilter || row.applicableMonth === monthFilter;
+
+    return matchesSearch && matchesType && matchesMonth;
   });
 
-  const handleSubmit = async (e: any) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/requests`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          quantityOrdered: parseFloat(formData.quantityOrdered)
-        })
-      });
-      onSuccess();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
+  // Toggle selection for all filtered rows
+  const isAllSelected = filtered.length > 0 && filtered.every(row => selectedIds.includes(row.id));
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      const filteredIds = filtered.map(row => row.id);
+      setSelectedIds(prev => prev.filter(id => !filteredIds.includes(id)));
+    } else {
+      const filteredIds = filtered.map(row => row.id);
+      setSelectedIds(prev => Array.from(new Set([...prev, ...filteredIds])));
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl">
-        <div className="flex justify-between items-center p-6 border-b border-gray-100">
-          <h2 className="text-lg font-black uppercase tracking-widest text-gray-900">New Tailoring Request</h2>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-900 rounded-full hover:bg-gray-100"><X className="h-5 w-5" /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Select Tailor</label>
-            <select required value={formData.tailorId} onChange={e => setFormData({...formData, tailorId: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm font-bold bg-gray-50 focus:ring-primary focus:border-primary">
-              <option value="">-- Select Tailor --</option>
-              {tailors.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Select Fabric (Optional)</label>
-            <select value={formData.fabricId} onChange={e => setFormData({...formData, fabricId: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm font-bold bg-gray-50 focus:ring-primary focus:border-primary">
-              <option value="">-- No Fabric Specified --</option>
-              {fabrics.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Quantity (pcs)</label>
-              <input type="number" required value={formData.quantityOrdered} onChange={e => setFormData({...formData, quantityOrdered: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm font-bold bg-gray-50 focus:ring-primary focus:border-primary" />
-            </div>
-            <div>
-              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Target Date</label>
-              <input type="date" required value={formData.targetDate} onChange={e => setFormData({...formData, targetDate: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm font-bold bg-gray-50 focus:ring-primary focus:border-primary" />
-            </div>
-          </div>
-          <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Item/Style Description & Remarks</label>
-            <textarea required rows={3} value={formData.remarks} onChange={e => setFormData({...formData, remarks: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm font-bold bg-gray-50 focus:ring-primary focus:border-primary placeholder:text-gray-300" placeholder="E.g. Bullcap - Yellow (Katrina)"></textarea>
-          </div>
-          <div className="pt-4 flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest text-gray-500 hover:bg-gray-100">Cancel</button>
-            <button type="submit" disabled={loading} className="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20 disabled:opacity-50">
-              {loading ? 'Saving...' : 'Create RSQ'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
+  const handleToggleSelectRow = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent row double click / hover triggers
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
 
-function AddFabricModal({ onClose, onSuccess }: any) {
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    type: 'KATRINA',
-    color: '',
-    unit: 'Roll',
-    unitPrice: ''
-  });
-
-  const handleSubmit = async (e: any) => {
-    e.preventDefault();
-    setLoading(true);
-    // Since there's no dedicated 'create fabric' endpoint yet, we might need one.
-    // Let's assume we can post to /rsq/fabrics if we add it, or we can just tell the user it needs a backend update.
-    // For now, I will add the UI and mock the success if the endpoint doesn't exist.
+  // Perform bulk delete
+  const handleDeleteSelected = async () => {
+    setIsDeleting(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/fabrics`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/transactions/bulk-delete`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          unitPrice: parseFloat(formData.unitPrice) || 0
-        })
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ids: selectedIds }),
       });
+      
       if (res.ok) {
-        onSuccess();
+        setSelectedIds([]);
+        setIsConfirmDeleteOpen(false);
+        if (onRefresh) {
+          onRefresh();
+        }
       } else {
-        alert('Failed to add fabric. Please check console for details.');
+        alert('Failed to delete transactions. Please try again.');
       }
     } catch (err) {
-      console.error(err);
+      console.error('Error during deletion:', err);
+      alert('An error occurred. Please try again.');
     } finally {
-      setLoading(false);
+      setIsDeleting(false);
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl">
-        <div className="flex justify-between items-center p-6 border-b border-gray-100">
-          <h2 className="text-lg font-black uppercase tracking-widest text-gray-900">Add New Fabric</h2>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-900 rounded-full hover:bg-gray-100"><X className="h-5 w-5" /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Fabric Name</label>
-            <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm font-bold bg-gray-50 focus:ring-primary focus:border-primary" placeholder="E.g. Katrinas - Red" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Type</label>
-              <input type="text" required value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm font-bold bg-gray-50 focus:ring-primary focus:border-primary" placeholder="E.g. KATRINA" />
-            </div>
-            <div>
-              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Color (Optional)</label>
-              <input type="text" value={formData.color} onChange={e => setFormData({...formData, color: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm font-bold bg-gray-50 focus:ring-primary focus:border-primary" placeholder="E.g. Red" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Unit</label>
-              <input type="text" required value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm font-bold bg-gray-50 focus:ring-primary focus:border-primary" placeholder="E.g. Roll, Yards" />
-            </div>
-            <div>
-              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Unit Price (₱)</label>
-              <input type="number" required step="0.01" value={formData.unitPrice} onChange={e => setFormData({...formData, unitPrice: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm font-bold bg-gray-50 focus:ring-primary focus:border-primary" />
-            </div>
-          </div>
-          <div className="pt-4 flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest text-gray-500 hover:bg-gray-100">Cancel</button>
-            <button type="submit" disabled={loading} className="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20 disabled:opacity-50">
-              {loading ? 'Saving...' : 'Add Fabric'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+  // Movement Details Calculations
+  const targetDateStr = selectedDate ? new Date(selectedDate).toDateString() : '';
+  const sameDayMovements = parsedRows.filter(
+    row => row.date && new Date(row.date).toDateString() === targetDateStr
   );
-}
 
-function TransactionModal({ onClose, fabrics, onSuccess }: any) {
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    fabricId: '',
-    type: 'STOCK_IN',
-    quantity: '',
-    remarks: ''
-  });
-
-  const handleSubmit = async (e: any) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/transactions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          quantity: parseFloat(formData.quantity)
-        })
-      });
-      onSuccess();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const totalStockIn = sameDayMovements.reduce(
+    (acc, row) => (row.type === 'STOCK_IN' || row.type === 'BEGINNING') ? acc + row.quantity : acc, 
+    0
+  );
+  const totalStockOut = sameDayMovements.reduce(
+    (acc, row) => row.type === 'WITHDRAWAL' ? acc + row.quantity : acc, 
+    0
+  );
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl">
-        <div className="flex justify-between items-center p-6 border-b border-gray-100">
-          <h2 className="text-lg font-black uppercase tracking-widest text-gray-900">Log Fabric Movement</h2>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-900 rounded-full hover:bg-gray-100"><X className="h-5 w-5" /></button>
+    <div className="space-y-6">
+      {/* Filtering and Search Controls */}
+      <div className="flex flex-col lg:flex-row gap-4 items-stretch justify-between">
+        <div className="flex items-center gap-2 bg-gray-50 px-4 py-2.5 rounded-2xl border border-gray-200/50 flex-1 max-w-md shadow-inner">
+          <Search className="h-4 w-4 text-gray-400" />
+          <input 
+            type="text" 
+            placeholder="Search batch #, RSQ #, or apparel name..." 
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="bg-transparent border-none outline-none text-xs font-bold text-gray-600 placeholder:text-gray-300 w-full focus:ring-0"
+          />
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Movement Type</label>
-            <div className="flex bg-gray-50 p-1 rounded-xl">
-              {['STOCK_IN', 'WITHDRAWAL', 'RETURN'].map(type => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setFormData({...formData, type})}
-                  className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
-                    formData.type === type 
-                      ? 'bg-white shadow-sm text-primary' 
-                      : 'text-gray-400 hover:text-gray-600'
-                  }`}
-                >
-                  {type.replace('_', ' ')}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Select Fabric</label>
-            <select required value={formData.fabricId} onChange={e => setFormData({...formData, fabricId: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm font-bold bg-gray-50 focus:ring-primary focus:border-primary">
-              <option value="">-- Select Fabric --</option>
-              {fabrics.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
+
+        <div className="flex flex-wrap gap-3 items-center">
+          {/* Type Filter */}
+          <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200/50">
+            <Filter className="h-3 w-3 text-gray-400" />
+            <select 
+              value={typeFilter}
+              onChange={e => setTypeFilter(e.target.value)}
+              className="bg-transparent border-none outline-none text-xs font-bold text-gray-600 focus:ring-0 py-0.5 cursor-pointer"
+            >
+              <option value="">All Movement Types</option>
+              <option value="WITHDRAWAL">WITHDRAWAL</option>
+              <option value="STOCK_IN">STOCK IN</option>
+              <option value="RETURN">RETURN</option>
+              <option value="BEGINNING">BEGINNING</option>
             </select>
           </div>
-          <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Quantity</label>
-            <input type="number" required step="0.1" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm font-bold bg-gray-50 focus:ring-primary focus:border-primary" />
+
+          {/* Month Filter */}
+          <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200/50">
+            <Calendar className="h-3 w-3 text-gray-400" />
+            <select 
+              value={monthFilter}
+              onChange={e => setMonthFilter(e.target.value)}
+              className="bg-transparent border-none outline-none text-xs font-bold text-gray-600 focus:ring-0 py-0.5 cursor-pointer"
+            >
+              <option value="">All Applicable Months</option>
+              {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
           </div>
-          <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Remarks</label>
-            <textarea rows={2} value={formData.remarks} onChange={e => setFormData({...formData, remarks: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm font-bold bg-gray-50 focus:ring-primary focus:border-primary placeholder:text-gray-300"></textarea>
+        </div>
+      </div>
+
+      {/* Spreadsheet grid layout */}
+      <div className="overflow-x-auto rounded-3xl border border-gray-200 shadow-sm max-h-[600px] overflow-y-auto custom-scrollbar relative">
+        <table className="w-full text-[11px] font-sans border-collapse relative">
+          <thead className="sticky top-0 z-20 bg-gray-50 shadow-sm text-center">
+            <tr className="border-b border-gray-200 text-gray-400 uppercase tracking-widest text-[9px] font-black">
+              <th className="px-3 py-3 border-r border-gray-200 text-center w-10 sticky left-0 bg-gray-50 z-30">
+                <input 
+                  type="checkbox"
+                  checked={isAllSelected}
+                  onChange={handleToggleSelectAll}
+                  className="rounded border-gray-300 text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer transition-all"
+                />
+              </th>
+              <th className="px-3 py-3 border-r border-gray-200 text-left">Transaction #</th>
+              <th className="px-3 py-3 border-r border-gray-200">Series #</th>
+              <th className="px-3 py-3 border-r border-gray-200">RSQ #</th>
+              <th className="px-3 py-3 border-r border-gray-200 text-left w-48">Apparel (Fabric)</th>
+              <th className="px-3 py-3 border-r border-gray-200">Group</th>
+              <th className="px-3 py-3 border-r border-gray-200">Type</th>
+              <th className="px-3 py-3 border-r border-gray-200">Month</th>
+              <th className="px-3 py-3 border-r border-gray-200">Date</th>
+              <th className="px-3 py-3 border-r border-gray-200">Qty</th>
+              <th className="px-3 py-3 border-r border-gray-200">Unit</th>
+              <th className="px-3 py-3 border-r border-gray-200">Price</th>
+              <th className="px-3 py-3 border-r border-gray-200">Amount</th>
+              <th className="px-3 py-3 border-r border-gray-200 text-left w-44">Remarks</th>
+              <th className="px-3 py-3 text-center">Print</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 bg-white">
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={15} className="text-center py-12 text-gray-400 font-bold uppercase tracking-wider text-xs">
+                  No matching transaction rows found.
+                </td>
+              </tr>
+            ) : (
+              filtered.map((row: any) => {
+                const isWithdrawal = row.type === 'WITHDRAWAL';
+                const isReturn = row.type === 'RETURN';
+                const hasMatchingSlip = (isWithdrawal || isReturn) && row.rsqNo && row.rsqNo !== '—' && requests.some(r => r.rsqNo === row.rsqNo);
+                const isRowSelected = selectedIds.includes(row.id);
+
+                return (
+                  <tr 
+                    key={row.id} 
+                    onDoubleClick={() => setSelectedDate(row.date)}
+                    className={`hover:bg-primary/5 transition-colors font-semibold text-gray-700 cursor-pointer select-none ${isRowSelected ? 'bg-primary/5 border-l-2 border-l-primary' : ''}`}
+                    title="Double-click row to view all movements on this date"
+                  >
+                    <td 
+                      className={`px-3 py-2.5 border-r border-gray-100 text-center sticky left-0 z-10 transition-all ${isRowSelected ? 'bg-blue-50/50' : 'bg-white'}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input 
+                        type="checkbox"
+                        checked={isRowSelected}
+                        onChange={(e) => handleToggleSelectRow(row.id, e as any)}
+                        className="rounded border-gray-300 text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer transition-all"
+                      />
+                    </td>
+                    <td className="px-3 py-2.5 border-r border-gray-100 font-black text-gray-900">{row.batchNo}</td>
+                    <td className="px-3 py-2.5 border-r border-gray-100 text-center font-mono font-bold text-gray-500">{row.seriesNo}</td>
+                    <td className="px-3 py-2.5 border-r border-gray-100 text-center font-mono font-black text-primary">{row.rsqNo || '—'}</td>
+                    <td className="px-3 py-2.5 border-r border-gray-100 text-left font-black uppercase text-gray-800 leading-tight">{row.apparel}</td>
+                    <td className="px-3 py-2.5 border-r border-gray-100 text-center uppercase text-[10px] text-gray-500">{row.apparelGroup}</td>
+                    <td className="px-3 py-2.5 border-r border-gray-100 text-center">
+                      <span className={`inline-flex px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter ${
+                        row.type === 'WITHDRAWAL' ? 'bg-red-50 text-red-600 border border-red-100' :
+                        row.type === 'RETURN' ? 'bg-green-50 text-green-600 border border-green-100' :
+                        row.type === 'STOCK_IN' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
+                        'bg-gray-100 text-gray-600 border border-gray-200'
+                      }`}>
+                        {row.type.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 border-r border-gray-100 text-center uppercase font-bold text-[10px] text-gray-500">{row.applicableMonth || '—'}</td>
+                    <td className="px-3 py-2.5 border-r border-gray-100 text-center font-bold text-gray-500">{new Date(row.date).toLocaleDateString()}</td>
+                    <td className="px-3 py-2.5 border-r border-gray-100 text-center font-black text-gray-900">{row.quantity}</td>
+                    <td className="px-3 py-2.5 border-r border-gray-100 text-center uppercase text-gray-400 text-[10px]">{row.unit}</td>
+                    <td className="px-3 py-2.5 border-r border-gray-100 text-center font-bold text-gray-500">₱{row.price.toLocaleString()}</td>
+                    <td className="px-3 py-2.5 border-r border-gray-100 text-center font-black text-gray-900">₱{row.amount.toLocaleString()}</td>
+                    <td className="px-3 py-2.5 border-r border-gray-100 text-left line-clamp-1 italic text-gray-400 text-[10px] leading-tight py-3" title={row.remarks}>
+                      {row.remarks || '—'}
+                    </td>
+                    <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                      <button 
+                        onClick={() => {
+                          if (hasMatchingSlip) {
+                            onPrintRSQ(row.rsqNo);
+                          } else {
+                            onPrintTrn({
+                              id: row.id,
+                              transactionNo: row.batchNo === 'BEGINNING' ? 'BEGINNING' : `${row.batchNo}_${row.seriesNo}`,
+                              date: row.date,
+                              type: row.type,
+                              quantity: row.quantity,
+                              unit: row.unit,
+                              remarks: row.rawRemarks,
+                              fabric: row.fabric,
+                              createdAt: row.date
+                            });
+                          }
+                        }} 
+                        className="p-1 text-gray-400 hover:text-primary transition-all hover:bg-primary/5 rounded-lg active:scale-95 group relative flex items-center justify-center mx-auto"
+                        title={hasMatchingSlip ? "Print 4-Copy RSQ Slips" : "Print Material Transmittal Report"}
+                      >
+                        <Printer className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Floating Action Toolbar */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-40 bg-white/90 backdrop-blur-md px-6 py-4 rounded-3xl border border-gray-200/80 shadow-2xl flex items-center gap-6 transition-all animate-bounce-subtle">
+          <div className="flex flex-col">
+            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none">Selection Active</span>
+            <span className="text-xs font-black text-gray-950 mt-1">{selectedIds.length} Transaction{selectedIds.length > 1 ? 's' : ''} Selected</span>
           </div>
-          <div className="pt-4 flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest text-gray-500 hover:bg-gray-100">Cancel</button>
-            <button type="submit" disabled={loading} className="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20 disabled:opacity-50">
-              {loading ? 'Saving...' : 'Save Record'}
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setSelectedIds([])}
+              className="px-4 py-2 border border-gray-200 text-gray-500 rounded-2xl text-xs font-bold uppercase tracking-wider hover:bg-gray-100 hover:text-gray-950 active:scale-95 transition-all"
+            >
+              Clear Selection
+            </button>
+            <button 
+              onClick={() => setIsConfirmDeleteOpen(true)}
+              className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-2xl text-xs font-bold uppercase tracking-widest shadow-lg shadow-red-200 flex items-center gap-2 active:scale-95 transition-all"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete Selected
             </button>
           </div>
-        </form>
-      </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Dialog */}
+      {isConfirmDeleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-[2rem] border border-gray-100 shadow-2xl w-full max-w-md p-6 space-y-6 hover:scale-[1.01] transition-all">
+            <div className="flex items-center gap-4 text-red-600">
+              <div className="h-12 w-12 rounded-2xl bg-red-50 flex items-center justify-center">
+                <Trash2 className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-gray-900 uppercase tracking-tight">Confirm Bulk Deletion</h3>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Destructive Ledger Action</p>
+              </div>
+            </div>
+
+            <p className="text-xs font-bold text-gray-500 leading-relaxed uppercase">
+              Are you absolutely sure you want to delete <span className="text-gray-950 font-black">{selectedIds.length} selected transaction logs</span>? This action is permanent and cannot be undone.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button 
+                onClick={() => setIsConfirmDeleteOpen(false)}
+                disabled={isDeleting}
+                className="px-5 py-2.5 border border-gray-200 text-gray-500 rounded-2xl text-xs font-bold uppercase tracking-widest hover:bg-gray-50 active:scale-95 transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleDeleteSelected}
+                disabled={isDeleting}
+                className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-2xl text-xs font-bold uppercase tracking-widest shadow-lg shadow-red-200 flex items-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <div className="h-3.5 w-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Double Click Movement Ledger Details Modal */}
+      {selectedDate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-[2rem] border border-gray-100 shadow-2xl w-full max-w-3xl overflow-hidden max-h-[85vh] flex flex-col hover:scale-[1.002] transition-all">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
+              <div>
+                <h3 className="text-base font-black text-gray-900 uppercase tracking-tight">Movement Ledger Details</h3>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">
+                  All transactions on {new Date(selectedDate).toLocaleDateString(undefined, { dateStyle: 'full' })}
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedDate(null)}
+                className="p-2 hover:bg-gray-100 rounded-xl text-gray-400 hover:text-gray-900 transition-all active:scale-95"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
+              {/* Day Balance Summary Widgets */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-4 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest block">Total Stock In</span>
+                    <span className="text-xl font-black text-blue-900 mt-1 block">{totalStockIn.toLocaleString()} Rolls</span>
+                  </div>
+                  <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-600 font-black text-xs">IN</div>
+                </div>
+                <div className="bg-red-50/50 border border-red-100 rounded-2xl p-4 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-black text-red-500 uppercase tracking-widest block">Total Stock Out</span>
+                    <span className="text-xl font-black text-red-900 mt-1 block">{totalStockOut.toLocaleString()} Rolls</span>
+                  </div>
+                  <div className="h-10 w-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-600 font-black text-xs">OUT</div>
+                </div>
+              </div>
+
+              {/* List of Movements */}
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Chronological Daily Logs</h4>
+                <div className="border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                    <table className="w-full text-[10px] text-center border-collapse">
+                      <thead className="bg-gray-50/80 sticky top-0 font-black uppercase text-gray-400 text-[8px] tracking-widest">
+                        <tr className="border-b border-gray-100">
+                          <th className="px-3 py-2 border-r border-gray-100 text-left">Transaction #</th>
+                          <th className="px-3 py-2 border-r border-gray-100">Type</th>
+                          <th className="px-3 py-2 border-r border-gray-100 text-left">Fabric</th>
+                          <th className="px-3 py-2 border-r border-gray-100">Qty</th>
+                          <th className="px-3 py-2 border-r border-gray-100">Price</th>
+                          <th className="px-3 py-2 border-r border-gray-100">Amount</th>
+                          <th className="px-3 py-2 text-left">Remarks</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white">
+                        {sameDayMovements.map((mv: any) => (
+                          <tr key={mv.id} className="hover:bg-gray-50/50 transition-colors font-bold text-gray-600">
+                            <td className="px-3 py-2 border-r border-gray-100 text-left text-gray-900 font-black">
+                              {mv.batchNo === 'BEGINNING' ? 'BEGINNING' : `${mv.batchNo}_${mv.seriesNo}`}
+                            </td>
+                            <td className="px-3 py-2 border-r border-gray-100">
+                              <span className={`inline-flex px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter ${
+                                mv.type === 'WITHDRAWAL' ? 'bg-red-50 text-red-600 border border-red-100' :
+                                mv.type === 'RETURN' ? 'bg-green-50 text-green-600 border border-green-100' :
+                                'bg-blue-50 text-blue-600 border border-blue-100'
+                              }`}>
+                                {mv.type.replace('_', ' ')}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 border-r border-gray-100 text-left uppercase text-gray-800 leading-tight">
+                              {mv.apparel}
+                            </td>
+                            <td className="px-3 py-2 border-r border-gray-100 font-black text-gray-900">
+                              {mv.quantity} {mv.unit}
+                            </td>
+                            <td className="px-3 py-2 border-r border-gray-100 text-gray-400">
+                              ₱{mv.price.toLocaleString()}
+                            </td>
+                            <td className="px-3 py-2 border-r border-gray-100 text-gray-900 font-black">
+                              ₱{mv.amount.toLocaleString()}
+                            </td>
+                            <td className="px-3 py-2 text-left text-gray-400 italic font-semibold max-w-[200px] truncate" title={mv.remarks}>
+                              {mv.remarks || '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end p-6 border-t border-gray-100 bg-gray-50/30 gap-3">
+              <button 
+                onClick={() => setSelectedDate(null)}
+                className="px-6 py-2.5 bg-gray-950 hover:bg-gray-850 text-white rounded-2xl text-xs font-bold uppercase tracking-widest active:scale-95 transition-all"
+              >
+                Close Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// Lists
-
+// 2. Fabric Inventory List
 function FabricList({ data }: { data: any[] }) {
   const [search, setSearch] = useState('');
-  
-  const filtered = data.filter(f => f.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = data.filter((f: any) => f.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div className="space-y-6">
@@ -470,18 +761,18 @@ function FabricList({ data }: { data: any[] }) {
             <div key={fabric.id} className="bg-gray-50/50 rounded-2xl border border-gray-100 p-6 hover:shadow-lg hover:border-primary/20 transition-all group">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <span className="text-[10px] font-black text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                  <span className="text-[10px] font-black text-primary bg-primary/10 px-2.5 py-0.5 rounded-full uppercase tracking-tighter">
                     {fabric.type}
                   </span>
-                  <h3 className="text-sm font-black text-gray-900 uppercase mt-2 group-hover:text-primary transition-colors">{fabric.name}</h3>
+                  <h3 className="text-sm font-black text-gray-900 uppercase mt-2 group-hover:text-primary transition-colors leading-snug">{fabric.name}</h3>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">Balance</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Balance</p>
                   <p className="text-lg font-black text-gray-900">{balance} <span className="text-xs text-gray-400 uppercase">{fabric.unit}</span></p>
                 </div>
               </div>
-              <div className="flex items-center justify-between pt-4 border-t border-gray-200/60">
-                <p className="text-[10px] font-bold text-gray-400 uppercase">Unit Price: <span className="text-gray-700">₱{fabric.unitPrice.toLocaleString()}</span></p>
+              <div className="flex items-center justify-between pt-4 border-t border-gray-200/60 text-[10px] font-bold text-gray-400 uppercase">
+                <span>Unit Price: <span className="text-gray-700">₱{fabric.unitPrice.toLocaleString()}</span></span>
               </div>
             </div>
           );
@@ -491,126 +782,504 @@ function FabricList({ data }: { data: any[] }) {
   );
 }
 
-function RequestList({ data, onPrint }: { data: any[], onPrint: (rsq: any) => void }) {
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-black text-gray-900 uppercase tracking-widest">Active RSQ Tracking</h2>
-      </div>
+// 3. Batch Transaction Form Modal (Supercharged Excel Multi-line Form)
+interface FormItemRow {
+  fabricId: string;
+  type: string; // WITHDRAWAL, RETURN, STOCK_IN, BEGINNING
+  quantity: number;
+  price: number;
+  remarks: string;
+  tailorId: string;
+  rsqNo?: string;
+  seriesNo?: string;
+}
 
-      <div className="overflow-x-auto max-h-[600px] overflow-y-auto custom-scrollbar">
-        <table className="w-full relative">
-          <thead className="sticky top-0 z-10 bg-white">
-            <tr className="bg-gray-50 border-y border-gray-100">
-              <th className="px-6 py-4 text-left text-[10px] font-black text-gray-500 uppercase tracking-widest">RSQ No.</th>
-              <th className="px-6 py-4 text-left text-[10px] font-black text-gray-500 uppercase tracking-widest">Product / Details</th>
-              <th className="px-6 py-4 text-left text-[10px] font-black text-gray-500 uppercase tracking-widest">Fabric</th>
-              <th className="px-6 py-4 text-left text-[10px] font-black text-gray-500 uppercase tracking-widest">Tailor</th>
-              <th className="px-6 py-4 text-center text-[10px] font-black text-gray-500 uppercase tracking-widest">Qty</th>
-              <th className="px-6 py-4 text-center text-[10px] font-black text-gray-500 uppercase tracking-widest">Status</th>
-              <th className="px-6 py-4 text-right text-[10px] font-black text-gray-500 uppercase tracking-widest">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {data.map((req) => (
-              <tr key={req.id} className="hover:bg-gray-50/50 transition-colors">
-                <td className="px-6 py-4">
-                  <span className="text-xs font-black text-gray-900">{req.rsqNo}</span>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mt-0.5">
-                    {new Date(req.orderDate).toLocaleDateString()}
-                  </p>
-                </td>
-                <td className="px-6 py-4">
-                  <span className="text-xs font-bold text-gray-700">{req.product?.name || 'N/A'}</span>
-                  <p className="text-[10px] text-gray-400 line-clamp-1 italic">{req.remarks}</p>
-                </td>
-                <td className="px-6 py-4">
-                  <span className="text-xs font-bold text-gray-600 uppercase">{req.fabric?.name || 'N/A'}</span>
-                </td>
-                <td className="px-6 py-4">
-                  <span className="text-xs font-bold text-gray-600 uppercase">{req.tailor?.name}</span>
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <span className="text-xs font-black text-gray-900">{req.quantityOrdered}</span>
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                    req.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
-                    req.status === 'PENDING' ? 'bg-amber-100 text-amber-700' :
-                    'bg-blue-100 text-blue-700'
-                  }`}>
-                    {req.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <button onClick={() => onPrint(req)} className="p-2 text-gray-400 hover:text-primary transition-colors hover:bg-primary/5 rounded-lg group relative">
-                      <Printer className="h-4 w-4" />
-                      <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Print RSQ Slip</span>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+function BatchTransactionModal({ onClose, fabrics, tailors, onSuccess }: any) {
+  const [loading, setLoading] = useState(false);
+  const [transactionNo, setTransactionNo] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [applicableMonth, setApplicableMonth] = useState('');
+
+  const [sequenceData, setSequenceData] = useState<any>(null);
+  
+  // Grid row states
+  const [rows, setRows] = useState<FormItemRow[]>([
+    { fabricId: '', type: 'WITHDRAWAL', quantity: 1, price: 0, remarks: '', tailorId: tailors[0]?.id || '' }
+  ]);
+
+  // Set default applicable month (e.g. "MAY 2026")
+  useEffect(() => {
+    const today = new Date();
+    const months = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
+    setApplicableMonth(`${months[today.getMonth()]} ${today.getFullYear()}`);
+  }, []);
+
+  // Fetch sequence numbers on load
+  useEffect(() => {
+    const fetchSeq = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/next-sequence`);
+        const data = await res.json();
+        setSequenceData(data);
+        setTransactionNo(data.nextTransactionNo);
+      } catch (err) {
+        console.error('Failed to fetch sequences', err);
+      }
+    };
+    fetchSeq();
+  }, []);
+
+  // Auto-calculate rows' Series # and RSQ # whenever rows, date, or sequenceData changes
+  const computedRows = rows.map((row, idx) => {
+    if (!sequenceData) return { ...row, seriesNo: '', rsqNo: '' };
+
+    // 1. Calculate Series No
+    // Date formats: e.g. "2026-05-17"
+    const [y, m, d] = date.split('-').map(Number);
+    
+    // We count sequence of rows entered today.
+    // If today matches current date, startSeq is today's start count. Otherwise, default start count to 1.
+    const todayStr = new Date().toISOString().split('T')[0];
+    let startSeq = 1;
+    if (date === todayStr) {
+      const todaySeqStr = sequenceData.todaySeriesSequence.split('.');
+      startSeq = parseInt(todaySeqStr[todaySeqStr.length - 1]) || 1;
+    }
+    const computedSeries = `${m}.${d}.${startSeq + idx}`;
+
+    // 2. Calculate RSQ No
+    let computedRsq = '';
+    if (row.type === 'WITHDRAWAL' || row.type === 'RETURN') {
+      const lastRsqStr = sequenceData.nextRsqNo.replace('RSQ-', '');
+      const lastRsqNo = parseInt(lastRsqStr) || 589;
+      
+      // Count how many withdrawals/returns occurred before this row index
+      const priorCount = rows.slice(0, idx).filter(r => r.type === 'WITHDRAWAL' || r.type === 'RETURN').length;
+      computedRsq = `RSQ-${String(lastRsqNo + priorCount).padStart(5, '0')}`;
+    }
+
+    return {
+      ...row,
+      seriesNo: computedSeries,
+      rsqNo: computedRsq
+    };
+  });
+
+  const handleAddRow = () => {
+    setRows([
+      ...rows,
+      { fabricId: '', type: 'WITHDRAWAL', quantity: 1, price: 0, remarks: '', tailorId: tailors[0]?.id || '' }
+    ]);
+  };
+
+  const handleRemoveRow = (idx: number) => {
+    if (rows.length === 1) return;
+    setRows(rows.filter((_, i) => i !== idx));
+  };
+
+  const handleUpdateRow = (idx: number, fields: Partial<FormItemRow>) => {
+    const updated = rows.map((row, i) => {
+      if (i !== idx) return row;
+      const newRow = { ...row, ...fields };
+
+      // If fabricId changed, auto-populate price from fabric price
+      if (fields.fabricId) {
+        const fab = fabrics.find((f: any) => f.id === fields.fabricId);
+        newRow.price = fab ? fab.unitPrice : 0;
+      }
+
+      // If type changed to STOCK_IN or BEGINNING, clear tailorId
+      if (fields.type && (fields.type === 'STOCK_IN' || fields.type === 'BEGINNING')) {
+        newRow.tailorId = '';
+      } else if (fields.type && !newRow.tailorId) {
+        newRow.tailorId = tailors[0]?.id || '';
+      }
+
+      return newRow;
+    });
+    setRows(updated);
+  };
+
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+    if (!transactionNo) return alert('Transaction number is required');
+
+    // Validation
+    const invalidRow = computedRows.find(r => !r.fabricId);
+    if (invalidRow) {
+      return alert('Please select a fabric/apparel for all rows.');
+    }
+
+    setLoading(true);
+    try {
+      const itemsToSubmit = computedRows.map(row => ({
+        transactionNo,
+        seriesNo: row.seriesNo,
+        rsqNo: row.rsqNo || undefined,
+        fabricId: row.fabricId,
+        type: row.type,
+        quantity: parseFloat(row.quantity as any) || 0,
+        remarks: row.remarks,
+        applicableMonth,
+        date,
+        tailorId: row.tailorId || undefined
+      }));
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: itemsToSubmit })
+      });
+
+      if (res.ok) {
+        onSuccess();
+      } else {
+        const err = await res.json();
+        alert(`Failed to save: ${err.message || 'Unknown error'}`);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Network error while saving batch.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Summaries
+  const totalQty = rows.reduce((acc, r) => acc + (parseFloat(r.quantity as any) || 0), 0);
+  const totalAmount = computedRows.reduce((acc, r) => acc + ((parseFloat(r.quantity as any) || 0) * (r.price || 0)), 0);
+
+  const monthsList = [
+    'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
+    'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'
+  ];
+
+  const currentYear = new Date().getFullYear();
+  const monthDropdownOptions = monthsList.map(m => `${m} ${currentYear}`);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl w-full max-w-7xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="flex justify-between items-center p-6 border-b border-gray-100 shrink-0">
+          <div>
+            <h2 className="text-lg font-black uppercase tracking-widest text-gray-900">Add Transaction Batch Entry</h2>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Logs a batch of fabric movements simultaneously</p>
+          </div>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-900 rounded-full hover:bg-gray-100 transition-colors">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* Top global inputs row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-gray-50 border-b border-gray-200/50 shrink-0">
+            <div>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Transaction # (Batch Code)</label>
+              <input 
+                type="text" 
+                required 
+                value={transactionNo} 
+                onChange={e => setTransactionNo(e.target.value)} 
+                className="w-full rounded-xl border-gray-200 px-4 py-2.5 text-xs font-black bg-white focus:ring-primary focus:border-primary shadow-sm" 
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Applicable Month</label>
+              <select 
+                required 
+                value={applicableMonth} 
+                onChange={e => setApplicableMonth(e.target.value)} 
+                className="w-full rounded-xl border-gray-200 px-4 py-2.5 text-xs font-bold bg-white focus:ring-primary focus:border-primary shadow-sm cursor-pointer"
+              >
+                <option value="">-- Choose Applicable Month --</option>
+                {monthDropdownOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Batch Date</label>
+              <input 
+                type="date" 
+                required 
+                value={date} 
+                onChange={e => setDate(e.target.value)} 
+                className="w-full rounded-xl border-gray-200 px-4 py-2.5 text-xs font-bold bg-white focus:ring-primary focus:border-primary shadow-sm" 
+              />
+            </div>
+          </div>
+
+          {/* Grid spreadsheet-style rows editor */}
+          <div className="flex-1 overflow-auto p-6 custom-scrollbar min-h-0">
+            <table className="w-full border-collapse text-left text-[11px] font-semibold text-gray-700">
+              <thead>
+                <tr className="bg-gray-100/50 text-[9px] font-black uppercase text-gray-400 tracking-wider border-b border-gray-200">
+                  <th className="py-2.5 px-2 text-center w-16">Series #</th>
+                  <th className="py-2.5 px-2 text-center w-20">RSQ #</th>
+                  <th className="py-2.5 px-2 w-72">Apparel (Fabric)</th>
+                  <th className="py-2.5 px-2 text-center w-24">Group</th>
+                  <th className="py-2.5 px-2 text-center w-36">Movement Type</th>
+                  <th className="py-2.5 px-2 text-center w-16">Qty</th>
+                  <th className="py-2.5 px-2 text-center w-16">Unit</th>
+                  <th className="py-2.5 px-2 text-center w-24">Price</th>
+                  <th className="py-2.5 px-2 text-center w-28">Amount</th>
+                  <th className="py-2.5 px-2 w-48">Tailor (Dest.)</th>
+                  <th className="py-2.5 px-2 w-48">Remarks</th>
+                  <th className="py-2.5 px-2 text-center w-12">Delete</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {computedRows.map((row, idx) => {
+                  const selectedFabric = fabrics.find((f: any) => f.id === row.fabricId);
+                  const isJobOrder = row.type === 'WITHDRAWAL' || row.type === 'RETURN';
+
+                  return (
+                    <tr key={idx} className="hover:bg-gray-50/20 align-middle">
+                      {/* Series # */}
+                      <td className="py-3 px-2 text-center font-mono text-gray-400 font-bold">
+                        {row.seriesNo || '—'}
+                      </td>
+
+                      {/* RSQ # */}
+                      <td className="py-3 px-2 text-center font-mono font-black text-primary">
+                        {row.rsqNo || '—'}
+                      </td>
+
+                      {/* Apparel Selection */}
+                      <td className="py-3 px-2">
+                        <select 
+                          required
+                          value={row.fabricId}
+                          onChange={e => handleUpdateRow(idx, { fabricId: e.target.value })}
+                          className="w-full rounded-lg border-gray-200 py-1 px-2 text-[10px] font-bold bg-white focus:ring-primary focus:border-primary shadow-sm"
+                        >
+                          <option value="">-- Choose Apparel --</option>
+                          {fabrics.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                        </select>
+                      </td>
+
+                      {/* Apparel Group */}
+                      <td className="py-3 px-2 text-center uppercase text-[10px] text-gray-400">
+                        {selectedFabric?.type || '—'}
+                      </td>
+
+                      {/* Movement Type */}
+                      <td className="py-3 px-2">
+                        <select 
+                          value={row.type}
+                          onChange={e => handleUpdateRow(idx, { type: e.target.value })}
+                          className="w-full rounded-lg border-gray-200 py-1 px-2 text-[10px] font-black uppercase bg-white focus:ring-primary focus:border-primary shadow-sm cursor-pointer"
+                        >
+                          <option value="WITHDRAWAL">WITHDRAWAL</option>
+                          <option value="STOCK_IN">STOCK IN</option>
+                          <option value="RETURN">RETURN</option>
+                          <option value="BEGINNING">BEGINNING</option>
+                        </select>
+                      </td>
+
+                      {/* Qty */}
+                      <td className="py-3 px-2 text-center">
+                        <input 
+                          type="number" 
+                          required 
+                          min="0.1" 
+                          step="0.1"
+                          value={row.quantity} 
+                          onChange={e => handleUpdateRow(idx, { quantity: parseFloat(e.target.value) || 0 })} 
+                          className="w-full rounded-lg border-gray-200 py-1 px-2 text-[10px] font-black text-center bg-white focus:ring-primary focus:border-primary shadow-sm"
+                        />
+                      </td>
+
+                      {/* Unit */}
+                      <td className="py-3 px-2 text-center uppercase text-gray-400 text-[10px]">
+                        {selectedFabric?.unit || '—'}
+                      </td>
+
+                      {/* Price */}
+                      <td className="py-3 px-2 text-center">
+                        <input 
+                          type="number" 
+                          required 
+                          min="0" 
+                          value={row.price} 
+                          onChange={e => handleUpdateRow(idx, { price: parseFloat(e.target.value) || 0 })} 
+                          className="w-full rounded-lg border-gray-200 py-1 px-2 text-[10px] font-bold text-center bg-white focus:ring-primary focus:border-primary shadow-sm"
+                        />
+                      </td>
+
+                      {/* Amount */}
+                      <td className="py-3 px-2 text-center font-black text-gray-900">
+                        ₱{((row.quantity || 0) * (row.price || 0)).toLocaleString()}
+                      </td>
+
+                      {/* Tailor (Dest) */}
+                      <td className="py-3 px-2">
+                        {isJobOrder ? (
+                          <select 
+                            required={isJobOrder}
+                            value={row.tailorId}
+                            onChange={e => handleUpdateRow(idx, { tailorId: e.target.value })}
+                            className="w-full rounded-lg border-gray-200 py-1 px-2 text-[10px] font-bold bg-white focus:ring-primary focus:border-primary shadow-sm cursor-pointer"
+                          >
+                            <option value="">-- Choose Tailor --</option>
+                            {tailors.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                          </select>
+                        ) : (
+                          <span className="text-[10px] text-gray-300 font-bold uppercase block text-center bg-gray-50 py-1 rounded border border-gray-100">BODEGA</span>
+                        )}
+                      </td>
+
+                      {/* Remarks */}
+                      <td className="py-3 px-2">
+                        <input 
+                          type="text" 
+                          placeholder="Instructions/Notes..."
+                          value={row.remarks} 
+                          onChange={e => handleUpdateRow(idx, { remarks: e.target.value })} 
+                          className="w-full rounded-lg border-gray-200 py-1 px-2 text-[10px] bg-white focus:ring-primary focus:border-primary shadow-sm"
+                        />
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-3 px-2 text-center">
+                        <button 
+                          type="button" 
+                          disabled={rows.length === 1}
+                          onClick={() => handleRemoveRow(idx)}
+                          className="p-1 text-gray-400 hover:text-red-500 rounded hover:bg-red-50 disabled:opacity-30 transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {/* Append row button */}
+            <button 
+              type="button" 
+              onClick={handleAddRow}
+              className="mt-4 flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2 rounded-xl font-bold text-[10px] uppercase tracking-wider transition-colors active:scale-95 shadow-sm border border-gray-200/50"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add Item Row
+            </button>
+          </div>
+
+          {/* Footer Area with summaries and buttons */}
+          <div className="bg-gray-50 border-t border-gray-200/50 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
+            {/* Totals */}
+            <div className="flex gap-6 text-xs uppercase font-bold text-gray-500 tracking-wider">
+              <div>
+                <span>Total Quantity: </span>
+                <span className="font-black text-gray-900 text-sm ml-1">{totalQty}</span>
+              </div>
+              <div className="border-r border-gray-200 h-5"></div>
+              <div>
+                <span>Total Amount: </span>
+                <span className="font-black text-gray-900 text-sm ml-1">₱{totalAmount.toLocaleString()}</span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-3">
+              <button 
+                type="button" 
+                onClick={onClose} 
+                className="px-6 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest text-gray-500 hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                disabled={loading} 
+                className="px-6 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20 disabled:opacity-50 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              >
+                {loading ? 'Saving Batch...' : 'Save Transaction Batch'}
+              </button>
+            </div>
+          </div>
+        </form>
       </div>
     </div>
   );
 }
 
-function TransactionList({ data, onPrint }: { data: any[], onPrint: (trn: any) => void }) {
+// 4. Fabric Creation Modal
+function AddFabricModal({ onClose, onSuccess }: any) {
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    type: 'KATRINA',
+    color: '',
+    unit: 'Roll',
+    unitPrice: ''
+  });
+
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/fabrics`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          unitPrice: parseFloat(formData.unitPrice) || 0
+        })
+      });
+      if (res.ok) {
+        onSuccess();
+      } else {
+        alert('Failed to add fabric.');
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="space-y-6">
-       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-black text-gray-900 uppercase tracking-widest">Fabric Movement History</h2>
-      </div>
-
-      <div className="space-y-3 max-h-[600px] overflow-y-auto custom-scrollbar pr-2">
-        {data.map((trn) => {
-          const isOut = trn.type === 'WITHDRAWAL';
-          const isIn = trn.type === 'STOCK_IN' || trn.type === 'RETURN' || trn.type === 'INITIAL_BALANCE';
-
-          return (
-            <div key={trn.id} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100 hover:border-primary/20 transition-all group">
-              <div className="flex items-center gap-4">
-                <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${
-                  isOut ? 'bg-red-50 text-red-500' : 
-                  trn.type === 'INITIAL_BALANCE' ? 'bg-blue-50 text-blue-500' :
-                  'bg-green-50 text-green-500'
-                }`}>
-                  {isOut ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownLeft className="h-5 w-5" />}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-gray-900 uppercase">{trn.fabric?.name}</span>
-                    <span className={`text-[10px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded-md ${
-                      isOut ? 'bg-red-100 text-red-700' : 
-                      trn.type === 'INITIAL_BALANCE' ? 'bg-blue-100 text-blue-700' :
-                      'bg-green-100 text-green-700'
-                    }`}>
-                      {trn.type.replace('_', ' ')}
-                    </span>
-                  </div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
-                    {new Date(trn.date).toLocaleString()} • {trn.location || 'BODEGA'} • {trn.transactionNo}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-6">
-                <div className="text-right">
-                  <p className={`text-sm font-black ${isOut ? 'text-red-600' : 'text-green-600'}`}>
-                    {isOut ? '-' : '+'}{trn.quantity} <span className="text-[10px] uppercase">{trn.unit}</span>
-                  </p>
-                  <p className="text-[10px] text-gray-400 italic mt-0.5 max-w-[200px] truncate">{trn.remarks || 'No remarks'}</p>
-                </div>
-                <button onClick={() => onPrint(trn)} className="p-2 text-gray-400 hover:text-primary transition-colors hover:bg-primary/5 rounded-lg opacity-0 group-hover:opacity-100">
-                  <Printer className="h-4 w-4" />
-                </button>
-              </div>
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl">
+        <div className="flex justify-between items-center p-6 border-b border-gray-100">
+          <h2 className="text-lg font-black uppercase tracking-widest text-gray-900">Add New Fabric</h2>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-900 rounded-full hover:bg-gray-100"><X className="h-5 w-5" /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Fabric Name</label>
+            <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm font-bold bg-gray-50 focus:ring-primary focus:border-primary placeholder:text-gray-300" placeholder="E.g. ALPHAGINA - RED" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Group/Type</label>
+              <input type="text" required value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm font-bold bg-gray-50 focus:ring-primary focus:border-primary placeholder:text-gray-300" placeholder="E.g. KATRINA" />
             </div>
-          );
-        })}
+            <div>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Color (Optional)</label>
+              <input type="text" value={formData.color} onChange={e => setFormData({...formData, color: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm font-bold bg-gray-50 focus:ring-primary focus:border-primary placeholder:text-gray-300" placeholder="E.g. RED" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Unit</label>
+              <input type="text" required value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm font-bold bg-gray-50 focus:ring-primary focus:border-primary placeholder:text-gray-300" placeholder="E.g. Roll, Yards" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Unit Price (₱)</label>
+              <input type="number" required step="0.01" value={formData.unitPrice} onChange={e => setFormData({...formData, unitPrice: e.target.value})} className="w-full rounded-xl border-gray-200 p-3 text-sm font-bold bg-gray-50 focus:ring-primary focus:border-primary" />
+            </div>
+          </div>
+          <div className="pt-4 flex justify-end gap-3">
+            <button type="button" onClick={onClose} className="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest text-gray-500 hover:bg-gray-100">Cancel</button>
+            <button type="submit" disabled={loading} className="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20 disabled:opacity-50">
+              {loading ? 'Saving...' : 'Add Fabric'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

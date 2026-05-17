@@ -16,4 +16,10 @@ export class AuthController {
   signOut(@Body('userId') userId: string) {
     return this.authService.logout(userId);
   }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('verify-super-admin')
+  verifySuperAdmin(@Body('password') password: string) {
+    return this.authService.verifySuperAdmin(password);
+  }
 }

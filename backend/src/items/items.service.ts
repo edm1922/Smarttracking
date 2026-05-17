@@ -392,18 +392,11 @@ export class ItemsService {
         }
       });
 
-      let threshold = 5;
-      item.fieldValues.forEach(fv => {
-        const v = fv.value as any;
-        if (v && typeof v === 'object' && v.useUnitQty) {
-          if (v.threshold !== undefined) threshold = v.threshold;
-        }
-      });
+
 
       inventory[name].items.push({
         slug: item.slug,
         qty,
-        threshold,
         batch: item.batch?.batchCode,
         status: item.status,
         fieldValues: item.fieldValues.map(fv => ({
@@ -415,7 +408,15 @@ export class ItemsService {
     });
 
     // Convert Set to Array and prepare final list
+    const productNames = Object.keys(inventory);
+    const products = await this.prisma.product.findMany({
+      where: { name: { in: productNames } },
+      select: { name: true, threshold: true }
+    });
+    const productMap = new Map(products.map(p => [p.name, p.threshold]));
+
     let result = Object.values(inventory).map((group: any) => {
+      group.threshold = productMap.get(group.name) ?? 50;
       if (group.specs) {
         Object.keys(group.specs).forEach(key => {
           group.specs[key] = Array.from(group.specs[key]);

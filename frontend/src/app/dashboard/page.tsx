@@ -13,6 +13,7 @@ import {
   RefreshCw, Loader2
 } from 'lucide-react';
 import api from '@/lib/api';
+import { toast } from 'sonner';
 import { Printer, Eye, X as CloseIcon } from 'lucide-react';
 import { PageHeaderSkeleton, CardSkeleton } from '@/components/ui/LoadingSkeletons';
 import { CircularLoading, useLoadingSteps } from '@/components/ui/LoadingProgress';
@@ -47,14 +48,14 @@ function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: (
   const reports = section === 'product' ? productReports : section === 'employee' ? employeeReports : activityReports;
 
   const handleGenerate = async () => {
-    if (!reportType) return alert('Please select a report type');
+    if (!reportType) return toast.warning('Please select a report type');
     setLoading(true);
     try {
       const res = await api.get(`/reports/report-data?type=${reportType}`);
       setPreviewData(res.data);
       setIsPreviewOpen(true);
     } catch (err) {
-      alert('Failed to generate report');
+      toast.error('Failed to generate report');
     } finally {
       setLoading(false);
     }

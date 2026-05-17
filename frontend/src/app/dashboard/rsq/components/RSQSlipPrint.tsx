@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface RSQSlipPrintProps {
@@ -8,113 +7,167 @@ interface RSQSlipPrintProps {
 export function RSQSlipPrint({ rsq }: RSQSlipPrintProps) {
   if (!rsq) return null;
 
-  return (
-    <div className="hidden print:block bg-white text-black p-8 text-xs font-sans w-full max-w-4xl mx-auto border border-black">
-      {/* Header section */}
-      <div className="flex justify-between items-start mb-6">
-        <div>
-          <h1 className="text-xl font-bold uppercase tracking-widest border-b-2 border-black pb-1 inline-block">Maunlad Uniform Inc.</h1>
-          <p className="font-bold mt-1 text-sm">FABRIC & TAILORING REQUEST SLIP</p>
-        </div>
-        <div className="text-right border border-black p-2 bg-gray-100">
-          <p className="font-bold text-sm">RSQ NO: {rsq.rsqNo}</p>
-          <p className="font-semibold">DATE: {new Date(rsq.orderDate).toLocaleDateString()}</p>
-        </div>
-      </div>
+  const tailorName = rsq.tailor?.name || 'TAILOR';
+  // Standardized tailor nickname (e.g. MAUNLAD UNIFORM INC -> MAUNLAD)
+  let tailorNickname = tailorName.replace(/tailoring|inc|cooperative|services/gi, '').trim().toUpperCase();
+  if (!tailorNickname || tailorNickname === 'UNASSIGNED' || tailorNickname === 'UNASSIGNED TAILOR') {
+    tailorNickname = 'MAUNLAD';
+  }
 
-      {/* Details section */}
-      <div className="grid grid-cols-2 gap-4 mb-4 border border-black p-4">
-        <div>
-          <p className="mb-2"><span className="font-bold uppercase inline-block w-24">Tailor Name:</span> <span className="border-b border-black px-2 py-0.5 min-w-[200px] inline-block font-bold">{rsq.tailor?.name}</span></p>
-          <p><span className="font-bold uppercase inline-block w-24">Item/Style:</span> <span className="border-b border-black px-2 py-0.5 min-w-[200px] inline-block font-bold">{rsq.product?.name || rsq.remarks || 'N/A'}</span></p>
-        </div>
-        <div>
-          <p className="mb-2"><span className="font-bold uppercase inline-block w-24">Target Date:</span> <span className="border-b border-black px-2 py-0.5 min-w-[200px] inline-block font-bold">{rsq.targetDate ? new Date(rsq.targetDate).toLocaleDateString() : 'N/A'}</span></p>
-          <p><span className="font-bold uppercase inline-block w-24">Status:</span> <span className="border-b border-black px-2 py-0.5 min-w-[200px] inline-block font-bold">{rsq.status}</span></p>
-        </div>
-      </div>
+  const formattedDate = rsq.orderDate ? new Date(rsq.orderDate).toLocaleDateString() : new Date().toLocaleDateString();
 
-      {/* Main Table */}
-      <table className="w-full border-collapse border border-black mb-8 text-center text-sm">
-        <thead>
-          <tr className="bg-gray-100 border border-black">
-            <th className="border border-black py-2 px-2 w-12">S. NO</th>
-            <th className="border border-black py-2 px-2 text-left">PARTICULARS / FABRIC</th>
-            <th className="border border-black py-2 px-2" colSpan={2}>REQUEST</th>
-            <th className="border border-black py-2 px-2" colSpan={2}>OUTPUT (CUTTING)</th>
-            <th className="border border-black py-2 px-2">OUTPUT (TAILOR)</th>
-          </tr>
-          <tr className="border border-black bg-gray-50 text-[10px]">
-            <th className="border border-black py-1 px-1"></th>
-            <th className="border border-black py-1 px-1"></th>
-            <th className="border border-black py-1 px-1 w-20">QTY</th>
-            <th className="border border-black py-1 px-1 w-20">UNIT</th>
-            <th className="border border-black py-1 px-1 w-20">QTY</th>
-            <th className="border border-black py-1 px-1 w-24">PRICE</th>
-            <th className="border border-black py-1 px-1 w-24">TOTAL QTY</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr className="border border-black h-12">
-            <td className="border border-black py-2 px-2">1</td>
-            <td className="border border-black py-2 px-2 text-left font-bold">{rsq.fabric?.name || 'N/A'}</td>
-            <td className="border border-black py-2 px-2 font-bold">{rsq.quantityOrdered}</td>
-            <td className="border border-black py-2 px-2 uppercase font-bold">{rsq.unit}</td>
-            <td className="border border-black py-2 px-2 bg-gray-100/50"></td>
-            <td className="border border-black py-2 px-2 bg-gray-100/50"></td>
-            <td className="border border-black py-2 px-2 font-bold">{rsq.quantityReceived || 0}</td>
-          </tr>
-          {/* Empty rows for spacing to match physical slip */}
-          {[2, 3, 4, 5].map(i => (
-            <tr key={i} className="border border-black h-8">
-              <td className="border border-black py-1 px-2">{i}</td>
-              <td className="border border-black py-1 px-2"></td>
-              <td className="border border-black py-1 px-2"></td>
-              <td className="border border-black py-1 px-2"></td>
-              <td className="border border-black py-1 px-2"></td>
-              <td className="border border-black py-1 px-2"></td>
-              <td className="border border-black py-1 px-2"></td>
+  // Helper to render a single copy of the slip
+  const renderSlipCopy = (title: string, type: 'CUTTING' | 'TAILORING') => {
+    const isCutting = type === 'CUTTING';
+    const rawRemarks = rsq.remarks || '';
+    const isImportedProduct = rawRemarks.toLowerCase().startsWith('imported product:');
+    const displayParticulars = isImportedProduct
+      ? rawRemarks.replace(/imported product:\s*/i, '').trim()
+      : (rawRemarks || `${rsq.fabric?.name || 'N/A'} Style`);
+
+    return (
+      <div className="w-full bg-white text-black p-6 border-2 border-dashed border-gray-300 rounded-xl space-y-4 text-xs font-sans relative break-inside-avoid shadow-sm">
+        {/* Header */}
+        <div className="flex justify-between items-start border-b border-black/10 pb-3">
+          <div>
+            <h2 className="text-sm font-black uppercase tracking-wider text-gray-900">Centro Services Cooperative</h2>
+            <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">Purok Camachile, Brgy. Tambler, General Santos City</p>
+            <p className="text-xs font-black uppercase tracking-widest text-primary mt-1">Uniform Request Slip</p>
+          </div>
+          <div className="text-right flex flex-col items-end">
+            <span className="bg-gray-100 border border-black/20 text-gray-800 text-[10px] font-black uppercase px-2 py-0.5 rounded tracking-widest mb-1 shadow-sm">
+              {title}
+            </span>
+            <p className="font-mono text-[10px] font-black text-gray-900">RQ NO: {rsq.rsqNo}</p>
+            <p className="text-[9px] font-bold text-gray-500 uppercase">DATE: {formattedDate}</p>
+          </div>
+        </div>
+
+        {/* Table */}
+        <table className="w-full border-collapse border border-black text-center text-[10px]">
+          <thead>
+            {/* Main headers */}
+            <tr className="bg-gray-50 border border-black">
+              <th className="border border-black py-1 px-1 w-10">S. NO</th>
+              <th className="border border-black py-1 px-2 text-left w-52">PARTICULARS</th>
+              <th className="border border-black py-1 px-1" colSpan={2}>REQUEST</th>
+              {isCutting ? (
+                <th className="border border-black py-1 px-1" colSpan={3}>OUTPUT (CUTTING)</th>
+              ) : (
+                <>
+                  <th className="border border-black py-1 px-1 w-16" rowSpan={2}>TOTAL CUTTING</th>
+                  <th className="border border-black py-1 px-1" colSpan={3}>OUTPUT (TAILORING)</th>
+                </>
+              )}
             </tr>
-          ))}
-        </tbody>
-      </table>
+            {/* Sub headers */}
+            <tr className="border border-black bg-gray-50/50">
+              {isCutting ? (
+                <>
+                  <th className="border border-black py-0.5 px-0.5"></th>
+                  <th className="border border-black py-0.5 px-0.5"></th>
+                  <th className="border border-black py-0.5 px-1 w-12">QTY</th>
+                  <th className="border border-black py-0.5 px-1 w-12">UNIT</th>
+                  <th className="border border-black py-0.5 px-1 w-12">QTY</th>
+                  <th className="border border-black py-0.5 px-1 w-16">PRICE</th>
+                  <th className="border border-black py-0.5 px-1 w-20">AMOUNT</th>
+                </>
+              ) : (
+                <>
+                  <th className="border border-black py-0.5 px-0.5"></th>
+                  <th className="border border-black py-0.5 px-0.5"></th>
+                  <th className="border border-black py-0.5 px-1 w-12">QTY</th>
+                  <th className="border border-black py-0.5 px-1 w-12">UNIT</th>
+                  <th className="border border-black py-0.5 px-1 w-12">QTY</th>
+                  <th className="border border-black py-0.5 px-1 w-16">PRICE</th>
+                  <th className="border border-black py-0.5 px-1 w-20">AMOUNT</th>
+                </>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border border-black h-10 font-bold">
+              <td className="border border-black py-1 px-1 text-center">1</td>
+              <td className="border border-black py-1 px-2 text-left uppercase text-[9px] leading-tight">
+                {displayParticulars}
+              </td>
+              <td className="border border-black py-1 px-1 text-center">{rsq.quantityOrdered}</td>
+              <td className="border border-black py-1 px-1 text-center uppercase">{rsq.unit || 'pcs'}</td>
+              {!isCutting && <td className="border border-black py-1 px-1 bg-gray-50/30 text-center">{rsq.quantityOrdered}</td>}
+              <td className="border border-black py-1 px-1 text-center">{rsq.quantityReceived || ''}</td>
+              <td className="border border-black py-1 px-1 text-center">₱{rsq.fabric?.unitPrice?.toLocaleString() || '0'}</td>
+              <td className="border border-black py-1 px-1 text-center">
+                {rsq.quantityReceived ? `₱${(rsq.quantityReceived * (rsq.fabric?.unitPrice || 0)).toLocaleString()}` : ''}
+              </td>
+            </tr>
+            {/* Placeholder spacing rows */}
+            {[2, 3].map(i => (
+              <tr key={i} className="border border-black h-6">
+                <td className="border border-black py-0.5 px-1 text-center text-gray-300">{i}</td>
+                <td className="border border-black py-0.5 px-2"></td>
+                <td className="border border-black py-0.5 px-1"></td>
+                <td className="border border-black py-0.5 px-1"></td>
+                {!isCutting && <td className="border border-black py-0.5 px-1 bg-gray-50/10"></td>}
+                <td className="border border-black py-0.5 px-1"></td>
+                <td className="border border-black py-0.5 px-1"></td>
+                <td className="border border-black py-0.5 px-1"></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-      {/* Remarks Section */}
-      <div className="border border-black p-2 mb-8 min-h-[60px]">
-        <p className="font-bold uppercase text-[10px]">Remarks / Instructions:</p>
-        <p className="italic">{rsq.remarks}</p>
+        {/* Receivers */}
+        <div className="flex justify-between items-center text-[9px] font-bold py-1 border-t border-black/5">
+          <p>Received by: _______________________</p>
+          <p>Received by: _______________________</p>
+        </div>
+
+        {/* Bottom Signatories */}
+        <div className="grid grid-cols-3 gap-6 pt-3 text-center text-[8px] font-bold uppercase tracking-wider border-t border-black/10">
+          <div>
+            <p className="mb-4">Requested by:</p>
+            <div className="border-b border-black w-2/3 mx-auto"></div>
+          </div>
+          <div>
+            <p className="mb-4">Verified by:</p>
+            <div className="border-b border-black w-2/3 mx-auto"></div>
+          </div>
+          <div>
+            <p className="mb-4">Approved by:</p>
+            <div className="border-b border-black w-2/3 mx-auto"></div>
+          </div>
+        </div>
       </div>
+    );
+  };
 
-      {/* Signatories */}
-      <div className="grid grid-cols-4 gap-4 pt-4 mt-8">
-        <div className="text-center">
-          <div className="border-b border-black w-3/4 mx-auto mb-1"></div>
-          <p className="font-bold text-[10px] uppercase">Prepared By</p>
-        </div>
-        <div className="text-center">
-          <div className="border-b border-black w-3/4 mx-auto mb-1"></div>
-          <p className="font-bold text-[10px] uppercase">Checked By</p>
-        </div>
-        <div className="text-center">
-          <div className="border-b border-black w-3/4 mx-auto mb-1"></div>
-          <p className="font-bold text-[10px] uppercase">Approved By</p>
-        </div>
-        <div className="text-center">
-          <div className="border-b border-black w-3/4 mx-auto mb-1"></div>
-          <p className="font-bold text-[10px] uppercase">Received By (Tailor)</p>
-        </div>
-      </div>
+  return (
+    <div className="hidden print:flex flex-col gap-6 bg-white text-black p-4 w-full max-w-4xl mx-auto">
+      {renderSlipCopy(`(${tailorNickname} COPY)`, 'CUTTING')}
+      {renderSlipCopy('(TAILORING COPY)', 'TAILORING')}
+      {renderSlipCopy(`${tailorNickname} -> MAIN OFFICE`, 'CUTTING')}
+      {renderSlipCopy('TAILORING -> MAIN OFFICE', 'TAILORING')}
 
-      <div className="text-right mt-8 pt-4 border-t border-black/20 text-[9px] text-gray-500 font-mono">
-        Smart Tracking System • RSQ Ref: {rsq.id} • Printed: {new Date().toLocaleString()}
-      </div>
-
+      {/* Printing Styles */}
       <style jsx global>{`
         @media print {
-          @page { size: landscape; margin: 0.5in; }
-          body { background: white; }
-          .no-print { display: none !important; }
-          main { padding: 0 !important; margin: 0 !important; }
+          body {
+            background: white !important;
+            color: black !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+          main {
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          @page {
+            size: portrait;
+            margin: 0.4in;
+          }
         }
       `}</style>
     </div>

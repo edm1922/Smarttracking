@@ -371,8 +371,7 @@ export class PayrollService {
         OR: [
           { username: { equals: cleanUsername, mode: 'insensitive' } },
           { sys_id: { equals: cleanUsername, mode: 'insensitive' } }
-        ],
-        role: 'EMPLOYEE'
+        ]
       }
     });
 

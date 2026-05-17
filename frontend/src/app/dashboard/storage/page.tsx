@@ -7,6 +7,8 @@ import {
   Eye, QrCode, Clock, Printer, X, Trash2
 } from 'lucide-react';
 import { TableSkeleton, CardSkeleton } from '@/components/ui/LoadingSkeletons';
+import { toast } from 'sonner';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 interface Batch {
   id: string;
@@ -46,6 +48,9 @@ export default function StoragePage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'details'>('grid');
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [batchToDelete, setBatchToDelete] = useState<Batch | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -100,19 +105,33 @@ export default function StoragePage() {
     return String(value);
   };
 
-  const handleDeleteBatch = async (e: React.MouseEvent, batch: Batch) => {
+  const handleDeleteBatch = (e: React.MouseEvent, batch: Batch) => {
     e.stopPropagation();
-    if (!confirm(`Are you sure you want to delete the batch "${batch.batchCode}"? This will NOT delete the items inside, but they will no longer be grouped under this batch.`)) return;
+    setBatchToDelete(batch);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDeleteBatch = async () => {
+    if (!batchToDelete) return;
     
+    setIsDeleting(true);
     try {
-      await fetch(`/api/batches/${batch.id}`, { method: 'DELETE' });
-      if (selectedBatch?.id === batch.id) {
+      const res = await fetch(`/api/batches/${batchToDelete.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete batch');
+      
+      toast.success(`Batch "${batchToDelete.batchCode}" deleted successfully`);
+      
+      if (selectedBatch?.id === batchToDelete.id) {
         setSelectedBatch(null);
         setViewMode('grid');
       }
       fetchData();
-    } catch (err) {
-      alert('Failed to delete batch. Make sure it is not being used by other records.');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete batch. Make sure it is not being used by other records.');
+    } finally {
+      setIsDeleting(false);
+      setIsDeleteModalOpen(false);
+      setBatchToDelete(null);
     }
   };
 
@@ -428,6 +447,19 @@ export default function StoragePage() {
         </>
         )}
       </div>
+
+      <ConfirmModal 
+        isOpen={isDeleteModalOpen}
+        title="Delete Batch Storage"
+        message={`Are you sure you want to delete the batch "${batchToDelete?.batchCode}"? This will NOT delete the items inside, but they will no longer be grouped under this batch.`}
+        confirmText={isDeleting ? "Deleting..." : "Delete Batch"}
+        isDestructive={true}
+        onConfirm={confirmDeleteBatch}
+        onCancel={() => {
+          setIsDeleteModalOpen(false);
+          setBatchToDelete(null);
+        }}
+      />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { LayoutDashboard, LogOut, Package, Printer, User, Box, Settings, MapPin, FileText, QrCode, ClipboardList, Database, Activity, Users, Info, X, ShieldCheck, Wallet } from 'lucide-react';
 import AdminNotifications from './AdminNotifications';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
@@ -437,7 +438,10 @@ useEffect(() => {
 
       {/* Main content */}
       <main className="flex-1 pl-64 print:pl-0 print:block">
-        <div className="mx-auto max-w-7xl p-8 print:max-w-none print:p-0 print:m-0 w-full print:block">{children}</div>
+        <div className="mx-auto max-w-7xl p-8 print:max-w-none print:p-0 print:m-0 w-full print:block">
+          <Breadcrumbs />
+          {children}
+        </div>
       </main>
 
       {/* Dev Notice Modal */}

@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react';
 import { Plus, Search, Edit2, Trash2, Settings, ListPlus, Eye, X, LayoutGrid, GripVertical } from 'lucide-react';
 import api from '@/lib/api';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { TableSkeleton } from '@/components/ui/LoadingSkeletons';
 
 interface CustomField {
   id: string;
@@ -26,13 +29,20 @@ export default function CustomFieldsPage() {
   const [editingField, setEditingField] = useState<CustomField | null>(null);
   const [draggedFieldId, setDraggedFieldId] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState({
+  const defaultFormData = {
     name: '',
     fieldType: 'text',
     optionsString: '',
     required: false,
     batchCode: '',
-  });
+  };
+
+  const [formData, setFormData] = useState(defaultFormData);
+  const [initialFormData, setInitialFormData] = useState(defaultFormData);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [fieldToDelete, setFieldToDelete] = useState<CustomField | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const fetchFields = async () => {
     try {
@@ -58,29 +68,38 @@ export default function CustomFieldsPage() {
       const opts = field.options || {};
       const dropdownOpts = Array.isArray(opts) ? opts : (opts.dropdownOptions || []);
       
-      setEditingField(field);
-      setFormData({
+      const data = {
         name: field.name,
         fieldType: field.fieldType,
         optionsString: dropdownOpts.join(', '),
         required: field.required,
         batchCode: field.batch?.batchCode || '',
-      });
+      };
+      setFormData(data);
+      setInitialFormData(data);
     } else {
       setEditingField(null);
-      setFormData({
-        name: '',
-        fieldType: 'text',
-        optionsString: '',
-        required: false,
-        batchCode: '',
-      });
+      setFormData(defaultFormData);
+      setInitialFormData(defaultFormData);
     }
     setIsModalOpen(true);
   };
 
+  const handleCloseModal = () => {
+    if (JSON.stringify(formData) !== JSON.stringify(initialFormData)) {
+      setIsConfirmOpen(true);
+    } else {
+      setIsModalOpen(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (formData.name.length < 2) {
+      setErrors({ name: 'Field name must be at least 2 characters' });
+      return;
+    }
     
     const dropdownOptions = formData.optionsString ? formData.optionsString.split(',').map(o => o.trim()) : [];
     
@@ -104,10 +123,17 @@ export default function CustomFieldsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this field? All associated data on items will be lost.')) return;
+  const handleDelete = (field: CustomField) => {
+    setFieldToDelete(field);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!fieldToDelete) return;
     try {
-      await api.delete(`/custom-fields/${id}`);
+      await api.delete(`/custom-fields/${fieldToDelete.id}`);
+      setIsDeleteConfirmOpen(false);
+      setFieldToDelete(null);
       fetchFields();
     } catch (err) {
       alert('Failed to delete field');
@@ -175,44 +201,64 @@ export default function CustomFieldsPage() {
 
       <div className="table-container">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="table-header">
+          <thead>
             <tr>
-              <th className="table-cell font-semibold">Field Name</th>
-              <th className="table-cell font-semibold">Type</th>
-              <th className="table-cell font-semibold">Assignment (Batch)</th>
-              <th className="table-cell font-semibold">Required</th>
-              <th className="table-cell font-semibold text-right">Actions</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Field Name</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Type</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Context</th>
+              <th className="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Required</th>
+              <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 bg-white">
             {loading ? (
-              <tr><td colSpan={5} className="table-cell text-center py-10">Loading...</td></tr>
+              <TableSkeleton columns={5} rows={8} />
             ) : fields.length === 0 ? (
-              <tr><td colSpan={5} className="table-cell text-center py-10">No custom fields defined.</td></tr>
+              <tr>
+                <td colSpan={5} className="p-0">
+                  <EmptyState 
+                    icon={Settings}
+                    title="No Custom Fields"
+                    description="Define custom data points to capture during scans, like 'Fabric Weight' or 'Serial Number'."
+                    action={{
+                      label: "Add First Field",
+                      onClick: () => handleOpenModal()
+                    }}
+                  />
+                </td>
+              </tr>
             ) : (
               fields.map((field) => (
-                <tr key={field.id} className="table-row">
-                  <td className="table-cell font-medium">{field.name}</td>
-                  <td className="table-cell capitalize">{field.fieldType}</td>
-                  <td className="table-cell">
+                <tr key={field.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 text-sm font-bold text-gray-900">{field.name}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500 capitalize">{field.fieldType}</td>
+                  <td className="px-6 py-4 text-sm">
                     {field.batch ? (
-                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 border border-blue-100">
+                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-bold text-blue-700 border border-blue-100 uppercase tracking-tight">
                         Batch: {field.batch.batchCode}
                       </span>
                     ) : (
-                      <span className="inline-flex items-center rounded-full bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 border border-gray-100 italic">
-                        Global (All Items)
+                      <span className="inline-flex items-center rounded-full bg-gray-50 px-2.5 py-0.5 text-[10px] font-bold text-gray-500 border border-gray-100 uppercase tracking-tight italic">
+                        Global
                       </span>
                     )}
                   </td>
-                  <td className="table-cell">{field.required ? 'Yes' : 'No'}</td>
-                  <td className="table-cell text-right">
-                    <button onClick={() => handleOpenModal(field)} className="p-1 text-gray-400 hover:text-primary mr-2">
-                      <Edit2 className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => handleDelete(field.id)} className="p-1 text-gray-400 hover:text-red-600">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                  <td className="px-6 py-4 text-center">
+                    {field.required ? (
+                      <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded border border-red-100 uppercase tracking-widest">Required</span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Optional</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end space-x-2">
+                      <button onClick={() => handleOpenModal(field)} className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-md transition-colors">
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => handleDelete(field)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -226,16 +272,31 @@ export default function CustomFieldsPage() {
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl overflow-y-auto max-h-[90vh]">
             <h2 className="text-xl font-bold text-gray-900 mb-4">{editingField ? 'Edit Field' : 'Add New Field'}</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
+               <div>
                 <label className="block text-sm font-medium text-gray-700">Field Name</label>
                 <input
                   type="text"
                   value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:ring-1 focus:ring-primary outline-none"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData({...formData, name: val});
+                    if (val.length < 2) {
+                      setErrors(prev => ({...prev, name: 'Min. 2 characters required'}));
+                    } else {
+                      setErrors(prev => ({...prev, name: ''}));
+                    }
+                  }}
+                  className={`mt-1 block w-full rounded-md border px-3 py-2 text-sm text-gray-900 outline-none transition-all ${
+                    errors.name 
+                      ? 'border-red-300 focus:ring-1 focus:ring-red-100' 
+                      : 'border-gray-300 focus:ring-1 focus:ring-primary'
+                  }`}
                   placeholder="e.g. Fabric Weight"
                   required
                 />
+                {errors.name && (
+                  <p className="mt-1 text-[10px] font-bold text-red-500 uppercase tracking-wider">{errors.name}</p>
+                )}
               </div>
 
               <div>
@@ -295,7 +356,7 @@ export default function CustomFieldsPage() {
                 <label htmlFor="required" className="ml-2 block text-sm text-gray-900">This field is required</label>
               </div>
               <div className="flex justify-end space-x-3 mt-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md">Cancel</button>
+                <button type="button" onClick={handleCloseModal} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md">Cancel</button>
                 <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary-dark rounded-md">Save Field</button>
               </div>
             </form>
@@ -391,6 +452,35 @@ export default function CustomFieldsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={isConfirmOpen}
+        title="Unsaved Changes"
+        message="You have unsaved information in this form. Are you sure you want to discard it?"
+        confirmText="Discard Changes"
+        cancelText="Keep Editing"
+        onConfirm={() => {
+          setIsConfirmOpen(false);
+          setIsModalOpen(false);
+        }}
+        onCancel={() => setIsConfirmOpen(false)}
+        isDestructive={true}
+      />
+
+      <ConfirmModal
+        isOpen={isDeleteConfirmOpen}
+        title="Delete Custom Field"
+        message={`Are you sure you want to delete "${fieldToDelete?.name}"? All associated data for this field across all items will be permanently erased.`}
+        confirmText="Permanently Erase"
+        cancelText="Keep Field"
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setIsDeleteConfirmOpen(false);
+          setFieldToDelete(null);
+        }}
+        isDestructive={true}
+        requireConfirmationText="DELETE"
+      />
     </div>
   );
 }

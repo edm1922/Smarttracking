@@ -11,7 +11,7 @@ export class InternalRequestsService {
   private cachedAdminId: string | null = null;
   
   // O(1) OPTIMIZATION: Cache for issuance counts
-  private issuanceCache: Map<string, Map<string, number>> | null = null;
+  private issuanceCache: Map<string, number> | null = null;
   private cacheTimestamp: number = 0;
   private readonly CACHE_TTL = 60000; // 1 minute
   
@@ -118,29 +118,31 @@ export class InternalRequestsService {
     // O(1) OPTIMIZATION: Use cached issuance counts with periodic refresh
     const now = Date.now();
     if (!this.issuanceCache || now - this.cacheTimestamp > this.CACHE_TTL) {
-      const issuanceCounts = await this.prisma.internalRequest.groupBy({
-        by: ['productId', 'employeeName'],
+      const issuanceGroups = await this.prisma.internalRequest.groupBy({
+        by: ['employeeName', 'date'],
         where: { status: 'FULFILLED' },
-        _count: {
-          productId: true,
-        },
       });
 
       this.issuanceCache = new Map();
-      issuanceCounts.forEach((i) => {
-        if (!this.issuanceCache!.has(i.productId)) {
-          this.issuanceCache!.set(i.productId, new Map());
-        }
-        this.issuanceCache!.get(i.productId)!.set(i.employeeName, i._count.productId);
+      issuanceGroups.forEach((i) => {
+        const count = this.issuanceCache!.get(i.employeeName) || 0;
+        this.issuanceCache!.set(i.employeeName, count + 1);
       });
       this.cacheTimestamp = now;
     }
 
     const data = requests.map((req) => {
-      const productMap = this.issuanceCache?.get(req.productId);
+      let count = (this.issuanceCache as any).get(req.employeeName) ?? 0;
+      
+      // If this specific request is already FULFILLED, it's included in the count.
+      // We subtract 1 to get the number of PREVIOUS issuances.
+      if (req.status === 'FULFILLED' && count > 0) {
+        count--;
+      }
+
       return {
         ...req,
-        previousIssuancesCount: productMap?.get(req.employeeName) ?? 0,
+        previousIssuancesCount: count,
       };
     });
 

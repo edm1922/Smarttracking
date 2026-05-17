@@ -133,4 +133,170 @@ export class RsqService {
       data: updateData,
     });
   }
+
+  async getNextSequences() {
+    // 1. Calculate Next Transaction #
+    // Find the latest FabricTransaction starting with 'T-'
+    const lastTx = await this.prisma.fabricTransaction.findFirst({
+      where: {
+        transactionNo: {
+          startsWith: 'T-',
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    let nextTransactionNo = 'T-2026-27'; // Default start after Excel migration point (T-2026-26)
+    if (lastTx) {
+      const parts = lastTx.transactionNo.split('_');
+      const batchCode = parts[0]; // e.g. 'T-2026-26'
+      
+      const match = batchCode.match(/T-(\d+)-(\d+)/);
+      if (match) {
+        const year = parseInt(match[1]);
+        const seq = parseInt(match[2]);
+        nextTransactionNo = `T-${year}-${seq + 1}`;
+      } else {
+        const simpleMatch = batchCode.match(/T-(\d+)/);
+        if (simpleMatch) {
+          const seq = parseInt(simpleMatch[1]);
+          nextTransactionNo = `T-${seq + 1}`;
+        }
+      }
+    }
+
+    // 2. Calculate Next RSQ #
+    const nextRsqNo = await this.generateNextRsqNo();
+
+    // 3. Today's Series Sequence
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const todayCount = await this.prisma.fabricTransaction.count({
+      where: {
+        date: {
+          gte: today,
+          lt: tomorrow,
+        },
+      },
+    });
+
+    const month = today.getMonth() + 1; // 1-indexed
+    const day = today.getDate();
+    const todaySeriesSequence = `${month}.${day}.${todayCount + 1}`;
+
+    return {
+      nextTransactionNo,
+      nextRsqNo,
+      todaySeriesSequence,
+    };
+  }
+
+  async createBatchTransactions(items: Array<{
+    transactionNo: string;
+    seriesNo: string;
+    rsqNo?: string;
+    fabricId: string;
+    type: string;
+    quantity: number;
+    remarks?: string;
+    applicableMonth: string;
+    date?: string;
+    tailorId?: string;
+  }>) {
+    const createdTransactions = [];
+
+    for (const item of items) {
+      const fabric = await this.prisma.fabric.findUnique({ where: { id: item.fabricId } });
+      if (!fabric) throw new NotFoundException(`Fabric not found: ${item.fabricId}`);
+
+      // Combine Transaction No and Series No (T-2026-26_5.15.7)
+      const dbTxNo = `${item.transactionNo}_${item.seriesNo}`;
+
+      // Package remarks with RSQ and applicable month info
+      let packagedRemarks = item.remarks || '';
+      if (item.rsqNo || item.applicableMonth) {
+        packagedRemarks = `RSQ: ${item.rsqNo || 'N/A'} | Month: ${item.applicableMonth || ''} | Remarks: ${item.remarks || ''}`;
+      }
+
+      // Create fabric transaction
+      const tx = await this.prisma.fabricTransaction.create({
+        data: {
+          transactionNo: dbTxNo,
+          fabricId: item.fabricId,
+          type: item.type,
+          quantity: item.quantity,
+          unit: fabric.unit,
+          remarks: packagedRemarks,
+          location: 'BODEGA',
+          date: item.date ? new Date(item.date) : new Date(),
+        },
+      });
+
+      // If withdrawal or return (associated with an RSQ), manage TailoringRequest
+      if (item.rsqNo && (item.type === 'WITHDRAWAL' || item.type === 'RETURN')) {
+        const existingRequest = await this.prisma.tailoringRequest.findUnique({
+          where: { rsqNo: item.rsqNo }
+        });
+
+        let targetTailorId = item.tailorId;
+        if (!targetTailorId) {
+          const tailors = await this.prisma.tailor.findMany({ take: 1 });
+          if (tailors.length > 0) {
+            targetTailorId = tailors[0].id;
+          } else {
+            const placeholderTailor = await this.prisma.tailor.create({
+              data: { name: 'UNASSIGNED TAILOR', address: 'PLACEHOLDER' }
+            });
+            targetTailorId = placeholderTailor.id;
+          }
+        }
+
+        if (existingRequest) {
+          await this.prisma.tailoringRequest.update({
+            where: { id: existingRequest.id },
+            data: {
+              fabricId: item.fabricId,
+              tailorId: targetTailorId,
+              quantityReceived: item.type === 'RETURN'
+                ? Math.max(0, existingRequest.quantityReceived - item.quantity)
+                : existingRequest.quantityReceived,
+              remarks: item.remarks || existingRequest.remarks,
+            }
+          });
+        } else {
+          await this.prisma.tailoringRequest.create({
+            data: {
+              rsqNo: item.rsqNo,
+              fabricId: item.fabricId,
+              tailorId: targetTailorId,
+              quantityOrdered: item.quantity,
+              quantityReceived: 0,
+              unit: 'pcs',
+              orderDate: item.date ? new Date(item.date) : new Date(),
+              status: 'PENDING',
+              remarks: item.remarks,
+            }
+          });
+        }
+      }
+
+      createdTransactions.push(tx);
+    }
+
+    return createdTransactions;
+  }
+
+  async deleteTransactions(ids: string[]) {
+    return this.prisma.fabricTransaction.deleteMany({
+      where: {
+        id: { in: ids }
+      }
+    });
+  }
 }
+

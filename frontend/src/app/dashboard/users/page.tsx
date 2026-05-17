@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { UserPlus, Trash2, Shield, User, Key, Copy, Check, Search, AlertCircle } from 'lucide-react';
 import api from '@/lib/api';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { TableSkeleton } from '@/components/ui/LoadingSkeletons';
 
 interface UserData {
@@ -18,10 +20,17 @@ export default function UsersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
-  const [formData, setFormData] = useState({
+  const defaultFormData = {
     username: '',
     role: 'inventory' as 'admin' | 'inventory' | 'payroll_staff' | 'payroll_admin',
-  });
+  };
+  
+  const [formData, setFormData] = useState(defaultFormData);
+  const [initialFormData, setInitialFormData] = useState(defaultFormData);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<UserData | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [generatedUser, setGeneratedUser] = useState<any | null>(null);
   const [copied, setCopied] = useState(false);
@@ -43,6 +52,17 @@ export default function UsersPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Final validation check
+    if (formData.username.length < 3) {
+      setErrors({ username: 'Username must be at least 3 characters' });
+      return;
+    }
+    if (/\s/.test(formData.username)) {
+      setErrors({ username: 'Username cannot contain spaces' });
+      return;
+    }
+
     try {
       const res = await api.post('/users', formData);
       setGeneratedUser(res.data);
@@ -53,10 +73,17 @@ export default function UsersPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this user? They will lose all access immediately.')) return;
+  const handleDelete = (user: UserData) => {
+    setUserToDelete(user);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!userToDelete) return;
     try {
-      await api.delete(`/users/${id}`);
+      await api.delete(`/users/${userToDelete.id}`);
+      setIsDeleteConfirmOpen(false);
+      setUserToDelete(null);
       fetchUsers();
     } catch (err) {
       alert('Failed to delete user');
@@ -73,6 +100,14 @@ export default function UsersPage() {
     u.username.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handleCloseModal = () => {
+    if (JSON.stringify(formData) !== JSON.stringify(initialFormData) && !generatedUser) {
+      setIsConfirmOpen(true);
+    } else {
+      setIsModalOpen(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -84,6 +119,8 @@ export default function UsersPage() {
           onClick={() => {
             setIsModalOpen(true);
             setGeneratedUser(null);
+            setFormData(defaultFormData);
+            setInitialFormData(defaultFormData);
           }}
           className="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-primary-dark transition-all active:scale-95"
         >
@@ -103,9 +140,9 @@ export default function UsersPage() {
         />
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="table-container">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+          <thead>
             <tr>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Account</th>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Access Level</th>
@@ -115,9 +152,21 @@ export default function UsersPage() {
           </thead>
           <tbody className="divide-y divide-gray-100 bg-white">
             {loading ? (
-              <TableSkeleton columns={4} rows={4} />
+              <TableSkeleton columns={4} rows={10} />
             ) : filteredUsers.length === 0 ? (
-              <tr><td colSpan={4} className="px-6 py-10 text-center text-sm text-gray-400">No users found.</td></tr>
+              <tr>
+                <td colSpan={4} className="p-0">
+                  <EmptyState 
+                    icon={User}
+                    title={searchTerm ? "No matches found" : "No Users Registered"}
+                    description={searchTerm ? `We couldn't find any users matching "${searchTerm}".` : "Start by adding your first system user to manage the inventory."}
+                    action={searchTerm ? undefined : {
+                      label: "Register New User",
+                      onClick: () => setIsModalOpen(true)
+                    }}
+                  />
+                </td>
+              </tr>
             ) : (
               filteredUsers.map((user) => (
                 <tr key={user.id} className="hover:bg-gray-50 transition-colors">
@@ -148,7 +197,7 @@ export default function UsersPage() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <button 
-                      onClick={() => handleDelete(user.id)}
+                      onClick={() => handleDelete(user)}
                       className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -176,10 +225,25 @@ export default function UsersPage() {
                       required
                       type="text"
                       value={formData.username}
-                      onChange={(e) => setFormData({...formData, username: e.target.value})}
-                      className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                      onChange={(e) => {
+                        const val = e.target.value.toLowerCase().replace(/\s/g, '');
+                        setFormData({...formData, username: val});
+                        if (val.length < 3) {
+                          setErrors(prev => ({...prev, username: 'Min. 3 characters required'}));
+                        } else {
+                          setErrors(prev => ({...prev, username: ''}));
+                        }
+                      }}
+                      className={`w-full rounded-xl border px-4 py-3 text-sm text-gray-900 focus:ring-2 outline-none transition-all ${
+                        errors.username 
+                          ? 'border-red-300 focus:ring-red-100' 
+                          : 'border-gray-200 focus:ring-primary/20'
+                      }`}
                       placeholder="e.g. jdoe_warehouse"
                     />
+                    {errors.username && (
+                      <p className="mt-1 text-[10px] font-bold text-red-500 uppercase tracking-wider">{errors.username}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Role</label>
@@ -243,7 +307,7 @@ export default function UsersPage() {
                   <div className="flex justify-end space-x-3 pt-6 border-t border-gray-100">
                     <button 
                       type="button" 
-                      onClick={() => setIsModalOpen(false)} 
+                      onClick={handleCloseModal} 
                       className="px-6 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-900"
                     >
                       Cancel
@@ -303,6 +367,35 @@ export default function UsersPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={isConfirmOpen}
+        title="Unsaved Changes"
+        message="You have unsaved information in this form. Are you sure you want to discard it?"
+        confirmText="Discard Changes"
+        cancelText="Keep Editing"
+        onConfirm={() => {
+          setIsConfirmOpen(false);
+          setIsModalOpen(false);
+        }}
+        onCancel={() => setIsConfirmOpen(false)}
+        isDestructive={true}
+      />
+
+      <ConfirmModal
+        isOpen={isDeleteConfirmOpen}
+        title="Delete User Account"
+        message={`Are you sure you want to delete ${userToDelete?.username}? This action is permanent and they will lose all system access immediately.`}
+        confirmText="Permanently Delete"
+        cancelText="Keep User"
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setIsDeleteConfirmOpen(false);
+          setUserToDelete(null);
+        }}
+        isDestructive={true}
+        requireConfirmationText="DELETE"
+      />
     </div>
   );
 }

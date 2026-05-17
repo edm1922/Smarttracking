@@ -727,18 +727,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                             />
                           </div>
                         </div>
-                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-gray-400 uppercase">Restock Alert Threshold</label>
-                          <input 
-                            type="number" 
-                            disabled={!canAdmin && !canInventory}
-                            placeholder="Low stock alert number..."
-                            value={unitTracking.threshold} 
-                            onChange={(e) => setUnitTracking({ ...unitTracking, threshold: parseInt(e.target.value) || 0 })} 
-                            className="w-full rounded-2xl bg-white border border-blue-100 px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:ring-4 focus:ring-red-500/10 transition-all disabled:opacity-50" 
-                          />
-                          <p className="text-[9px] text-gray-400 font-bold italic">Item will pulse red in dashboard when quantity is ≤ this number</p>
-                        </div>
+
                       </div>
                     )}
                   </div>
@@ -817,10 +806,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Current Stock</p>
                             <p className="text-sm font-black text-gray-900">{unitTracking.qty}</p>
                          </div>
-                         <div>
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Alert Threshold</p>
-                            <p className="text-sm font-black text-gray-900">≤ {unitTracking.threshold}</p>
-                         </div>
+
                       </div>
                    )}
                 </div>

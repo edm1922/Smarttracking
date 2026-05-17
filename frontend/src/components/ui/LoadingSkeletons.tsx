@@ -80,3 +80,36 @@ export function Spinner({ className = "h-4 w-4" }: { className?: string }) {
     </svg>
   );
 }
+
+/** Analytics Dashboard Skeleton Loader */
+export function AnalyticsSkeleton() {
+  return (
+    <div className="space-y-8 animate-in fade-in duration-300">
+      <PageHeaderSkeleton />
+      
+      {/* Hero Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <CardSkeleton className="h-[140px]" />
+        <CardSkeleton className="h-[140px]" />
+        <CardSkeleton className="h-[140px]" />
+        <CardSkeleton className="h-[140px]" />
+      </div>
+
+      {/* Middle Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2">
+          <CardSkeleton className="h-[450px]" />
+        </div>
+        <div>
+          <CardSkeleton className="h-[450px]" />
+        </div>
+      </div>
+
+      {/* Bottom Panels */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <CardSkeleton className="h-[500px]" />
+        <CardSkeleton className="h-[500px]" />
+      </div>
+    </div>
+  );
+}

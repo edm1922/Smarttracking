@@ -44,4 +44,23 @@ export class AuthService {
     });
     return { success: true };
   }
+
+  async verifySuperAdmin(password: string) {
+    if (!password) {
+      throw new UnauthorizedException('Password required');
+    }
+
+    const admins = await this.prisma.user.findMany({
+      where: { role: 'admin' }
+    });
+
+    for (const admin of admins) {
+      const isMatch = await bcrypt.compare(password, admin.password);
+      if (isMatch) {
+        return { valid: true };
+      }
+    }
+
+    throw new UnauthorizedException('Invalid super admin password');
+  }
 }

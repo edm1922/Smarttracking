@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react';
 import { Search, ClipboardList, Clock, User, QrCode, ArrowRight, History } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import api from '@/lib/api';
+import { TableSkeleton } from '@/components/ui/LoadingSkeletons';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { useUrlFilters } from '@/hooks/useUrlFilters';
 
 interface LogEntry {
   id: string;
@@ -21,11 +24,12 @@ interface LogEntry {
 }
 
 export default function QRLogsPage() {
+  const { getFilter, setFilter } = useUrlFilters();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(getFilter('search'));
 
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(parseInt(getFilter('page', '1')));
   const [totalLogs, setTotalLogs] = useState(0);
   const pageSize = 20;
   const debouncedSearch = useDebounce(searchTerm, 300);
@@ -46,6 +50,8 @@ export default function QRLogsPage() {
 
   useEffect(() => {
     fetchLogs();
+    setFilter('page', page > 1 ? page : null);
+    setFilter('search', debouncedSearch || null);
   }, [page, debouncedSearch]);
 
   useEffect(() => {
@@ -81,119 +87,113 @@ export default function QRLogsPage() {
         />
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+      <div className="table-container">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead>
+            <tr>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Activity</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Reference</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">User</th>
+              <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-widest">Timestamp</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 bg-white">
+            {loading ? (
+              <TableSkeleton columns={4} rows={10} />
+            ) : filteredLogs.length === 0 ? (
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Activity</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Reference</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">User</th>
-                <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-widest">Timestamp</th>
+                <td colSpan={4} className="p-0">
+                  <EmptyState 
+                    icon={History}
+                    title={searchTerm ? "No activities found" : "No Logs Recorded"}
+                    description={searchTerm ? `No logs match your search for "${searchTerm}".` : "Activity logs will appear here as users interact with the QR system."}
+                  />
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 bg-white">
-              {loading ? (
-                <tr>
-                  <td colSpan={4} className="px-6 py-20 text-center">
-                    <div className="flex flex-col items-center">
-                      <div className="h-10 w-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4"></div>
-                      <p className="text-sm text-gray-500 font-medium">Fetching system logs...</p>
+            ) : (
+              filteredLogs.map((log) => (
+                <tr key={log.id} className="hover:bg-gray-50 transition-colors group">
+                  <td className="px-6 py-5">
+                    <div className="flex items-center">
+                      <div className={`p-2 rounded-lg mr-4 ${
+                        log.action.includes('SUBMIT') ? 'bg-green-50 text-green-600' : 
+                        log.action.includes('LOCK') ? 'bg-red-50 text-red-600' :
+                        'bg-blue-50 text-blue-600'
+                      }`}>
+                        <ClipboardList className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-gray-900 group-hover:text-primary transition-colors">
+                          {log.action.replace(/_/g, ' ')}
+                        </div>
+                        {log.changes && (
+                          <div className="text-[10px] text-gray-400 mt-1 max-w-xs truncate italic">
+                            {JSON.stringify(log.changes).substring(0, 50)}...
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-5">
+                    {log.item ? (
+                      <div className="flex flex-col">
+                        <span className="text-xs font-mono font-bold text-primary bg-primary/5 px-2 py-0.5 rounded w-fit uppercase">
+                          {log.item.slug}
+                        </span>
+                        <span className="text-[10px] text-gray-500 mt-1">{log.item.name || 'Untitled Form'}</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">System Event</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-5">
+                    <div className="flex items-center">
+                      <div className="h-7 w-7 bg-gray-100 rounded-full flex items-center justify-center mr-2">
+                        <User className="h-4 w-4 text-gray-400" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-gray-900">{log.user.username}</div>
+                        <div className="text-[10px] text-gray-400 uppercase tracking-tighter">{log.user.role}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-5 text-right">
+                    <div className="flex flex-col items-end">
+                      <div className="text-xs font-bold text-gray-900 flex items-center">
+                        <Clock className="h-3 w-3 mr-1 text-gray-400" />
+                        {new Date(log.createdAt).toLocaleTimeString()}
+                      </div>
+                      <div className="text-[10px] text-gray-400 mt-0.5">
+                        {new Date(log.createdAt).toLocaleDateString()}
+                      </div>
                     </div>
                   </td>
                 </tr>
-              ) : filteredLogs.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-6 py-20 text-center text-sm text-gray-500">
-                    <History className="h-12 w-12 text-gray-200 mx-auto mb-4" />
-                    No activity logs found matching your search.
-                  </td>
-                </tr>
-              ) : (
-                filteredLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="px-6 py-5">
-                      <div className="flex items-center">
-                        <div className={`p-2 rounded-lg mr-4 ${
-                          log.action.includes('SUBMIT') ? 'bg-green-50 text-green-600' : 
-                          log.action.includes('LOCK') ? 'bg-red-50 text-red-600' :
-                          'bg-blue-50 text-blue-600'
-                        }`}>
-                          <ClipboardList className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <div className="text-sm font-bold text-gray-900 group-hover:text-primary transition-colors">
-                            {log.action.replace(/_/g, ' ')}
-                          </div>
-                          {log.changes && (
-                            <div className="text-[10px] text-gray-400 mt-1 max-w-xs truncate italic">
-                              {JSON.stringify(log.changes).substring(0, 50)}...
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-5">
-                      {log.item ? (
-                        <div className="flex flex-col">
-                          <span className="text-xs font-mono font-bold text-primary bg-primary/5 px-2 py-0.5 rounded w-fit uppercase">
-                            {log.item.slug}
-                          </span>
-                          <span className="text-[10px] text-gray-500 mt-1">{log.item.name || 'Untitled Form'}</span>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-400 italic">System Event</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-5">
-                      <div className="flex items-center">
-                        <div className="h-7 w-7 bg-gray-100 rounded-full flex items-center justify-center mr-2">
-                          <User className="h-4 w-4 text-gray-400" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-gray-900">{log.user.username}</div>
-                          <div className="text-[10px] text-gray-400 uppercase tracking-tighter">{log.user.role}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-5 text-right">
-                      <div className="flex flex-col items-end">
-                        <div className="text-xs font-bold text-gray-900 flex items-center">
-                          <Clock className="h-3 w-3 mr-1 text-gray-400" />
-                          {new Date(log.createdAt).toLocaleTimeString()}
-                        </div>
-                        <div className="text-[10px] text-gray-400 mt-0.5">
-                          {new Date(log.createdAt).toLocaleDateString()}
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      
+      <div className="flex items-center justify-between p-4 border-t border-gray-100 bg-white">
+        <div className="text-xs font-bold text-gray-500">
+          Showing {totalLogs === 0 ? 0 : ((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, totalLogs)} of {totalLogs} entries
         </div>
-        
-        <div className="flex items-center justify-between p-4 border-t border-gray-100 bg-white">
-          <div className="text-xs font-bold text-gray-500">
-            Showing {totalLogs === 0 ? 0 : ((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, totalLogs)} of {totalLogs} entries
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-black uppercase disabled:opacity-50 hover:bg-gray-50 transition-colors shadow-sm"
-            >
-              Previous
-            </button>
-            <button
-              onClick={() => setPage(p => p + 1)}
-              disabled={page * pageSize >= totalLogs}
-              className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-black uppercase disabled:opacity-50 hover:bg-gray-50 transition-colors shadow-sm"
-            >
-              Next
-            </button>
-          </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-black uppercase disabled:opacity-50 hover:bg-gray-50 transition-colors shadow-sm"
+          >
+            Previous
+          </button>
+          <button
+            onClick={() => setPage(p => p + 1)}
+            disabled={page * pageSize >= totalLogs}
+            className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-black uppercase disabled:opacity-50 hover:bg-gray-50 transition-colors shadow-sm"
+          >
+            Next
+          </button>
         </div>
       </div>
     </div>
