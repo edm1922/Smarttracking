@@ -89,12 +89,20 @@ export class ProductsService {
     const initialStock = data.initialStock ? Number(data.initialStock) : 0;
     const price = data.price ? Number(data.price) : 0;
     const threshold = data.threshold ? Number(data.threshold) : 0;
-    const { initialLocationId, userId, initialStock: _, ...productData } = data;
+    
+    // Auto-generate SKU if empty or missing
+    let finalSku = data.sku;
+    if (!finalSku || finalSku.trim() === '') {
+      finalSku = `SKU-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    }
+
+    const { initialLocationId, userId, initialStock: _, sku, ...productData } = data;
 
     return this.prisma.$transaction(async (tx) => {
       const product = await tx.product.create({
         data: {
           ...productData,
+          sku: finalSku,
           price,
           threshold,
         },
