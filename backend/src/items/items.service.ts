@@ -282,10 +282,18 @@ export class ItemsService {
               });
 
               if (product) {
-                // 4. Log to stock (Default Location: WAREHOUSE - 906271f9-c80c-449c-81f5-60156c83e1d1)
+                // 4. Log to stock (Dynamic Location: Try WAREHOUSE, fallback to first available)
+                let defaultLoc = await this.prisma.location.findFirst({
+                  where: { name: { contains: 'WAREHOUSE', mode: 'insensitive' } }
+                });
+                if (!defaultLoc) {
+                  defaultLoc = await this.prisma.location.findFirst();
+                }
+                const targetLocationId = defaultLoc?.id || '906271f9-c80c-449c-81f5-60156c83e1d1';
+
                 await this.productsService.processStock(
                   product.id,
-                  '906271f9-c80c-449c-81f5-60156c83e1d1',
+                  targetLocationId,
                   userId,
                   type,
                   qty,
@@ -343,7 +351,7 @@ export class ItemsService {
       orderBy: { name: 'asc' },
     });
 
-    const inventory: Record<string, any> = {};
+    const groupsMap = new Map<string, { name: string, totalQty: number, unit: string, rawItems: any[] }>();
     
     items.forEach(item => {
       // Skip items with no name (they are part of TELA batch but not individual products)
@@ -355,98 +363,106 @@ export class ItemsService {
       });
       
       if (!unitField) return;
-      const val = unitField.value as any;
       
       const name = item.name;
-      const qty = val.qty || 0;
-      const unit = val.unit || 'Units';
+      const qty = (unitField.value as any).qty || 0;
       
-      if (!inventory[name]) {
-        inventory[name] = {
+      if (!groupsMap.has(name)) {
+        groupsMap.set(name, {
           name,
           totalQty: 0,
-          unit,
-          items: []
-        };
-      }
-      
-      inventory[name].totalQty += qty;
-      
-      if (!inventory[name].specs) inventory[name].specs = {};
-      item.fieldValues.forEach(fv => {
-        const v = fv.value as any;
-        let displayValue: string | null = null;
-
-        if (v && typeof v === 'object') {
-          displayValue = String(v.main ?? v.qty ?? JSON.stringify(v));
-        } else {
-          displayValue = String(fv.value);
-        }
-
-        if (displayValue && displayValue.trim() !== '') {
-          const fieldName = fv.field?.name || 'Unknown Field';
-          if (!inventory[name].specs[fieldName]) {
-            inventory[name].specs[fieldName] = new Set();
-          }
-          inventory[name].specs[fieldName].add(displayValue.trim());
-        }
-      });
-
-
-
-      inventory[name].items.push({
-        slug: item.slug,
-        qty,
-        batch: item.batch?.batchCode,
-        status: item.status,
-        fieldValues: item.fieldValues.map(fv => ({
-          fieldId: fv.fieldId,
-          name: fv.field?.name || 'Unknown Field',
-          value: fv.value
-        }))
-      });
-    });
-
-    // Convert Set to Array and prepare final list
-    const productNames = Object.keys(inventory);
-    const products = await this.prisma.product.findMany({
-      where: { name: { in: productNames } },
-      select: { name: true, threshold: true }
-    });
-    const productMap = new Map(products.map(p => [p.name, p.threshold]));
-
-    let result = Object.values(inventory).map((group: any) => {
-      group.threshold = productMap.get(group.name) ?? 50;
-      if (group.specs) {
-        Object.keys(group.specs).forEach(key => {
-          group.specs[key] = Array.from(group.specs[key]);
+          unit: (unitField.value as any).unit || 'Units',
+          rawItems: []
         });
       }
-      return group;
+      
+      const group = groupsMap.get(name)!;
+      group.totalQty += qty;
+      group.rawItems.push(item);
     });
+
+    let allGroups = Array.from(groupsMap.values());
 
     // Apply search filtering in JS for better matching across products and item slugs
     if (search) {
       const searchLower = search.toLowerCase();
-      result = result.filter(group => {
-        // Match group name
+      allGroups = allGroups.filter(group => {
         if (group.name.toLowerCase().includes(searchLower)) return true;
-        // Match any item slug or specification in the group
-        if (group.items.some((it: any) => {
+        return group.rawItems.some(it => {
           if (it.slug.toLowerCase().includes(searchLower)) return true;
           return it.fieldValues.some((fv: any) => {
             const v = fv.value;
             const valStr = typeof v === 'object' ? String(v?.main || JSON.stringify(v)) : String(v);
             return valStr.toLowerCase().includes(searchLower);
           });
-        })) return true;
-        return false;
+        });
       });
     }
 
-    const total = result.length;
-    // Apply pagination to the GROUPED products
-    result = result.slice(skip, skip + take);
+    const total = allGroups.length;
+    
+    // Apply pagination BEFORE expanding the heavy JSON payloads
+    const paginatedGroups = allGroups.slice(skip, skip + take);
+
+    // Fetch thresholds for the paginated subset
+    const productNames = paginatedGroups.map(g => g.name);
+    const products = await this.prisma.product.findMany({
+      where: { name: { in: productNames } },
+      select: { name: true, threshold: true }
+    });
+    const productMap = new Map(products.map(p => [p.name, p.threshold]));
+
+    // Format ONLY the paginated results
+    let result = paginatedGroups.map(group => {
+      const formattedSpecs: Record<string, Set<string>> = {};
+      const formattedItems = group.rawItems.map(item => {
+        
+        // Build specs dynamically
+        item.fieldValues.forEach((fv: any) => {
+          const v = fv.value as any;
+          let displayValue: string | null = null;
+          if (v && typeof v === 'object') {
+            displayValue = String(v.main ?? v.qty ?? JSON.stringify(v));
+          } else {
+            displayValue = String(fv.value);
+          }
+          if (displayValue && displayValue.trim() !== '') {
+            const fieldName = fv.field?.name || 'Unknown Field';
+            if (!formattedSpecs[fieldName]) {
+              formattedSpecs[fieldName] = new Set();
+            }
+            formattedSpecs[fieldName].add(displayValue.trim());
+          }
+        });
+        
+        return {
+          slug: item.slug,
+          qty: (item.fieldValues.find((fv: any) => (fv.value as any)?.useUnitQty === true)?.value as any)?.qty || 0,
+          batch: item.batch?.batchCode,
+          status: item.status,
+          fieldValues: item.fieldValues.map((fv: any) => ({
+            fieldId: fv.fieldId,
+            name: fv.field?.name || 'Unknown Field',
+            value: fv.value
+          }))
+        };
+      });
+
+      // Convert Set to Array for JSON response
+      const specsOutput: Record<string, string[]> = {};
+      Object.keys(formattedSpecs).forEach(key => {
+        specsOutput[key] = Array.from(formattedSpecs[key]);
+      });
+
+      return {
+        name: group.name,
+        totalQty: group.totalQty,
+        unit: group.unit,
+        threshold: productMap.get(group.name) ?? 50,
+        specs: specsOutput,
+        items: formattedItems
+      };
+    });
 
     if (result.length === 0 && skip === 0 && !search) {
       // Fallback only if no search and no grouped items found at all
@@ -556,7 +572,10 @@ export class ItemsService {
     const logUnit = unitValue?.unit || 'Units';
 
     // Use a real user ID for the log (required by foreign key constraint)
-    const systemUser = await this.prisma.user.findFirst({ where: { role: 'admin' } });
+    let systemUser = await this.prisma.user.findFirst({ where: { role: 'admin' } });
+    if (!systemUser) {
+      systemUser = await this.prisma.user.findFirst(); // Fallback to any valid user
+    }
     
     await this.logsService.create({
       userId: systemUser?.id || '7b026b2a-d53a-486d-9a15-3cc0229e43cf', 

@@ -247,8 +247,22 @@ export class PullOutRequestsService {
     if (!request) throw new NotFoundException('Request not found');
     if (request.status !== 'PENDING' && request.status !== 'SUBMITTED') throw new BadRequestException('Request is already processed');
 
-    const item = request.item;
-    const qty = request.qty;
+    // OCC: Atomic claim to prevent double-execution
+    const claimResult = await this.prisma.pullOutRequest.updateMany({
+      where: {
+        id,
+        status: request.status
+      },
+      data: { status: 'PROCESSING' }
+    });
+
+    if (claimResult.count === 0) {
+      throw new BadRequestException('Request is currently being processed by another user');
+    }
+
+    try {
+      const item = request.item;
+      const qty = request.qty;
     
     const unitField = item.fieldValues.find((fv: any) => {
         const val = fv.value as any;
@@ -344,7 +358,14 @@ export class PullOutRequestsService {
       request.unit
     );
 
-    return result;
+      return result;
+    } catch (error) {
+      await this.prisma.pullOutRequest.update({
+        where: { id },
+        data: { status: request.status }
+      });
+      throw error;
+    }
   }
 
   async reject(id: string, adminId: string) {
