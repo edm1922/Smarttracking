@@ -6,20 +6,23 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   // Manual CORS & Logging Middleware
   app.use((req: any, res: any, next: any) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - Origin: ${req.headers.origin}`);
-    
     res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS,PATCH');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, X-Requested-With, Origin');
+    res.header(
+      'Access-Control-Allow-Methods',
+      'GET,PUT,POST,DELETE,OPTIONS,PATCH',
+    );
+    res.header(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Accept, Authorization, X-Requested-With, Origin',
+    );
     res.header('Access-Control-Allow-Credentials', 'true');
 
     if (req.method === 'OPTIONS') {
-      console.log('  -> Handling OPTIONS preflight');
       return res.sendStatus(200);
     }
     next();
   });
-  
+
   // Increase body limit for base64 evidence images
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ limit: '50mb', extended: true }));
@@ -32,7 +35,7 @@ async function bootstrap() {
   } else {
     await app.init();
   }
-  
+
   return app;
 }
 
