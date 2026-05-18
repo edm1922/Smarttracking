@@ -129,11 +129,13 @@ export class ProductsService {
         });
       }
 
-      await this.logsService.create({
-        userId: data.userId || 'system',
-        productId: product.id,
-        action: 'CREATE_PRODUCT',
-        changes: { name: product.name, sku: product.sku },
+      await tx.activityLog.create({
+        data: {
+          userId: data.userId || 'system',
+          productId: product.id,
+          action: 'CREATE_PRODUCT',
+          changes: { name: product.name, sku: product.sku },
+        }
       });
 
       return product;
