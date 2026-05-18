@@ -191,6 +191,10 @@ export default function ProductTransmittalPage() {
       } else {
         parsedRequester = log.remarks.split('Legacy Quick Pull:')[1]?.split('(')[0]?.trim();
       }
+    } else if (log.remarks?.includes('Issued to ')) {
+      parsedRequester = log.remarks.split('Issued to ')[1]?.trim();
+    } else if (log.remarks?.includes('Transferred to ')) {
+      parsedRequester = log.remarks.split('Transferred to ')[1]?.trim();
     }
 
     if (transmittalType !== 'EMPLOYEE') {

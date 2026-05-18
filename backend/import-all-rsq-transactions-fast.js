@@ -27,7 +27,7 @@ function normalizeFabricName(name) {
 async function main() {
   console.log("=== STARTING SUPER-FAST HIGH-FIDELITY RSQ DATA IMPORT ===");
 
-  const filePath = path.resolve(__dirname, '2026_Fabric & Tailor Request Records (1).xlsx');
+  const filePath = path.resolve(__dirname, '../2026_Fabric & Tailor Request Records (1).xlsx');
   const workbook = XLSX.readFile(filePath);
   const sheet = workbook.Sheets['Transaction'];
   const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
@@ -142,7 +142,7 @@ async function main() {
     else if (task.type === 'STOCK IN') dbType = 'STOCK_IN';
 
     // Encode remarks
-    const dbRemarks = `RSQ: ${task.rsqNo || '—'} | Month: ${task.month || '—'} | Remarks: ${task.remarks || ''}`;
+    const dbRemarks = `RSQ: ${task.rsqNo || '—'} | Month: ${task.month || '—'} | Apparel: ${task.actualApparel || '—'} | Remarks: ${task.remarks || ''}`;
 
     try {
       // 1. Create FabricTransaction

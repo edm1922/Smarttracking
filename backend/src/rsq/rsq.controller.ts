@@ -21,6 +21,11 @@ export class RsqController {
     return this.rsqService.getTailors();
   }
 
+  @Post('tailors')
+  createTailor(@Body() data: any) {
+    return this.rsqService.createTailor(data);
+  }
+
   @Get('requests')
   getRequests() {
     return this.rsqService.getRequests();

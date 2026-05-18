@@ -38,6 +38,51 @@ const parseRemarks = (remarksString: string) => {
   };
 };
 
+const normalizeFabricName = (name: string) => {
+  if (!name) return '';
+  let n = name.trim().toUpperCase();
+  n = n.replace('APHAGINA', 'ALPHAGINA');
+  n = n.replace('ALPAGINA', 'ALPHAGINA');
+  n = n.replace('LAVANDER', 'LAVENDER');
+  n = n.replace('SKYBLUE', 'SKY BLUE');
+  return n;
+};
+
+const APPAREL_MAP: Record<string, string> = {
+  "HOODCAP- YELLOW (KATRINA)": "KATRINA - YELLOW",
+  "PANTS (LARGE) - KATRINA": "KATRINA - NAVY BLUE",
+  "TRAPAL- TRANSPARENT": "TRAPAL- TRANSPARENT",
+  "HOODCAP YELLOW WITH GREEN BAND (KATRINA)": "KATRINA - YELLOW",
+  "HOODCAP YELLOW WITH ORANGE BAND (KATRINA)": "KATRINA - YELLOW",
+  "HOODCAP- YELLOW W/ BLUE BAND (KATRINA)": "KATRINA - YELLOW",
+  "HAIRNET WHITE (SOFTULE)": "SOFT TULE - WHITE",
+  "PANTS MEDIUM- NAVY BLUE (KATRINA)": "KATRINA - NAVY BLUE",
+  "PANTS LARGE- NAVY BLUE (KATRINA)": "KATRINA - NAVY BLUE",
+  "SMOCKGOWN- YELLOW (ALPAGINA)": "ALPHAGINA - YELLOW",
+  "SMOCK GOWN- PINK (ALPHAGINA)": "ALPHAGINA - PINK",
+  "HOODCAP- PINK (KATRINA)": "KATRINA - PINK",
+  "BULLCAP- ORANGE (KATRINA)": "KATRINA - ORANGE",
+  "BULLCAP- RED (KATRINA)": "KATRINA - RED",
+  "SMOCK GOWN - PINK (ALPHAGINA)": "ALPHAGINA - PINK",
+  "MASK- WHITE (KATRINA)": "KATRINA - WHITE",
+  "HOOD CAP - ORANGE (KATRINA)": "KATRINA - ORANGE",
+  "SMOCK GOWN- ORANGE (ALPHAGINA)": "ALPHAGINA - ORANGE",
+  "PANTS LARGE - NAVY BLUE KATRINA": "KATRINA - NAVY BLUE",
+  "PANTS (MEDIUM) - KATRINA": "KATRINA - NAVY BLUE",
+  "PANTS SMALL- NAVY BLUE (KATRINA)": "KATRINA - NAVY BLUE",
+  "SMOCK GOWN - LAVANDER (ALPHAGINA)": "ALPHAGINA - LAVENDER",
+  "HOOD CAP - LAVANDER (KATRINA)": "KATRINA - LAVANDER",
+  "BULLCAP - YELLOW (KATRINA)": "KATRINA - YELLOW",
+  "BULLCAP- NAVY BLUE (KATRINA)": "KATRINA - NAVY BLUE",
+  "BULLCAP- VIOLET (KATRINA)": "KATRINA - VIOLET",
+  "HOODCAP- ORANGE W/YELLOW BAND (KATRINA)": "KATRINA - ORANGE",
+  "SMOCK GOWN - BROWN (ALPHAGINA)": "ALPHAGINA - BROWN",
+  "HOOD CAP - BROWN (KATRINA)": "KATRINA - BROWN",
+  "APRON- SKY BLUE (KATRINA)": "KATRINA - SKY BLUE",
+  "BULLCAP- MAROON (KATRINA)": "KATRINA - MAROON",
+  "BULLCAP- APPLE GREEN (KATRINA)": "KATRINA - APPLE GREEN",
+};
+
 const parseTransactionRow = (trn: any) => {
   const parts = trn.transactionNo?.split('_') || [trn.transactionNo || ''];
   let batchNo = parts[0] || '—';
@@ -47,6 +92,7 @@ const parseTransactionRow = (trn: any) => {
   const remarksString = trn.remarks || '';
   const rsqMatch = remarksString.match(/RSQ:\s*([^\s|]+)/);
   const monthMatch = remarksString.match(/Month:\s*([^|]+)/);
+  const apparelMatch = remarksString.match(/Apparel:\s*([^|]+)/);
   const remarksMatch = remarksString.match(/Remarks:\s*(.*)/);
 
   // If this is an initial balance record, display clean labels
@@ -75,7 +121,8 @@ const parseTransactionRow = (trn: any) => {
     rsqNo: rsqMatch ? rsqMatch[1] : '—',
     applicableMonth: month,
     remarks: remarksMatch ? remarksMatch[1].trim() : (remarksString.includes('|') ? '' : remarksString),
-    apparel: trn.fabric?.name || '—',
+    apparel: apparelMatch && apparelMatch[1].trim() !== '—' ? apparelMatch[1].trim() : (trn.fabric?.name || '—'),
+    fabricName: trn.fabric?.name || '—',
     apparelGroup: trn.fabric?.type || '—',
     type: trn.type === 'INITIAL_BALANCE' ? 'BEGINNING' : trn.type,
     date: trn.date,
@@ -494,7 +541,12 @@ function TransactionSheetList({
                     <td className="px-3 py-2.5 border-r border-gray-100 font-black text-gray-900">{row.batchNo}</td>
                     <td className="px-3 py-2.5 border-r border-gray-100 text-center font-mono font-bold text-gray-500">{row.seriesNo}</td>
                     <td className="px-3 py-2.5 border-r border-gray-100 text-center font-mono font-black text-primary">{row.rsqNo || '—'}</td>
-                    <td className="px-3 py-2.5 border-r border-gray-100 text-left font-black uppercase text-gray-800 leading-tight">{row.apparel}</td>
+                    <td className="px-3 py-2.5 border-r border-gray-100 text-left font-black uppercase text-gray-800 leading-tight">
+                      {row.apparel}
+                      {row.fabricName !== '—' && row.fabricName !== row.apparel && (
+                        <div className="text-[9px] text-gray-400 font-bold mt-0.5">{row.fabricName}</div>
+                      )}
+                    </td>
                     <td className="px-3 py-2.5 border-r border-gray-100 text-center uppercase text-[10px] text-gray-500">{row.apparelGroup}</td>
                     <td className="px-3 py-2.5 border-r border-gray-100 text-center">
                       <span className={`inline-flex px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter ${
@@ -690,6 +742,9 @@ function TransactionSheetList({
                             </td>
                             <td className="px-3 py-2 border-r border-gray-100 text-left uppercase text-gray-800 leading-tight">
                               {mv.apparel}
+                              {mv.fabricName !== '—' && mv.fabricName !== mv.apparel && (
+                                <div className="text-[8px] text-gray-400 font-bold mt-0.5">{mv.fabricName}</div>
+                              )}
                             </td>
                             <td className="px-3 py-2 border-r border-gray-100 font-black text-gray-900">
                               {mv.quantity} {mv.unit}
@@ -790,21 +845,23 @@ interface FormItemRow {
   price: number;
   remarks: string;
   tailorId: string;
+  apparelName: string;
   rsqNo?: string;
   seriesNo?: string;
 }
 
-function BatchTransactionModal({ onClose, fabrics, tailors, onSuccess }: any) {
+function BatchTransactionModal({ onClose, fabrics, tailors: initialTailors, onSuccess }: any) {
   const [loading, setLoading] = useState(false);
   const [transactionNo, setTransactionNo] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [applicableMonth, setApplicableMonth] = useState('');
+  const [tailorsList, setTailorsList] = useState<any[]>(initialTailors || []);
 
   const [sequenceData, setSequenceData] = useState<any>(null);
   
   // Grid row states
   const [rows, setRows] = useState<FormItemRow[]>([
-    { fabricId: '', type: 'WITHDRAWAL', quantity: 1, price: 0, remarks: '', tailorId: tailors[0]?.id || '' }
+    { fabricId: '', type: 'WITHDRAWAL', quantity: 1, price: 0, remarks: '', tailorId: initialTailors[0]?.id || '', apparelName: '' }
   ]);
 
   // Set default applicable month (e.g. "MAY 2026")
@@ -868,7 +925,7 @@ function BatchTransactionModal({ onClose, fabrics, tailors, onSuccess }: any) {
   const handleAddRow = () => {
     setRows([
       ...rows,
-      { fabricId: '', type: 'WITHDRAWAL', quantity: 1, price: 0, remarks: '', tailorId: tailors[0]?.id || '' }
+      { fabricId: '', type: 'WITHDRAWAL', quantity: 1, price: 0, remarks: '', tailorId: tailorsList[0]?.id || '', apparelName: '' }
     ]);
   };
 
@@ -892,7 +949,7 @@ function BatchTransactionModal({ onClose, fabrics, tailors, onSuccess }: any) {
       if (fields.type && (fields.type === 'STOCK_IN' || fields.type === 'BEGINNING')) {
         newRow.tailorId = '';
       } else if (fields.type && !newRow.tailorId) {
-        newRow.tailorId = tailors[0]?.id || '';
+        newRow.tailorId = tailorsList[0]?.id || '';
       }
 
       return newRow;
@@ -922,7 +979,8 @@ function BatchTransactionModal({ onClose, fabrics, tailors, onSuccess }: any) {
         remarks: row.remarks,
         applicableMonth,
         date,
-        tailorId: row.tailorId || undefined
+        tailorId: row.tailorId || undefined,
+        apparelName: row.apparelName || undefined
       }));
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/batch`, {
@@ -1015,7 +1073,8 @@ function BatchTransactionModal({ onClose, fabrics, tailors, onSuccess }: any) {
                 <tr className="bg-gray-100/50 text-[9px] font-black uppercase text-gray-400 tracking-wider border-b border-gray-200">
                   <th className="py-2.5 px-2 text-center w-16">Series #</th>
                   <th className="py-2.5 px-2 text-center w-20">RSQ #</th>
-                  <th className="py-2.5 px-2 w-72">Apparel (Fabric)</th>
+                  <th className="py-2.5 px-2 w-48">Apparel Name</th>
+                  <th className="py-2.5 px-2 w-52">Fabric</th>
                   <th className="py-2.5 px-2 text-center w-24">Group</th>
                   <th className="py-2.5 px-2 text-center w-36">Movement Type</th>
                   <th className="py-2.5 px-2 text-center w-16">Qty</th>
@@ -1044,7 +1103,39 @@ function BatchTransactionModal({ onClose, fabrics, tailors, onSuccess }: any) {
                         {row.rsqNo || '—'}
                       </td>
 
-                      {/* Apparel Selection */}
+                      {/* Apparel Name (Text Input with Datalist) */}
+                      <td className="py-3 px-2">
+                        <input 
+                          type="text" 
+                          list={`apparel-list-${idx}`}
+                          placeholder="e.g. BULLCAP, APRON"
+                          value={row.apparelName} 
+                          onChange={e => {
+                            const val = e.target.value;
+                            const targetFabricName = APPAREL_MAP[val];
+                            let updateFields: Partial<FormItemRow> = { apparelName: val };
+                            
+                            if (targetFabricName) {
+                              const matchingFab = fabrics.find((f: any) => 
+                                normalizeFabricName(f.name) === normalizeFabricName(targetFabricName)
+                              );
+                              if (matchingFab) {
+                                updateFields.fabricId = matchingFab.id;
+                                updateFields.price = matchingFab.unitPrice;
+                              }
+                            }
+                            handleUpdateRow(idx, updateFields);
+                          }} 
+                          className="w-full rounded-lg border-gray-200 py-1 px-2 text-[10px] font-bold bg-white focus:ring-primary focus:border-primary shadow-sm"
+                        />
+                        <datalist id={`apparel-list-${idx}`}>
+                          {Object.keys(APPAREL_MAP).map(name => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
+                        </datalist>
+                      </td>
+
+                      {/* Fabric Selection */}
                       <td className="py-3 px-2">
                         <select 
                           required
@@ -1052,7 +1143,7 @@ function BatchTransactionModal({ onClose, fabrics, tailors, onSuccess }: any) {
                           onChange={e => handleUpdateRow(idx, { fabricId: e.target.value })}
                           className="w-full rounded-lg border-gray-200 py-1 px-2 text-[10px] font-bold bg-white focus:ring-primary focus:border-primary shadow-sm"
                         >
-                          <option value="">-- Choose Apparel --</option>
+                          <option value="">-- Choose Fabric --</option>
                           {fabrics.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
                         </select>
                       </td>
@@ -1117,11 +1208,37 @@ function BatchTransactionModal({ onClose, fabrics, tailors, onSuccess }: any) {
                           <select 
                             required={isJobOrder}
                             value={row.tailorId}
-                            onChange={e => handleUpdateRow(idx, { tailorId: e.target.value })}
+                            onChange={async e => {
+                              const val = e.target.value;
+                              if (val === 'ADD_NEW') {
+                                const name = prompt('Enter the name of the new tailor:');
+                                if (!name) return;
+                                try {
+                                  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/tailors`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ name: name.toUpperCase() })
+                                  });
+                                  if (res.ok) {
+                                    const newTailor = await res.json();
+                                    setTailorsList(prev => [...prev, newTailor].sort((a, b) => a.name.localeCompare(b.name)));
+                                    handleUpdateRow(idx, { tailorId: newTailor.id });
+                                  } else {
+                                    alert('Failed to save new tailor.');
+                                  }
+                                } catch (err) {
+                                  console.error(err);
+                                  alert('Error saving new tailor.');
+                                }
+                              } else {
+                                handleUpdateRow(idx, { tailorId: val });
+                              }
+                            }}
                             className="w-full rounded-lg border-gray-200 py-1 px-2 text-[10px] font-bold bg-white focus:ring-primary focus:border-primary shadow-sm cursor-pointer"
                           >
                             <option value="">-- Choose Tailor --</option>
-                            {tailors.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            {tailorsList.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            <option value="ADD_NEW" className="text-primary font-black font-semibold">+ Add New Tailor...</option>
                           </select>
                         ) : (
                           <span className="text-[10px] text-gray-300 font-bold uppercase block text-center bg-gray-50 py-1 rounded border border-gray-100">BODEGA</span>

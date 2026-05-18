@@ -302,9 +302,9 @@ export const UnitReqCreateTab: React.FC<UnitReqCreateTabProps> = ({
                           <div key={key} className="space-y-3">
                             <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] px-1">{key}</p>
                             <div className="flex flex-wrap gap-2">
-                              {(values as any[]).map((v: any) => (
+                              {(values as any[]).map((v: any, index: number) => (
                                 <button
-                                  key={v}
+                                  key={`${v}-${index}`}
                                   onClick={() => toggleFilter(product.name, key, v)}
                                   className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${productFilters[product.name]?.[key] === v ? 'bg-primary text-white shadow-md shadow-primary/20' : 'bg-white border border-gray-100 text-gray-400 hover:border-primary/30 hover:text-primary'}`}
                                 >
@@ -330,7 +330,7 @@ export const UnitReqCreateTab: React.FC<UnitReqCreateTabProps> = ({
                               ))
                               .map((item: any) => (
                                 <button
-                                  key={item.id}
+                                  key={item.slug}
                                   onClick={() => {
                                     const currentSpecStr = item.fieldValues
                                       .filter((fv: any) => fv.value)

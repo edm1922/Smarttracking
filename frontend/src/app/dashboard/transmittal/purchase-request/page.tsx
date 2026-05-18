@@ -289,7 +289,7 @@ export default function PRTransmittalPage() {
 
       <style jsx global>{`
         @media print {
-          @page { size: A4; margin: 0; }
+          @page { size: portrait; margin: 0.3in !important; }
           body { background: white !important; }
           .no-print { display: none !important; }
           main { padding: 0 !important; margin: 0 !important; }

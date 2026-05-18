@@ -36,6 +36,12 @@ export class RsqService {
     });
   }
 
+  async createTailor(data: { name: string; address?: string; contactPerson?: string; contactNumber?: string }) {
+    return this.prisma.tailor.create({
+      data,
+    });
+  }
+
   // --- Transactions ---
   async getTransactions(params?: { fabricId?: string }) {
     return this.prisma.fabricTransaction.findMany({
@@ -207,6 +213,7 @@ export class RsqService {
     applicableMonth: string;
     date?: string;
     tailorId?: string;
+    apparelName?: string;
   }>) {
     const createdTransactions = [];
 
@@ -217,11 +224,8 @@ export class RsqService {
       // Combine Transaction No and Series No (T-2026-26_5.15.7)
       const dbTxNo = `${item.transactionNo}_${item.seriesNo}`;
 
-      // Package remarks with RSQ and applicable month info
-      let packagedRemarks = item.remarks || '';
-      if (item.rsqNo || item.applicableMonth) {
-        packagedRemarks = `RSQ: ${item.rsqNo || 'N/A'} | Month: ${item.applicableMonth || ''} | Remarks: ${item.remarks || ''}`;
-      }
+      // Package remarks with RSQ, applicable month, and apparelName info
+      const dbRemarks = `RSQ: ${item.rsqNo || '—'} | Month: ${item.applicableMonth || '—'} | Apparel: ${item.apparelName || '—'} | Remarks: ${item.remarks || ''}`;
 
       // Create fabric transaction
       const tx = await this.prisma.fabricTransaction.create({
@@ -231,7 +235,7 @@ export class RsqService {
           type: item.type,
           quantity: item.quantity,
           unit: fabric.unit,
-          remarks: packagedRemarks,
+          remarks: dbRemarks,
           location: 'BODEGA',
           date: item.date ? new Date(item.date) : new Date(),
         },
@@ -256,6 +260,8 @@ export class RsqService {
           }
         }
 
+        const requestRemarks = item.apparelName || item.remarks || '';
+
         if (existingRequest) {
           await this.prisma.tailoringRequest.update({
             where: { id: existingRequest.id },
@@ -265,7 +271,7 @@ export class RsqService {
               quantityReceived: item.type === 'RETURN'
                 ? Math.max(0, existingRequest.quantityReceived - item.quantity)
                 : existingRequest.quantityReceived,
-              remarks: item.remarks || existingRequest.remarks,
+              remarks: requestRemarks || existingRequest.remarks,
             }
           });
         } else {
@@ -279,7 +285,7 @@ export class RsqService {
               unit: 'pcs',
               orderDate: item.date ? new Date(item.date) : new Date(),
               status: 'PENDING',
-              remarks: item.remarks,
+              remarks: requestRemarks,
             }
           });
         }

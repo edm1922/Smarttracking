@@ -15,7 +15,7 @@ import { UnitReqReleasingTab } from './components/UnitReqReleasingTab';
 
 // Additional UI components (Modals)
 import { 
-  X, Send, ImageIcon, Plus, Trash2, Box, AlertTriangle, CheckCircle 
+  X, Send, ImageIcon, Plus, Trash2, Box, AlertTriangle, CheckCircle, ClipboardList 
 } from 'lucide-react';
 
 export default function UnitRequisitionPage() {
@@ -461,61 +461,187 @@ function UnitRequisitionContent() {
       {/* MODALS */}
       {showSubmitModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="bg-primary px-10 py-8 flex items-center justify-between">
-              <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center">
-                <CheckCircle className="mr-3 h-5 w-5" />
-                Submit Verification
-              </h3>
+          <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
+            <div className="bg-primary px-10 py-8 flex items-center justify-between border-b border-gray-100">
+              <div>
+                <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center">
+                  <CheckCircle className="mr-3 h-5 w-5" />
+                  Approval Verification
+                </h3>
+                <p className="text-[10px] text-white/60 font-bold uppercase tracking-widest mt-1.5">Please print, sign, and upload the unit pull-out form before submitting.</p>
+              </div>
               <button onClick={() => setShowSubmitModal(false)} className="text-white/60 hover:text-white transition-colors">
                 <X className="h-6 w-6" />
               </button>
             </div>
-            <div className="p-10 space-y-8">
-              <div className="space-y-4">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Supervisor Name</label>
-                <input
-                  type="text"
-                  placeholder="ENTER SUPERVISOR FULL NAME..."
-                  value={form.supervisorName}
-                  onChange={e => setForm({ ...form, supervisorName: e.target.value.toUpperCase() })}
-                  className="w-full bg-gray-50 border-2 border-transparent rounded-2xl px-6 py-4 text-sm font-black text-gray-900 outline-none focus:bg-white focus:border-primary transition-all placeholder:text-gray-200"
-                />
-              </div>
-
+            
+            <div className="flex-1 overflow-y-auto p-10 grid grid-cols-1 md:grid-cols-2 gap-10 custom-scrollbar">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Approval Document</label>
-                  <span className="text-[9px] font-black text-primary bg-primary/5 px-2 py-0.5 rounded-lg">MANDATORY</span>
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Document Preview</h3>
+                  <button 
+                    onClick={() => {
+                      const printContent = document.getElementById('printable-area');
+                      const windowPrint = window.open('', '', 'left=0,top=0,width=800,height=900');
+                      if (windowPrint && printContent) {
+                        windowPrint.document.write(`<html><head><title>Unit Pull-Out Form</title><style>body { font-family: sans-serif; padding: 40px; } .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; } .details { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; } table { width: 100%; border-collapse: collapse; margin-top: 20px; } th, td { border: 1px solid #000; padding: 10px; text-align: left; } th { background: #eee; font-size: 10px; text-transform: uppercase; } .signatures { display: flex; justify-content: flex-end; margin-top: 50px; } .sig-line { width: 250px; border-top: 1px solid #000; text-align: center; padding-top: 5px; font-weight: bold; }</style></head><body>${printContent.innerHTML}</body></html>`);
+                        windowPrint.document.close();
+                        windowPrint.print();
+                        windowPrint.close();
+                      }
+                    }}
+                    className="px-4 py-2 bg-gray-900 text-white text-[10px] font-black uppercase rounded-xl shadow-lg hover:bg-primary transition-all flex items-center"
+                  >
+                    <ClipboardList className="w-3.5 h-3.5 mr-2" /> Print Form
+                  </button>
                 </div>
-                <label className="block">
-                  <input type="file" className="hidden" onChange={e => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setAttachmentFile(file);
-                      setAttachmentPreview(URL.createObjectURL(file));
-                    }
-                  }} />
-                  <div className={`w-full py-10 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center gap-4 transition-all ${attachmentFile ? 'bg-green-50/50 border-green-200 text-green-600' : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-primary hover:bg-white'}`}>
-                    {attachmentPreview ? (
-                      <img src={attachmentPreview} className="h-20 w-20 object-cover rounded-xl border border-gray-100 shadow-sm" alt="Preview" />
-                    ) : (
-                      <ImageIcon className="h-10 w-10 opacity-40" />
-                    )}
-                    <span className="text-xs font-black uppercase tracking-widest">
-                      {attachmentFile ? attachmentFile.name : 'Upload Signed Form'}
-                    </span>
+                <div id="printable-area" className="border border-gray-200 rounded-2xl p-8 bg-white shadow-sm text-xs text-gray-900 space-y-4">
+                  <div className="header text-center border-b-2 border-gray-900 pb-3">
+                    <h1 className="text-lg font-black tracking-widest uppercase">UNIT PULL-OUT REQUEST</h1>
+                    <p className="text-[10px] font-bold text-gray-400 mt-1">Date: {new Date(form.date).toLocaleDateString()}</p>
                   </div>
-                </label>
-              </div>
+                  <div className="details grid grid-cols-2 gap-4">
+                    <div>
+                      <p><strong>Supervisor:</strong> {form.supervisorName || 'N/A'}</p>
+                      <p><strong>Remarks:</strong> {form.remarks || 'N/A'}</p>
+                    </div>
+                  </div>
+                  <table className="w-full border-collapse border border-gray-900 mt-4">
+                    <thead>
+                      <tr className="bg-gray-100 text-[10px] uppercase">
+                        <th className="border border-gray-900 p-2 text-left" style={{ width: '35%' }}>Product Name</th>
+                        <th className="border border-gray-900 p-2 text-left" style={{ width: '45%' }}>Specification</th>
+                        <th className="border border-gray-900 p-2 text-left" style={{ width: '20%' }}>Quantity</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cart.map(item => {
+                        let name = item.productName || '';
+                        let specs = '';
+                        if (!name && item.manualSlug) {
+                          const foundProduct = inventory.find((p: any) => 
+                            p.items.some((ui: any) => ui.slug === item.manualSlug)
+                          );
+                          if (foundProduct) {
+                            name = foundProduct.name;
+                            const foundUnitItem = foundProduct.items.find((ui: any) => ui.slug === item.manualSlug);
+                            if (foundUnitItem) {
+                              specs = foundUnitItem.fieldValues
+                                .filter((fv: any) => fv.value)
+                                .map((fv: any) => {
+                                  const fvName = fv.name ? fv.name.trim().toUpperCase() : '';
+                                  const rawVal = fv.value;
+                                  const displayVal = typeof rawVal === 'object' ? (rawVal.main || '') : rawVal;
+                                  const valStr = String(displayVal || '').trim();
 
-              <button
-                onClick={handleFinalSubmit}
-                disabled={isSubmitting || !attachmentFile || !form.supervisorName}
-                className="w-full py-5 bg-primary text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-primary/30 hover:bg-primary-dark hover:-translate-y-1 transition-all disabled:opacity-50"
-              >
-                {isSubmitting ? 'Submitting...' : 'Complete Requisition'}
-              </button>
+                                  if (fvName === 'PRODUCT NAME' && valStr.toUpperCase() === name.toUpperCase()) {
+                                    return null;
+                                  }
+                                  return displayVal ? `${fv.name}: ${displayVal}` : null;
+                                })
+                                .filter(Boolean)
+                                .join(', ');
+                            }
+                          }
+                        } else {
+                          const specsStr = item.specs || '';
+                          if (specsStr) {
+                            specs = specsStr
+                              .split(/[,|]/)
+                              .map((part: string) => part.trim())
+                              .filter((part: string) => {
+                                if (!part) return false;
+                                if (part.toUpperCase().startsWith('PRODUCT NAME:')) {
+                                  const valPart = part.substring('PRODUCT NAME:'.length).trim();
+                                  if (valPart.toUpperCase() === name.toUpperCase()) {
+                                    return false;
+                                  }
+                                }
+                                return true;
+                              })
+                              .join(', ');
+                          }
+                        }
+
+                        const resolvedName = name || item.manualSlug || 'MANUAL ENTRY';
+                        const resolvedSpecs = specs || 'N/A';
+
+                        return (
+                          <tr key={item.id} className="text-xs">
+                            <td className="border border-gray-900 p-2 font-bold uppercase">{resolvedName}</td>
+                            <td className="border border-gray-900 p-2 font-bold uppercase">{resolvedSpecs}</td>
+                            <td className="border border-gray-900 p-2 font-bold uppercase">{item.qty} {item.unit || 'pcs'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <div className="signatures flex justify-end mt-12">
+                    <div className="text-center">
+                      <br /><br />
+                      <div className="w-[200px] border-t border-gray-900 pt-1 text-[10px] font-bold uppercase tracking-wider">Supervisor Approval Signature</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-6 flex flex-col justify-between">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Supervisor Name</label>
+                    <input
+                      type="text"
+                      placeholder="ENTER SUPERVISOR FULL NAME..."
+                      value={form.supervisorName}
+                      onChange={e => setForm({ ...form, supervisorName: e.target.value.toUpperCase() })}
+                      className="w-full bg-gray-50 border-2 border-transparent rounded-2xl px-6 py-4 text-sm font-black text-gray-900 outline-none focus:bg-white focus:border-primary transition-all placeholder:text-gray-200"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Upload Signed Form</label>
+                      <span className="text-[9px] font-black text-primary bg-primary/5 px-2 py-0.5 rounded-lg">MANDATORY</span>
+                    </div>
+                    <label className="block">
+                      <input type="file" className="hidden" accept="image/*,application/pdf" onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setAttachmentFile(file);
+                          setAttachmentPreview(URL.createObjectURL(file));
+                        }
+                      }} />
+                      <div className={`w-full py-10 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center gap-4 transition-all cursor-pointer ${attachmentFile ? 'bg-green-50/50 border-green-200 text-green-600' : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-primary hover:bg-white'}`}>
+                        {attachmentPreview ? (
+                          <img src={attachmentPreview} className="h-24 w-full object-contain rounded-xl p-2" alt="Preview" />
+                        ) : (
+                          <ImageIcon className="h-10 w-10 opacity-40" />
+                        )}
+                        <span className="text-xs font-black uppercase tracking-widest">
+                          {attachmentFile ? attachmentFile.name : 'Upload Signed Form'}
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="bg-blue-50/80 p-6 rounded-[2rem] flex items-start border border-blue-100 shadow-sm">
+                    <CheckCircle className="w-5 h-5 text-blue-600 mr-4 flex-shrink-0" />
+                    <p className="text-[10px] text-blue-800 leading-relaxed font-bold uppercase tracking-tight">
+                      To proceed, you must print this document, have your supervisor sign it, and upload the photo here. Admin will verify the signature before final approval.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={handleFinalSubmit}
+                    disabled={isSubmitting || !attachmentFile || !form.supervisorName}
+                    className="w-full py-5 bg-[#50C878] hover:bg-[#45b068] text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-[#50C878]/30 hover:-translate-y-1 transition-all disabled:opacity-50"
+                  >
+                    {isSubmitting ? 'Submitting...' : 'Complete Requisition'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
