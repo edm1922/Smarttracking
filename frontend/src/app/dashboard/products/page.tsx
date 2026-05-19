@@ -11,6 +11,7 @@ import { AddProductModal } from './components/AddProductModal';
 import { EditProductModal } from './components/EditProductModal';
 import { ReleaseModal } from './components/ReleaseModal';
 import { LogModal } from './components/LogModal';
+import { StockModal } from './components/StockModal';
 import { PasswordVerificationModal } from './components/PasswordVerificationModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { PageHeaderSkeleton } from '@/components/ui/LoadingSkeletons';
@@ -36,6 +37,7 @@ export default function ProductsPage() {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   
   // Form State
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -64,6 +66,15 @@ export default function ProductsPage() {
   const [editableStock, setEditableStock] = useState(0);
   const [adminPassInput, setAdminPassInput] = useState('');
   const [previewImageUrl, setPreviewImageUrl] = useState('');
+  const [stockForm, setStockForm] = useState({
+    productId: '',
+    productName: '',
+    locationId: '',
+    type: 'IN' as 'IN' | 'OUT',
+    quantity: 1,
+    remarks: ''
+  });
+  const [isProcessingStock, setIsProcessingStock] = useState(false);
   
   // UI Helpers
   const [activeEditTab, setActiveEditTab] = useState<'general' | 'stocks'>('general');
@@ -180,6 +191,38 @@ export default function ProductsPage() {
       toast.error(err.response?.data?.message || 'Release protocol failure.');
     } finally {
       setIsReleasing(false);
+    }
+  };
+
+  const handleStockSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stockForm.productId || !stockForm.locationId) {
+      toast.error('Please select a valid location and item.');
+      return;
+    }
+    setIsProcessingStock(true);
+    try {
+      await api.post(`/products/${stockForm.productId}/stock`, {
+        locationId: stockForm.locationId,
+        type: stockForm.type,
+        quantity: Number(stockForm.quantity),
+        remarks: stockForm.remarks,
+      });
+      toast.success(`Stock ${stockForm.type === 'IN' ? 'added' : 'deducted'} successfully.`);
+      setIsStockModalOpen(false);
+      setStockForm({
+        productId: '',
+        productName: '',
+        locationId: '',
+        type: 'IN',
+        quantity: 1,
+        remarks: '',
+      });
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Stock transaction failed.');
+    } finally {
+      setIsProcessingStock(false);
     }
   };
 
@@ -409,10 +452,15 @@ export default function ProductsPage() {
           }}
           handleOpenStockModal={(p: Product, type: 'IN' | 'OUT') => {
             if (type === 'IN') {
-              setEditingProduct(p);
-              setEditableStock(p.stocks.reduce((acc: number, s: any) => acc + s.quantity, 0));
-              setIsEditModalOpen(true);
-              setActiveEditTab('stocks');
+              setStockForm({
+                productId: p.id,
+                productName: p.name,
+                locationId: locations[0]?.id || '',
+                type: 'IN',
+                quantity: 1,
+                remarks: '',
+              });
+              setIsStockModalOpen(true);
             } else if (type === 'OUT') {
               setReleaseBulkForm(prev => ({ ...prev, sourceLocationId: locations[0]?.id || '' }));
               addReleaseItem(p);
@@ -450,6 +498,16 @@ export default function ProductsPage() {
         setPreviewImageUrl={setPreviewImageUrl} setIsPreviewOpen={setIsPreviewOpen}
         standardUnits={standardUnits} isAddingCustomUnitEdit={isAddingCustomUnitEdit} setIsAddingCustomUnitEdit={setIsAddingCustomUnitEdit}
         locations={locations}
+      />
+
+      <StockModal 
+        isOpen={isStockModalOpen}
+        onClose={() => setIsStockModalOpen(false)}
+        onSubmit={handleStockSubmit}
+        form={stockForm}
+        setForm={setStockForm}
+        locations={locations}
+        isProcessing={isProcessingStock}
       />
 
       <ReleaseModal 
