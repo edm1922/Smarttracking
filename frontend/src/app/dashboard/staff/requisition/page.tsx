@@ -257,6 +257,7 @@ function RSQContent() {
           productId: product.id,
           productName: product.name,
           sku: product.sku,
+          unit: product.unit,
           quantities: initialQuantities,
           maxQuantity: availableQty,
           description: product.description,

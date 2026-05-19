@@ -113,38 +113,16 @@ export const PrintableRequisition: React.FC<PrintableRequisitionProps> = ({
       </table>
 
       {/* Signature Block */}
-      <div className="grid grid-cols-3 gap-12 pt-8">
-        <div className="flex flex-col items-start pt-1">
-          <div className="w-full text-[8px] font-black text-gray-400 uppercase mb-6">Requested by:</div>
-          <div className="w-full">
-            <div className="text-[10px] font-black mb-1 uppercase text-center h-4"></div>
-            <div className="border-b-2 border-gray-900 w-full mb-1"></div>
-            <div className="text-center text-[7px] font-bold text-gray-400 uppercase italic tracking-tighter">
-              Requisitioner / Preparation Officer
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-col items-start pt-1">
-          <div className="w-full text-[8px] font-black text-gray-400 uppercase mb-6">Verified by:</div>
+      <div className="flex justify-end pt-8">
+        <div className="w-72">
+          <div className="w-full text-[8px] font-black text-gray-400 uppercase mb-6">Approved by:</div>
           <div className="w-full">
             <div className="text-[10px] font-black mb-1 uppercase text-center">
               {form.supervisorName || '____________________'}
             </div>
             <div className="border-b-2 border-gray-900 w-full mb-1"></div>
             <div className="text-center text-[7px] font-bold text-gray-400 uppercase italic tracking-tighter">
-              Direct Supervisor / Sign-Off
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-col items-start pt-1">
-          <div className="w-full text-[8px] font-black text-gray-400 uppercase mb-6">Approved by:</div>
-          <div className="w-full">
-            <div className="text-[10px] font-black mb-1 uppercase text-center h-4"></div>
-            <div className="border-b-2 border-gray-900 w-full mb-1"></div>
-            <div className="text-center text-[7px] font-bold text-gray-400 uppercase italic tracking-tighter">
-              Warehouse Checker / Logistics Officer
+              Direct Supervisor
             </div>
           </div>
         </div>

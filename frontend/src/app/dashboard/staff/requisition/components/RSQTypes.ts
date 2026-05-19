@@ -31,6 +31,7 @@ export interface SelectedItem {
   productId: string;
   productName: string;
   sku: string;
+  unit?: string;
   quantities: Record<string, number>;
   maxQuantity: number;
   description: string | null;
