@@ -65,6 +65,11 @@ export class RsqController {
     return this.rsqService.updateRequestStatus(id, status, quantityReceived);
   }
 
+  @Patch('transactions/:id')
+  updateTransaction(@Param('id') id: string, @Body() data: any) {
+    return this.rsqService.updateTransaction(id, data);
+  }
+
   @Post('transactions/bulk-delete')
   deleteTransactions(@Body('ids') ids: string[]) {
     return this.rsqService.deleteTransactions(ids);

@@ -8,11 +8,8 @@ export function RSQSlipPrint({ rsq }: RSQSlipPrintProps) {
   if (!rsq) return null;
 
   const tailorName = rsq.tailor?.name || 'TAILOR';
-  // Standardized tailor nickname (e.g. MAUNLAD UNIFORM INC -> MAUNLAD)
-  let tailorNickname = tailorName.replace(/tailoring|inc|cooperative|services/gi, '').trim().toUpperCase();
-  if (!tailorNickname || tailorNickname === 'UNASSIGNED' || tailorNickname === 'UNASSIGNED TAILOR') {
-    tailorNickname = 'MAUNLAD';
-  }
+  // Standardized tailor nickname
+  const tailorNickname = 'MAUNLAD';
 
   const formattedDate = rsq.orderDate ? new Date(rsq.orderDate).toLocaleDateString() : new Date().toLocaleDateString();
 
@@ -54,38 +51,17 @@ export function RSQSlipPrint({ rsq }: RSQSlipPrintProps) {
                 <th className="border border-black py-1.5 px-1 w-10">S. NO</th>
                 <th className="border border-black py-1.5 px-2 text-left w-52">PARTICULARS</th>
                 <th className="border border-black py-1.5 px-1" colSpan={2}>REQUEST</th>
-                {isCutting ? (
-                  <th className="border border-black py-1.5 px-1" colSpan={3}>OUTPUT (CUTTING)</th>
-                ) : (
-                  <>
-                    <th className="border border-black py-1.5 px-1 w-16" rowSpan={2}>TOTAL CUTTING</th>
-                    <th className="border border-black py-1.5 px-1" colSpan={3}>OUTPUT (TAILORING)</th>
-                  </>
-                )}
+                <th className="border border-black py-1.5 px-1" colSpan={3}>OUTPUT</th>
               </tr>
               {/* Sub headers */}
               <tr className="border border-black bg-gray-50/50">
-                {isCutting ? (
-                  <>
-                    <th className="border border-black py-0.5 px-0.5"></th>
-                    <th className="border border-black py-0.5 px-0.5"></th>
-                    <th className="border border-black py-0.5 px-1 w-12">QTY</th>
-                    <th className="border border-black py-0.5 px-1 w-12">UNIT</th>
-                    <th className="border border-black py-0.5 px-1 w-12">QTY</th>
-                    <th className="border border-black py-0.5 px-1 w-16">PRICE</th>
-                    <th className="border border-black py-0.5 px-1 w-20">AMOUNT</th>
-                  </>
-                ) : (
-                  <>
-                    <th className="border border-black py-0.5 px-0.5"></th>
-                    <th className="border border-black py-0.5 px-0.5"></th>
-                    <th className="border border-black py-0.5 px-1 w-12">QTY</th>
-                    <th className="border border-black py-0.5 px-1 w-12">UNIT</th>
-                    <th className="border border-black py-0.5 px-1 w-12">QTY</th>
-                    <th className="border border-black py-0.5 px-1 w-16">PRICE</th>
-                    <th className="border border-black py-0.5 px-1 w-20">AMOUNT</th>
-                  </>
-                )}
+                <th className="border border-black py-0.5 px-0.5"></th>
+                <th className="border border-black py-0.5 px-0.5"></th>
+                <th className="border border-black py-0.5 px-1 w-12">QTY</th>
+                <th className="border border-black py-0.5 px-1 w-12">UNIT</th>
+                <th className="border border-black py-0.5 px-1 w-12">QTY</th>
+                <th className="border border-black py-0.5 px-1 w-16">PRICE</th>
+                <th className="border border-black py-0.5 px-1 w-20">AMOUNT</th>
               </tr>
             </thead>
             <tbody>
@@ -96,7 +72,6 @@ export function RSQSlipPrint({ rsq }: RSQSlipPrintProps) {
                 </td>
                 <td className="border border-black py-1 px-1 text-center text-sm">{rsq.quantityOrdered}</td>
                 <td className="border border-black py-1 px-1 text-center uppercase text-sm">{rsq.unit || 'pcs'}</td>
-                {!isCutting && <td className="border border-black py-1 px-1 bg-gray-50/30 text-center text-sm">{rsq.quantityOrdered}</td>}
                 <td className="border border-black py-1 px-1 text-center text-sm">{rsq.quantityReceived || ''}</td>
                 <td className="border border-black py-1 px-1 text-center text-sm">₱{rsq.fabric?.unitPrice?.toLocaleString() || '0'}</td>
                 <td className="border border-black py-1 px-1 text-center text-sm font-black">
@@ -110,7 +85,6 @@ export function RSQSlipPrint({ rsq }: RSQSlipPrintProps) {
                   <td className="border border-black py-0.5 px-2"></td>
                   <td className="border border-black py-0.5 px-1"></td>
                   <td className="border border-black py-0.5 px-1"></td>
-                  {!isCutting && <td className="border border-black py-0.5 px-1 bg-gray-50/10"></td>}
                   <td className="border border-black py-0.5 px-1"></td>
                   <td className="border border-black py-0.5 px-1"></td>
                   <td className="border border-black py-0.5 px-1"></td>
@@ -153,7 +127,7 @@ export function RSQSlipPrint({ rsq }: RSQSlipPrintProps) {
         {renderSlipCopy('(TAILORING COPY)', 'TAILORING')}
       </div>
       <div className="print-page">
-        {renderSlipCopy(`${tailorNickname} -> MAIN OFFICE`, 'CUTTING')}
+        {renderSlipCopy(`${tailorNickname} TO MAIN OFFICE`, 'CUTTING')}
       </div>
       <div className="print-page">
         {renderSlipCopy('TAILORING -> MAIN OFFICE', 'TAILORING')}

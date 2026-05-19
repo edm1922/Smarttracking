@@ -297,6 +297,32 @@ export class RsqService {
     return createdTransactions;
   }
 
+  async updateTransaction(id: string, data: {
+    fabricId?: string;
+    type?: string;
+    quantity?: number;
+    unit?: string;
+    remarks?: string;
+    location?: string;
+    date?: Date;
+  }) {
+    const existing = await this.prisma.fabricTransaction.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Transaction not found');
+
+    return this.prisma.fabricTransaction.update({
+      where: { id },
+      data: {
+        ...(data.fabricId !== undefined && { fabricId: data.fabricId }),
+        ...(data.type !== undefined && { type: data.type }),
+        ...(data.quantity !== undefined && { quantity: data.quantity }),
+        ...(data.unit !== undefined && { unit: data.unit }),
+        ...(data.remarks !== undefined && { remarks: data.remarks }),
+        ...(data.location !== undefined && { location: data.location }),
+        ...(data.date !== undefined && { date: new Date(data.date) }),
+      },
+    });
+  }
+
   async deleteTransactions(ids: string[]) {
     return this.prisma.fabricTransaction.deleteMany({
       where: {

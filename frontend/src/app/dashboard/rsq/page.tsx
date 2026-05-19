@@ -286,6 +286,7 @@ export default function RSQPage() {
                 <TransactionSheetList 
                   data={transactions} 
                   requests={requests}
+                  fabrics={fabrics}
                   onPrintRSQ={handlePrintRSQ}
                   onPrintTrn={handlePrintTrn} 
                   onRefresh={fetchData}
@@ -328,12 +329,14 @@ export default function RSQPage() {
 function TransactionSheetList({ 
   data, 
   requests, 
+  fabrics,
   onPrintRSQ, 
   onPrintTrn,
   onRefresh
 }: { 
   data: any[], 
   requests: any[], 
+  fabrics: any[],
   onPrintRSQ: (rsqNo: string) => void, 
   onPrintTrn: (trn: any) => void,
   onRefresh?: () => void
@@ -347,8 +350,8 @@ function TransactionSheetList({
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Double Click / Movement Details Modal State
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  // Double Click / Edit Transaction Modal State
+  const [editTransaction, setEditTransaction] = useState<any | null>(null);
 
   // Process rows
   const parsedRows = data.map(parseTransactionRow);
@@ -417,21 +420,6 @@ function TransactionSheetList({
       setIsDeleting(false);
     }
   };
-
-  // Movement Details Calculations
-  const targetDateStr = selectedDate ? new Date(selectedDate).toDateString() : '';
-  const sameDayMovements = parsedRows.filter(
-    row => row.date && new Date(row.date).toDateString() === targetDateStr
-  );
-
-  const totalStockIn = sameDayMovements.reduce(
-    (acc, row) => (row.type === 'STOCK_IN' || row.type === 'BEGINNING') ? acc + row.quantity : acc, 
-    0
-  );
-  const totalStockOut = sameDayMovements.reduce(
-    (acc, row) => row.type === 'WITHDRAWAL' ? acc + row.quantity : acc, 
-    0
-  );
 
   return (
     <div className="space-y-6">
@@ -526,9 +514,9 @@ function TransactionSheetList({
                 return (
                   <tr 
                     key={row.id} 
-                    onDoubleClick={() => setSelectedDate(row.date)}
+                    onDoubleClick={() => setEditTransaction(row)}
                     className={`hover:bg-primary/5 transition-colors font-semibold text-gray-700 cursor-pointer select-none ${isRowSelected ? 'bg-primary/5 border-l-2 border-l-primary' : ''}`}
-                    title="Double-click row to view all movements on this date"
+                    title="Double-click row to edit transaction"
                   >
                     <td 
                       className={`px-3 py-2.5 border-r border-gray-100 text-center sticky left-0 z-10 transition-all ${isRowSelected ? 'bg-blue-50/50' : 'bg-white'}`}
@@ -671,116 +659,14 @@ function TransactionSheetList({
         </div>
       )}
 
-      {/* Double Click Movement Ledger Details Modal */}
-      {selectedDate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-[2rem] border border-gray-100 shadow-2xl w-full max-w-3xl overflow-hidden max-h-[85vh] flex flex-col hover:scale-[1.002] transition-all">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
-              <div>
-                <h3 className="text-base font-black text-gray-900 uppercase tracking-tight">Movement Ledger Details</h3>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">
-                  All transactions on {new Date(selectedDate).toLocaleDateString(undefined, { dateStyle: 'full' })}
-                </p>
-              </div>
-              <button 
-                onClick={() => setSelectedDate(null)}
-                className="p-2 hover:bg-gray-100 rounded-xl text-gray-400 hover:text-gray-900 transition-all active:scale-95"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
-              {/* Day Balance Summary Widgets */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-4 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest block">Total Stock In</span>
-                    <span className="text-xl font-black text-blue-900 mt-1 block">{totalStockIn.toLocaleString()} Rolls</span>
-                  </div>
-                  <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-600 font-black text-xs">IN</div>
-                </div>
-                <div className="bg-red-50/50 border border-red-100 rounded-2xl p-4 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] font-black text-red-500 uppercase tracking-widest block">Total Stock Out</span>
-                    <span className="text-xl font-black text-red-900 mt-1 block">{totalStockOut.toLocaleString()} Rolls</span>
-                  </div>
-                  <div className="h-10 w-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-600 font-black text-xs">OUT</div>
-                </div>
-              </div>
-
-              {/* List of Movements */}
-              <div className="space-y-3">
-                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Chronological Daily Logs</h4>
-                <div className="border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
-                  <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
-                    <table className="w-full text-[10px] text-center border-collapse">
-                      <thead className="bg-gray-50/80 sticky top-0 font-black uppercase text-gray-400 text-[8px] tracking-widest">
-                        <tr className="border-b border-gray-100">
-                          <th className="px-3 py-2 border-r border-gray-100 text-left">Transaction #</th>
-                          <th className="px-3 py-2 border-r border-gray-100">Type</th>
-                          <th className="px-3 py-2 border-r border-gray-100 text-left">Fabric</th>
-                          <th className="px-3 py-2 border-r border-gray-100">Qty</th>
-                          <th className="px-3 py-2 border-r border-gray-100">Price</th>
-                          <th className="px-3 py-2 border-r border-gray-100">Amount</th>
-                          <th className="px-3 py-2 text-left">Remarks</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 bg-white">
-                        {sameDayMovements.map((mv: any) => (
-                          <tr key={mv.id} className="hover:bg-gray-50/50 transition-colors font-bold text-gray-600">
-                            <td className="px-3 py-2 border-r border-gray-100 text-left text-gray-900 font-black">
-                              {mv.batchNo === 'BEGINNING' ? 'BEGINNING' : `${mv.batchNo}_${mv.seriesNo}`}
-                            </td>
-                            <td className="px-3 py-2 border-r border-gray-100">
-                              <span className={`inline-flex px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter ${
-                                mv.type === 'WITHDRAWAL' ? 'bg-red-50 text-red-600 border border-red-100' :
-                                mv.type === 'RETURN' ? 'bg-green-50 text-green-600 border border-green-100' :
-                                'bg-blue-50 text-blue-600 border border-blue-100'
-                              }`}>
-                                {mv.type.replace('_', ' ')}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2 border-r border-gray-100 text-left uppercase text-gray-800 leading-tight">
-                              {mv.apparel}
-                              {mv.fabricName !== '—' && mv.fabricName !== mv.apparel && (
-                                <div className="text-[8px] text-gray-400 font-bold mt-0.5">{mv.fabricName}</div>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 border-r border-gray-100 font-black text-gray-900">
-                              {mv.quantity} {mv.unit}
-                            </td>
-                            <td className="px-3 py-2 border-r border-gray-100 text-gray-400">
-                              ₱{mv.price.toLocaleString()}
-                            </td>
-                            <td className="px-3 py-2 border-r border-gray-100 text-gray-900 font-black">
-                              ₱{mv.amount.toLocaleString()}
-                            </td>
-                            <td className="px-3 py-2 text-left text-gray-400 italic font-semibold max-w-[200px] truncate" title={mv.remarks}>
-                              {mv.remarks || '—'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex items-center justify-end p-6 border-t border-gray-100 bg-gray-50/30 gap-3">
-              <button 
-                onClick={() => setSelectedDate(null)}
-                className="px-6 py-2.5 bg-gray-950 hover:bg-gray-850 text-white rounded-2xl text-xs font-bold uppercase tracking-widest active:scale-95 transition-all"
-              >
-                Close Details
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Edit Transaction Modal */}
+      {editTransaction && (
+        <EditTransactionModal
+          row={editTransaction}
+          fabrics={fabrics}
+          onClose={() => setEditTransaction(null)}
+          onSuccess={() => { setEditTransaction(null); if (onRefresh) onRefresh(); }}
+        />
       )}
     </div>
   );
@@ -835,6 +721,224 @@ function FabricList({ data }: { data: any[] }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// 2.5. Edit Transaction Modal (Double-click to correct info in print)
+function EditTransactionModal({ row, fabrics, onClose, onSuccess }: {
+  row: any;
+  fabrics: any[];
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+
+  // Parse encoded remarks into separate fields
+  const remarksString = row.rawRemarks || '';
+  const rsqMatch = remarksString.match(/RSQ:\s*([^|]+)/);
+  const monthMatch = remarksString.match(/Month:\s*([^|]+)/);
+  const apparelMatch = remarksString.match(/Apparel:\s*([^|]+)/);
+  const remarksMatch = remarksString.match(/Remarks:\s*(.*)/);
+
+  const [fabricId, setFabricId] = useState(row.fabric?.id || '');
+  const [type, setType] = useState(row.type === 'BEGINNING' ? 'INITIAL_BALANCE' : row.type);
+  const [quantity, setQuantity] = useState(row.quantity);
+  const [date, setDate] = useState(row.date ? new Date(row.date).toISOString().split('T')[0] : '');
+  const [rsqNo, setRsqNo] = useState(rsqMatch ? rsqMatch[1].trim() : '');
+  const [applicableMonth, setApplicableMonth] = useState(monthMatch ? monthMatch[1].trim() : (row.applicableMonth !== '—' ? row.applicableMonth : ''));
+  const [apparelName, setApparelName] = useState(apparelMatch ? apparelMatch[1].trim() : (row.apparel !== '—' && row.apparel !== row.fabricName ? row.apparel : ''));
+  const [customRemarks, setCustomRemarks] = useState(remarksMatch ? remarksMatch[1].trim() : (row.remarks && row.remarks !== '—' ? row.remarks : ''));
+
+  const selectedFabric = fabrics.find((f: any) => f.id === fabricId);
+
+  const handleSave = async () => {
+    if (!fabricId) return alert('Please select a fabric.');
+    setLoading(true);
+    try {
+      // Re-encode remarks with separate fields
+      const encodedRemarks = `RSQ: ${rsqNo || '—'} | Month: ${applicableMonth || '—'} | Apparel: ${apparelName || '—'} | Remarks: ${customRemarks || ''}`;
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/transactions/${row.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fabricId,
+          type,
+          quantity: parseFloat(quantity) || 0,
+          unit: selectedFabric?.unit || row.unit || 'Roll',
+          remarks: encodedRemarks,
+          date,
+        }),
+      });
+
+      if (res.ok) {
+        onSuccess();
+      } else {
+        const err = await res.json();
+        alert(`Failed to update: ${err.message || 'Unknown error'}`);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Network error while updating transaction.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const monthsList = [
+    'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
+    'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'
+  ];
+  const currentYear = new Date().getFullYear();
+  const monthDropdownOptions = monthsList.map(m => `${m} ${currentYear}`);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-2xl w-full max-w-lg overflow-hidden hover:scale-[1.002] transition-all">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
+          <div>
+            <h3 className="text-base font-black text-gray-900 uppercase tracking-tight">Edit Transaction</h3>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">
+              {row.batchNo === 'BEGINNING' ? 'BEGINNING' : `${row.batchNo}_${row.seriesNo}`}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl text-gray-400 hover:text-gray-900 transition-all active:scale-95">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Modal Content */}
+        <div className="p-6 space-y-5">
+          {/* Fabric */}
+          <div>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Fabric</label>
+            <select
+              value={fabricId}
+              onChange={e => setFabricId(e.target.value)}
+              className="w-full rounded-xl border-gray-200 px-4 py-2.5 text-xs font-bold bg-white focus:ring-primary focus:border-primary shadow-sm"
+            >
+              <option value="">-- Select Fabric --</option>
+              {fabrics.map((f: any) => (
+                <option key={f.id} value={f.id}>{f.name} ({f.type})</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* Movement Type */}
+            <div>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Movement Type</label>
+              <select
+                value={type}
+                onChange={e => setType(e.target.value)}
+                className="w-full rounded-xl border-gray-200 px-4 py-2.5 text-xs font-bold bg-white focus:ring-primary focus:border-primary shadow-sm"
+              >
+                <option value="WITHDRAWAL">WITHDRAWAL</option>
+                <option value="STOCK_IN">STOCK IN</option>
+                <option value="RETURN">RETURN</option>
+                <option value="INITIAL_BALANCE">BEGINNING</option>
+              </select>
+            </div>
+
+            {/* Quantity */}
+            <div>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Quantity ({selectedFabric?.unit || row.unit || 'Roll'})</label>
+              <input
+                type="number"
+                required
+                min="0"
+                step="0.1"
+                value={quantity}
+                onChange={e => setQuantity(parseFloat(e.target.value) || 0)}
+                className="w-full rounded-xl border-gray-200 px-4 py-2.5 text-xs font-bold bg-white focus:ring-primary focus:border-primary shadow-sm"
+              />
+            </div>
+          </div>
+
+          {/* Date */}
+          <div>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Date</label>
+            <input
+              type="date"
+              required
+              value={date}
+              onChange={e => setDate(e.target.value)}
+              className="w-full rounded-xl border-gray-200 px-4 py-2.5 text-xs font-bold bg-white focus:ring-primary focus:border-primary shadow-sm"
+            />
+          </div>
+
+          {/* RSQ # & Applicable Month */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">RSQ #</label>
+              <input
+                type="text"
+                value={rsqNo}
+                onChange={e => setRsqNo(e.target.value)}
+                placeholder="e.g. RSQ-00588"
+                className="w-full rounded-xl border-gray-200 px-4 py-2.5 text-xs font-bold bg-white focus:ring-primary focus:border-primary shadow-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Applicable Month</label>
+              <select
+                value={applicableMonth}
+                onChange={e => setApplicableMonth(e.target.value)}
+                className="w-full rounded-xl border-gray-200 px-4 py-2.5 text-xs font-bold bg-white focus:ring-primary focus:border-primary shadow-sm"
+              >
+                <option value="">-- Month --</option>
+                {monthDropdownOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Apparel Name */}
+          <div>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Apparel Name</label>
+            <input
+              type="text"
+              value={apparelName}
+              onChange={e => setApparelName(e.target.value)}
+              placeholder="e.g. APRON, BULLCAP"
+              className="w-full rounded-xl border-gray-200 px-4 py-2.5 text-xs font-bold bg-white focus:ring-primary focus:border-primary shadow-sm"
+            />
+          </div>
+
+          {/* Custom Remarks */}
+          <div>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Remarks / Notes</label>
+            <textarea
+              value={customRemarks}
+              onChange={e => setCustomRemarks(e.target.value)}
+              rows={2}
+              className="w-full rounded-xl border-gray-200 px-4 py-2.5 text-xs font-bold bg-white focus:ring-primary focus:border-primary shadow-sm resize-none"
+            />
+          </div>
+        </div>
+
+        {/* Modal Footer */}
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 bg-gray-50/30">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-6 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className="px-6 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20 disabled:opacity-50 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2"
+          >
+            {loading ? (
+              <div className="h-3.5 w-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+            ) : null}
+            Save Changes
+          </button>
+        </div>
       </div>
     </div>
   );

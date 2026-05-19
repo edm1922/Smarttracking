@@ -2,13 +2,8 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
 // Helper to normalize tailor nickname
-const getTailorNickname = (tailorName: string) => {
-  if (!tailorName) return 'MAUNLAD';
-  let nickname = tailorName.replace(/tailoring|inc|cooperative|services/gi, '').trim().toUpperCase();
-  if (!nickname || nickname === 'UNASSIGNED' || nickname === 'UNASSIGNED TAILOR') {
-    nickname = 'MAUNLAD';
-  }
-  return nickname;
+const getTailorNickname = (_tailorName: string) => {
+  return 'MAUNLAD';
 };
 
 // Helper to style borders
@@ -32,8 +27,7 @@ export async function exportRSQToExcel(rsq: any) {
   if (!rsq) return;
 
   const workbook = new ExcelJS.Workbook();
-  const tailorName = rsq.tailor?.name || 'TAILOR';
-  const tailorNickname = getTailorNickname(tailorName);
+  const tailorNickname = getTailorNickname(rsq.tailor?.name);
   const formattedDate = rsq.orderDate ? new Date(rsq.orderDate).toLocaleDateString() : new Date().toLocaleDateString();
 
   const rawRemarks = rsq.remarks || '';
@@ -46,7 +40,7 @@ export async function exportRSQToExcel(rsq: any) {
   const copies = [
     { title: `(${tailorNickname} COPY)`, type: 'CUTTING' as const },
     { title: '(TAILORING COPY)', type: 'TAILORING' as const },
-    { title: `${tailorNickname} -> MAIN OFFICE`, type: 'CUTTING' as const },
+    { title: `${tailorNickname} TO MAIN OFFICE`, type: 'CUTTING' as const },
     { title: 'TAILORING -> MAIN OFFICE', type: 'TAILORING' as const }
   ];
 
@@ -86,7 +80,6 @@ export async function exportRSQToExcel(rsq: any) {
   // Stack all 4 copies vertically on a single sheet
   for (let copyIndex = 0; copyIndex < copies.length; copyIndex++) {
     const copy = copies[copyIndex];
-    const isCutting = copy.type === 'CUTTING';
     
     // Each copy block occupies exactly 22 rows
     const startRow = (copyIndex * 22) + 1;
@@ -195,10 +188,10 @@ export async function exportRSQToExcel(rsq: any) {
       cell(String.fromCharCode(65 + cCol), 4).border = allThinBorders;
     }
 
-    // Row 5: Output (Cutting / Tailoring) header
+    // Row 5: Output header
     merge('F', 5, 'G', 5);
     const cellF5 = cell('F', 5);
-    cellF5.value = isCutting ? 'Output (Cutting)' : 'Output (Tailoring)';
+    cellF5.value = 'Output';
     cellF5.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF334155' } };
     cellF5.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } }; // Light Slate
     cellF5.alignment = { horizontal: 'center', vertical: 'middle' };
