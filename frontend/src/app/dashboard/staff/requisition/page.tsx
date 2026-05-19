@@ -9,6 +9,7 @@ import { RSQFormSection } from './components/RSQFormSection';
 import { RSQItemExplorer } from './components/RSQItemExplorer';
 import { RSQCartSection } from './components/RSQCartSection';
 import { RSQSubmitModal } from './components/RSQSubmitModal';
+import { PrintableRequisition } from './components/PrintableRequisition';
 import { Product, Location, Employee, SelectedItem, DraftEntry } from './components/RSQTypes';
 
 export default function StaffRequisitionPage() {
@@ -417,6 +418,12 @@ function RSQContent() {
           setAdditionalPreviews(additionalPreviews.filter((_, i) => i !== idx));
         }}
         isSubmitting={isSubmitting} onSubmit={handleFinalSubmit}
+      />
+
+      <PrintableRequisition 
+        form={form} 
+        employees={employees} 
+        selectedItems={selectedItems} 
       />
 
       <style jsx global>{`
