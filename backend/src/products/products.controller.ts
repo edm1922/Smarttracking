@@ -74,9 +74,9 @@ export class ProductsController {
   manualStockAdjustment(
     @Param('id') productId: string,
     @Body()
-    data: { 
-      locationId: string; 
-      newTotalQuantity: number; 
+    data: {
+      locationId: string;
+      newTotalQuantity: number;
       remarks?: string;
       skipLog?: boolean;
     },
@@ -88,7 +88,7 @@ export class ProductsController {
       req.user.sub,
       data.newTotalQuantity,
       data.remarks,
-      data.skipLog
+      data.skipLog,
     );
   }
 
@@ -115,8 +115,14 @@ export class ProductsController {
     return this.productsService.removeLog(id);
   }
 
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.productsService.findOne(id);
+  }
+
   @Patch(':id')
   update(@Param('id') id: string, @Body() data: any, @Request() req: any) {
+
     return this.productsService.update(id, data, req.user.sub);
   }
 

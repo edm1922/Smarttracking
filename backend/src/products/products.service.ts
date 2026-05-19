@@ -12,7 +12,15 @@ export class ProductsService {
     private logsService: LogsService,
   ) {}
 
-  async findAll(params: { skip?: number; take?: number; search?: string; stockFilter?: string; role?: string } = {}) {
+  async findAll(
+    params: {
+      skip?: number;
+      take?: number;
+      search?: string;
+      stockFilter?: string;
+      role?: string;
+    } = {},
+  ) {
     const { skip = 0, take = 20, search, stockFilter, role } = params;
 
     const where: any = {};
@@ -43,7 +51,7 @@ export class ProductsService {
         select: {
           locationId: true,
           quantity: true,
-          location: { select: { id: true, name: true } }
+          location: { select: { id: true, name: true } },
         },
       },
     };
@@ -75,6 +83,39 @@ export class ProductsService {
     }
   }
 
+  async findOne(id: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        sku: true,
+        name: true,
+        description: true,
+        unit: true,
+        price: true,
+        threshold: true,
+        imageUrl: true,
+        imageUrl2: true,
+        showInInventory: true,
+        createdAt: true,
+        stocks: {
+          select: {
+            locationId: true,
+            quantity: true,
+            location: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+
+    if (!product) {
+      throw new BadRequestException('Product not found');
+    }
+
+    return product;
+  }
+
+
   async create(data: {
     sku: string;
     name: string;
@@ -89,14 +130,20 @@ export class ProductsService {
     const initialStock = data.initialStock ? Number(data.initialStock) : 0;
     const price = data.price ? Number(data.price) : 0;
     const threshold = data.threshold ? Number(data.threshold) : 0;
-    
+
     // Auto-generate SKU if empty or missing
     let finalSku = data.sku;
     if (!finalSku || finalSku.trim() === '') {
       finalSku = `SKU-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     }
 
-    const { initialLocationId, userId, initialStock: _, sku, ...productData } = data;
+    const {
+      initialLocationId,
+      userId,
+      initialStock: _,
+      sku,
+      ...productData
+    } = data;
 
     return this.prisma.$transaction(async (tx) => {
       const product = await tx.product.create({
@@ -135,7 +182,7 @@ export class ProductsService {
           productId: product.id,
           action: 'CREATE_PRODUCT',
           changes: { name: product.name, sku: product.sku },
-        }
+        },
       });
 
       return product;
@@ -153,52 +200,55 @@ export class ProductsService {
     if (quantity <= 0)
       throw new BadRequestException('Quantity must be greater than zero');
 
-    return this.prisma.$transaction(async (tx) => {
-      // 1. Update or Create ProductStock
-      const existingStock = await tx.productStock.findUnique({
-        where: { productId_locationId: { productId, locationId } },
-      });
+    return this.prisma.$transaction(
+      async (tx) => {
+        // 1. Update or Create ProductStock
+        const existingStock = await tx.productStock.findUnique({
+          where: { productId_locationId: { productId, locationId } },
+        });
 
-      if (
-        type === 'OUT' &&
-        (!existingStock || existingStock.quantity < quantity)
-      ) {
-        throw new BadRequestException('Insufficient stock at this location');
-      }
+        if (
+          type === 'OUT' &&
+          (!existingStock || existingStock.quantity < quantity)
+        ) {
+          throw new BadRequestException('Insufficient stock at this location');
+        }
 
-      const newQuantity =
-        type === 'IN'
-          ? (existingStock?.quantity || 0) + quantity
-          : (existingStock?.quantity || 0) - quantity;
+        const newQuantity =
+          type === 'IN'
+            ? (existingStock?.quantity || 0) + quantity
+            : (existingStock?.quantity || 0) - quantity;
 
-      await tx.productStock.upsert({
-        where: { productId_locationId: { productId, locationId } },
-        create: { productId, locationId, quantity: newQuantity },
-        update: { quantity: newQuantity },
-      });
+        await tx.productStock.upsert({
+          where: { productId_locationId: { productId, locationId } },
+          create: { productId, locationId, quantity: newQuantity },
+          update: { quantity: newQuantity },
+        });
 
-      // 2. Create Transaction Log
-      const transaction = await tx.productTransaction.create({
-        data: {
-          productId,
-          locationId,
+        // 2. Create Transaction Log
+        const transaction = await tx.productTransaction.create({
+          data: {
+            productId,
+            locationId,
+            userId,
+            type,
+            quantity,
+            remarks,
+          },
+          include: { product: true, location: true },
+        });
+
+        await this.logsService.create({
           userId,
-          type,
-          quantity,
-          remarks,
-        },
-        include: { product: true, location: true },
-      });
+          productId,
+          action: `STOCK_${type}`,
+          changes: { quantity, remarks, location: transaction.location.name },
+        });
 
-      await this.logsService.create({
-        userId,
-        productId,
-        action: `STOCK_${type}`,
-        changes: { quantity, remarks, location: transaction.location.name },
-      });
-
-      return transaction;
-    }, { maxWait: 5000, timeout: 20000 });
+        return transaction;
+      },
+      { maxWait: 5000, timeout: 20000 },
+    );
   }
 
   async bulkRelease(data: {
@@ -209,66 +259,71 @@ export class ProductsService {
     userId: string;
     items: { productId: string; quantity: number }[];
   }) {
-    return this.prisma.$transaction(async (tx) => {
-      const results = [];
-      for (const item of data.items) {
-        // 1. Check stock
-        const existingStock = await tx.productStock.findUnique({
-          where: {
-            productId_locationId: {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const results = [];
+        for (const item of data.items) {
+          // 1. Check stock
+          const existingStock = await tx.productStock.findUnique({
+            where: {
+              productId_locationId: {
+                productId: item.productId,
+                locationId: data.sourceLocationId,
+              },
+            },
+          });
+
+          if (!existingStock || existingStock.quantity < item.quantity) {
+            throw new BadRequestException(
+              `Insufficient stock for item ${item.productId}`,
+            );
+          }
+
+          // 2. Update stock
+          const newQuantity = existingStock.quantity - item.quantity;
+          await tx.productStock.update({
+            where: {
+              productId_locationId: {
+                productId: item.productId,
+                locationId: data.sourceLocationId,
+              },
+            },
+            data: { quantity: newQuantity },
+          });
+
+          // 3. Log transaction
+          const log = await tx.productTransaction.create({
+            data: {
               productId: item.productId,
               locationId: data.sourceLocationId,
+              userId: data.userId,
+              type: 'OUT',
+              quantity: item.quantity,
+              remarks: `Bulk Release: ${data.remarks} | To: ${data.whereTo} | Req by: ${data.requestedBy}`,
             },
-          },
-        });
-
-        if (!existingStock || existingStock.quantity < item.quantity) {
-          throw new BadRequestException(
-            `Insufficient stock for item ${item.productId}`,
-          );
+          });
+          results.push(log);
         }
 
-        // 2. Update stock
-        const newQuantity = existingStock.quantity - item.quantity;
-        await tx.productStock.update({
-          where: {
-            productId_locationId: {
-              productId: item.productId,
-              locationId: data.sourceLocationId,
-            },
-          },
-          data: { quantity: newQuantity },
-        });
-
-        // 3. Log transaction
-        const log = await tx.productTransaction.create({
-          data: {
-            productId: item.productId,
-            locationId: data.sourceLocationId,
-            userId: data.userId,
-            type: 'OUT',
-            quantity: item.quantity,
-            remarks: `Bulk Release: ${data.remarks} | To: ${data.whereTo} | Req by: ${data.requestedBy}`,
+        await this.logsService.create({
+          userId: data.userId,
+          action: 'BULK_RELEASE',
+          changes: {
+            itemCount: data.items.length,
+            whereTo: data.whereTo,
+            requestedBy: data.requestedBy,
           },
         });
-        results.push(log);
-      }
 
-      await this.logsService.create({
-        userId: data.userId,
-        action: 'BULK_RELEASE',
-        changes: { 
-          itemCount: data.items.length, 
-          whereTo: data.whereTo,
-          requestedBy: data.requestedBy 
-        },
-      });
-
-      return results;
-    }, { maxWait: 5000, timeout: 30000 });
+        return results;
+      },
+      { maxWait: 5000, timeout: 30000 },
+    );
   }
 
-  async findAllTransactions(params: { skip?: number; take?: number; search?: string } = {}) {
+  async findAllTransactions(
+    params: { skip?: number; take?: number; search?: string } = {},
+  ) {
     const { skip = 0, take = 20, search } = params;
     const where: any = {};
 
@@ -308,7 +363,9 @@ export class ProductsService {
 
     const duration = Date.now() - start;
     if (duration > 300) {
-      console.warn(`[ProductsService] Slow findAllTransactions query: ${duration}ms`);
+      console.warn(
+        `[ProductsService] Slow findAllTransactions query: ${duration}ms`,
+      );
     }
 
     return { data, total };
@@ -387,30 +444,96 @@ export class ProductsService {
   }
 
   async update(id: string, data: any, userId?: string) {
-    // Ensure numbers are parsed correctly if they exist in update
-    if (data.price !== undefined) data.price = Number(data.price);
-    if (data.threshold !== undefined) data.threshold = Number(data.threshold);
+    // 1. Filter out only valid updatable fields of Product
+    const {
+      sku,
+      name,
+      description,
+      price,
+      threshold,
+      unit,
+      imageUrl,
+      imageUrl2,
+      showInInventory,
+      totalStock,
+    } = data;
 
-    const product = await this.prisma.product.update({
-      where: { id },
-      data,
-    });
-
-    if (userId) {
-      await this.logsService.create({
-        userId,
-        productId: id,
-        action: 'UPDATE_PRODUCT',
-        changes: data,
-      });
+    const updateData: any = {};
+    if (sku !== undefined) updateData.sku = sku;
+    if (name !== undefined) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (price !== undefined) updateData.price = Number(price);
+    if (threshold !== undefined) updateData.threshold = Number(threshold);
+    if (unit !== undefined) updateData.unit = unit;
+    if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
+    if (imageUrl2 !== undefined) updateData.imageUrl2 = imageUrl2;
+    if (showInInventory !== undefined) {
+      updateData.showInInventory = typeof showInInventory === 'boolean'
+        ? showInInventory
+        : showInInventory === 'true';
     }
 
-    return product;
+    // 2. Perform database updates in a transaction
+    return this.prisma.$transaction(async (tx) => {
+      const product = await tx.product.update({
+        where: { id },
+        data: updateData,
+      });
+
+      // 3. Handle administrative stock bypass if totalStock is specified
+      if (totalStock !== undefined) {
+        const currentStocks = await tx.productStock.findMany({
+          where: { productId: id },
+        });
+
+        const currentTotal = currentStocks.reduce((acc, s) => acc + s.quantity, 0);
+        const diff = Number(totalStock) - currentTotal;
+
+        if (diff !== 0) {
+          if (currentStocks.length > 0) {
+            // Apply correction to the primary (first) stock record
+            const primaryStock = currentStocks[0];
+            const newQty = primaryStock.quantity + diff;
+            await tx.productStock.update({
+              where: { id: primaryStock.id },
+              data: { quantity: newQty >= 0 ? newQty : 0 },
+            });
+          } else {
+            // No stock record exists yet, associate with the first location in database
+            const firstLocation = await tx.location.findFirst();
+            if (firstLocation) {
+              await tx.productStock.create({
+                data: {
+                  productId: id,
+                  locationId: firstLocation.id,
+                  quantity: Number(totalStock) >= 0 ? Number(totalStock) : 0,
+                },
+              });
+            }
+          }
+        }
+
+        // Add totalStock changes metadata to changes log
+        updateData.totalStock = Number(totalStock);
+      }
+
+      if (userId) {
+        await this.logsService.create({
+          userId,
+          productId: id,
+          action: 'UPDATE_PRODUCT',
+          changes: updateData,
+        });
+      }
+
+      return product;
+    });
   }
+
 
   async remove(id: string, userId?: string) {
     const product = await this.prisma.product.findUnique({ where: { id } });
-    
+
     const result = await this.prisma.product.delete({
       where: { id },
     });
