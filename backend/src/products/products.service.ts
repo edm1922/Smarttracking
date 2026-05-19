@@ -352,7 +352,7 @@ export class ProductsService {
           createdAt: true,
           productId: true,
           locationId: true,
-          product: { select: { id: true, name: true, sku: true } },
+          product: { select: { id: true, name: true, sku: true, unit: true, description: true } },
           location: { select: { id: true, name: true } },
           user: { select: { id: true, username: true } },
         },

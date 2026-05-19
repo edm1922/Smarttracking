@@ -90,7 +90,7 @@ export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
       
       <div className="p-8 space-y-10">
         {/* Context Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="space-y-3">
             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Source Location</label>
             <div className="relative group">
@@ -127,6 +127,20 @@ export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
                 <option value="MORNING" />
                 <option value="NIGHT" />
               </datalist>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Supervisor Name</label>
+            <div className="relative group">
+              <User className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
+              <input 
+                type="text"
+                placeholder="ENTER SUPERVISOR..."
+                value={form.supervisorName || ''} 
+                onChange={e => setForm({...form, supervisorName: e.target.value.toUpperCase()})}
+                className="w-full bg-gray-50/50 border border-gray-200 rounded-2xl pl-12 pr-6 py-3.5 text-xs font-semibold text-gray-900 outline-none hover:border-gray-300 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all uppercase placeholder:text-gray-400"
+              />
             </div>
           </div>
         </div>

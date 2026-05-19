@@ -90,26 +90,24 @@ export const PrintableTransmittal: React.FC<PrintableTransmittalProps> = ({
                 <>
                   <td className="py-2 px-3 text-[10px] font-bold border-r border-gray-900 text-center">{idx + 1}</td>
                   <td className="py-2 px-3 text-[10px] font-black border-r border-gray-900 uppercase">{item.requestedBy || '-'}</td>
-                  <td className="py-2 px-3 text-[10px] font-bold border-r border-gray-900 uppercase">{item.name}</td>
+                  <td className="py-2 px-3 text-[10px] font-bold border-r border-gray-900 uppercase">
+                    {item.name}
+                    {item.description ? ` (${item.description})` : ''}
+                  </td>
                   <td className="py-2 px-3 text-[10px] font-bold border-r border-gray-900">{item.dateRequested || '-'}</td>
-                  <td className="py-2 px-3 text-[10px] font-black text-center">{item.quantity} {item.unit || 'PCS'}</td>
+                  <td className="py-2 px-3 text-[10px] font-black text-center">{item.quantity} {(item.unit || 'PCS').toUpperCase()}</td>
                 </>
               ) : (
                 <>
                   <td className="py-2 px-3 text-[10px] font-bold border-r border-gray-900 text-center">{idx + 1}</td>
-                  <td className="py-2 px-3 text-[10px] font-bold border-r border-gray-900 uppercase">{item.name}</td>
-                  <td className="py-2 px-3 text-[10px] font-black border-r border-gray-900 text-center">{item.quantity} {item.unit || 'PCS'}</td>
+                  <td className="py-2 px-3 text-[10px] font-bold border-r border-gray-900 uppercase">
+                    {item.name}
+                    {item.description ? ` (${item.description})` : ''}
+                  </td>
+                  <td className="py-2 px-3 text-[10px] font-black border-r border-gray-900 text-center">{item.quantity} {(item.unit || 'PCS').toUpperCase()}</td>
                   <td className="py-2 px-3 text-[10px] font-mono">{item.sku || '-'}</td>
                 </>
               )}
-            </tr>
-          ))}
-          {/* Fill remaining space to keep layout consistent if few items */}
-          {Array.from({ length: Math.max(0, 10 - selectedItems.length) }).map((_, i) => (
-            <tr key={`empty-${i}`} className="border-b border-gray-900 h-8">
-              {Array.from({ length: transmittalType === 'EMPLOYEE' ? 5 : 4 }).map((_, j) => (
-                <td key={`empty-cell-${j}`} className={`py-2 px-3 border-r border-gray-900 last:border-r-0`}></td>
-              ))}
             </tr>
           ))}
         </tbody>

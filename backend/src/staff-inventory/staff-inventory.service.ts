@@ -174,9 +174,24 @@ export class StaffInventoryService {
   }
 
   async findMyReleases(userId: string) {
-    return this.prisma.staffRelease.findMany({
+    const releases = await this.prisma.staffRelease.findMany({
       where: { staffId: userId },
       orderBy: { date: 'desc' },
+    });
+
+    const inventories = await this.prisma.staffInventory.findMany({
+      where: { userId }
+    });
+
+    return releases.map(rel => {
+      const inv = inventories.find(i => 
+        i.productName === rel.productName && 
+        i.specs === rel.specs
+      );
+      return {
+        ...rel,
+        unit: inv?.unit || 'pcs'
+      };
     });
   }
 
@@ -259,9 +274,23 @@ export class StaffInventoryService {
   }
 
   async findAllReleases() {
-    return this.prisma.staffRelease.findMany({
+    const releases = await this.prisma.staffRelease.findMany({
       include: { User: true },
       orderBy: { date: 'desc' },
+    });
+
+    const inventories = await this.prisma.staffInventory.findMany();
+
+    return releases.map(rel => {
+      const inv = inventories.find(i => 
+        i.userId === rel.staffId && 
+        i.productName === rel.productName && 
+        i.specs === rel.specs
+      );
+      return {
+        ...rel,
+        unit: inv?.unit || 'pcs'
+      };
     });
   }
 

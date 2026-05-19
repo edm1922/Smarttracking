@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { RSQSlipPrint } from './components/RSQSlipPrint';
 import { TransactionSlipPrint } from './components/TransactionSlipPrint';
+import { exportRSQToExcel, exportTransactionToExcel } from './utils/excelExport';
 
 // Parse Remarks formatted: "RSQ: RSQ-00588 | Month: MAY 2026 | Remarks: Custom text"
 const parseRemarks = (remarksString: string) => {
@@ -193,26 +194,28 @@ export default function RSQPage() {
     }
   };
 
-  const handlePrintRSQ = (rsqNo: string) => {
+  const handlePrintRSQ = async (rsqNo: string) => {
     // Find the matching Tailoring Request in active state
     const matchedReq = requests.find(r => r.rsqNo === rsqNo);
     if (matchedReq) {
-      setPrintRsq(matchedReq);
-      setTimeout(() => {
-        window.print();
-        setPrintRsq(null);
-      }, 500);
+      try {
+        await exportRSQToExcel(matchedReq);
+      } catch (error) {
+        console.error('Error exporting RSQ to Excel:', error);
+        alert('Failed to export RSQ to Excel.');
+      }
     } else {
       alert(`Could not find a tailoring request record for ${rsqNo} to print.`);
     }
   };
 
-  const handlePrintTrn = (trn: any) => {
-    setPrintTrn(trn);
-    setTimeout(() => {
-      window.print();
-      setPrintTrn(null);
-    }, 500);
+  const handlePrintTrn = async (trn: any) => {
+    try {
+      await exportTransactionToExcel(trn);
+    } catch (error) {
+      console.error('Error exporting Transaction to Excel:', error);
+      alert('Failed to export Transaction to Excel.');
+    }
   };
 
   const tabs = [

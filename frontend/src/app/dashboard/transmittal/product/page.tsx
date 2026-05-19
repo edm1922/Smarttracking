@@ -244,14 +244,21 @@ export default function ProductTransmittalPage() {
     const itemId = rel.id;
     if (selectedItems.some(i => i.logIds.includes(itemId))) return;
 
+    // Resolve the real unit from the products list or fallback to rel.unit / 'PCS'
+    const foundProduct = products.find(p => 
+      p.sku?.toLowerCase() === rel.itemSlug?.toLowerCase() ||
+      p.name?.toLowerCase() === rel.productName?.toLowerCase()
+    );
+    const resolvedUnit = rel.unit || foundProduct?.unit || 'PCS';
+
     setSelectedItems([...selectedItems, {
       id: Math.random().toString(36).substr(2, 9),
       productId: rel.itemSlug || rel.productName,
       logIds: [itemId],
       name: rel.productName,
       sku: rel.itemSlug || 'N/A',
-      description: rel.description,
-      unit: 'PCS',
+      description: rel.specs || rel.description || foundProduct?.description,
+      unit: resolvedUnit,
       quantity: rel.qty,
       requestedBy: rel.employeeName,
       dateRequested: new Date(rel.date).toLocaleDateString()
