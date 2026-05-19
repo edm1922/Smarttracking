@@ -351,74 +351,76 @@ function RSQContent() {
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-12 animate-in fade-in duration-700 pb-20">
-      <RSQHeader onClear={clearForm} onPrintBlank={() => window.print()} />
+      <div className="no-print">
+        <RSQHeader onClear={clearForm} onPrintBlank={() => window.print()} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-7 space-y-10">
-          <RSQFormSection 
-            form={form} setForm={setForm} locations={locations}
-            employees={employees} existingEmployees={existingEmployees}
-            employeeInput={employeeInput} setEmployeeInput={setEmployeeInput}
-            positionInput={positionInput} setPositionInput={setPositionInput}
-            departmentInput={departmentInput} setDepartmentInput={setDepartmentInput}
-            showEmployeeDropdown={showEmployeeDropdown} setShowEmployeeDropdown={setShowEmployeeDropdown}
-            highlightedIndex={highlightedIndex} setHighlightedIndex={setHighlightedIndex}
-            activeEmployeeNames={activeEmployeeNames} toggleEmployeeSelection={toggleEmployeeSelection}
-            addEmployee={addEmployee} selectExistingEmployee={selectExistingEmployee}
-            removeEmployee={removeEmployee} handleEditEmployee={handleEditEmployee}
-            draftEntry={draftEntry} setDraftEntry={setDraftEntry}
-            quickItemInput={quickItemInput} setQuickItemInput={setQuickItemInput}
-            showItemDropdown={showItemDropdown} setShowItemDropdown={setShowItemDropdown}
-            filteredQuickProducts={quickDisplayProducts.slice(0, 5)}
-            addProductToDraft={addProductToDraft} updateDraftItemQuantity={updateDraftItemQuantity}
-            removeProductFromDraft={removeProductFromDraft} confirmDraftEntry={confirmDraftEntry}
-          />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-7 space-y-10">
+            <RSQFormSection 
+              form={form} setForm={setForm} locations={locations}
+              employees={employees} existingEmployees={existingEmployees}
+              employeeInput={employeeInput} setEmployeeInput={setEmployeeInput}
+              positionInput={positionInput} setPositionInput={setPositionInput}
+              departmentInput={departmentInput} setDepartmentInput={setDepartmentInput}
+              showEmployeeDropdown={showEmployeeDropdown} setShowEmployeeDropdown={setShowEmployeeDropdown}
+              highlightedIndex={highlightedIndex} setHighlightedIndex={setHighlightedIndex}
+              activeEmployeeNames={activeEmployeeNames} toggleEmployeeSelection={toggleEmployeeSelection}
+              addEmployee={addEmployee} selectExistingEmployee={selectExistingEmployee}
+              removeEmployee={removeEmployee} handleEditEmployee={handleEditEmployee}
+              draftEntry={draftEntry} setDraftEntry={setDraftEntry}
+              quickItemInput={quickItemInput} setQuickItemInput={setQuickItemInput}
+              showItemDropdown={showItemDropdown} setShowItemDropdown={setShowItemDropdown}
+              filteredQuickProducts={quickDisplayProducts.slice(0, 5)}
+              addProductToDraft={addProductToDraft} updateDraftItemQuantity={updateDraftItemQuantity}
+              removeProductFromDraft={removeProductFromDraft} confirmDraftEntry={confirmDraftEntry}
+            />
 
-          <RSQCartSection 
-            selectedItems={selectedItems} employees={employees}
-            updateCartItemQuantity={updateCartItemQuantity} removeCartItem={removeCartItem}
-            handleOpenSubmitModal={() => {
-              if (employees.length === 0) return toast.warning('Add employees first');
-              if (selectedItems.length === 0) return toast.warning('Select materials first');
-              if (!form.supervisorName.trim()) return toast.warning('Supervisor required');
-              setShowSubmitModal(true);
-            }}
-            isSubmitting={isSubmitting}
-          />
+            <RSQCartSection 
+              selectedItems={selectedItems} employees={employees}
+              updateCartItemQuantity={updateCartItemQuantity} removeCartItem={removeCartItem}
+              handleOpenSubmitModal={() => {
+                if (employees.length === 0) return toast.warning('Add employees first');
+                if (selectedItems.length === 0) return toast.warning('Select materials first');
+                if (!form.supervisorName.trim()) return toast.warning('Supervisor required');
+                setShowSubmitModal(true);
+              }}
+              isSubmitting={isSubmitting}
+            />
+          </div>
+
+          <div className="lg:col-span-5">
+            <RSQItemExplorer 
+              productSearch={productSearch} setProductSearch={setProductSearch}
+              displayProducts={displayProducts} addItemToCart={addItemToCart}
+              setViewItem={setViewItem}
+            />
+          </div>
         </div>
 
-        <div className="lg:col-span-5">
-          <RSQItemExplorer 
-            productSearch={productSearch} setProductSearch={setProductSearch}
-            displayProducts={displayProducts} addItemToCart={addItemToCart}
-            setViewItem={setViewItem}
-          />
-        </div>
+        <RSQSubmitModal 
+          isOpen={showSubmitModal} onClose={() => setShowSubmitModal(false)}
+          form={form} setForm={setForm}
+          attachmentFile={attachmentFile} attachmentPreview={attachmentPreview}
+          handleFileChange={e => {
+            if (e.target.files?.[0]) {
+              setAttachmentFile(e.target.files[0]);
+              setAttachmentPreview(URL.createObjectURL(e.target.files[0]));
+            }
+          }}
+          additionalFiles={additionalFiles} additionalPreviews={additionalPreviews}
+          handleAdditionalFileChange={e => {
+            if (e.target.files?.[0] && additionalFiles.length < 2) {
+              setAdditionalFiles([...additionalFiles, e.target.files[0]]);
+              setAdditionalPreviews([...additionalPreviews, URL.createObjectURL(e.target.files[0])]);
+            }
+          }}
+          removeAdditionalFile={idx => {
+            setAdditionalFiles(additionalFiles.filter((_, i) => i !== idx));
+            setAdditionalPreviews(additionalPreviews.filter((_, i) => i !== idx));
+          }}
+          isSubmitting={isSubmitting} onSubmit={handleFinalSubmit}
+        />
       </div>
-
-      <RSQSubmitModal 
-        isOpen={showSubmitModal} onClose={() => setShowSubmitModal(false)}
-        form={form} setForm={setForm}
-        attachmentFile={attachmentFile} attachmentPreview={attachmentPreview}
-        handleFileChange={e => {
-          if (e.target.files?.[0]) {
-            setAttachmentFile(e.target.files[0]);
-            setAttachmentPreview(URL.createObjectURL(e.target.files[0]));
-          }
-        }}
-        additionalFiles={additionalFiles} additionalPreviews={additionalPreviews}
-        handleAdditionalFileChange={e => {
-          if (e.target.files?.[0] && additionalFiles.length < 2) {
-            setAdditionalFiles([...additionalFiles, e.target.files[0]]);
-            setAdditionalPreviews([...additionalPreviews, URL.createObjectURL(e.target.files[0])]);
-          }
-        }}
-        removeAdditionalFile={idx => {
-          setAdditionalFiles(additionalFiles.filter((_, i) => i !== idx));
-          setAdditionalPreviews(additionalPreviews.filter((_, i) => i !== idx));
-        }}
-        isSubmitting={isSubmitting} onSubmit={handleFinalSubmit}
-      />
 
       <PrintableRequisition 
         form={form} 

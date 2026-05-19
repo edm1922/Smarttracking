@@ -33,7 +33,7 @@ export const PrintableRequisition: React.FC<PrintableRequisitionProps> = ({
   });
 
   return (
-    <div className="hidden print:block bg-white p-12 text-gray-900 min-h-screen">
+    <div className="hidden print-only bg-white p-12 text-gray-900 min-h-screen">
       {/* Header */}
       <div className="flex justify-between items-start border-b-2 border-gray-900 pb-6 mb-8">
         <div>
