@@ -394,14 +394,39 @@ export class InternalRequestsService {
     return results;
   }
 
+  async getMostRequested(limit = 30) {
+    const result = await this.prisma.internalRequest.groupBy({
+      by: ['productId'],
+      _count: { productId: true },
+      orderBy: { _count: { productId: 'desc' } },
+      take: limit,
+    });
+
+    const productIds = result.map(r => r.productId);
+    const products = productIds.length > 0
+      ? await this.prisma.product.findMany({
+          where: { id: { in: productIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+
+    const productMap = new Map(products.map(p => [p.id, p.name]));
+
+    return result.map(r => ({
+      productId: r.productId,
+      productName: productMap.get(r.productId) || null,
+      requestCount: r._count.productId,
+    }));
+  }
+
   async getUniqueEmployees() {
     try {
       const allRequests = await this.prisma.internalRequest.findMany({
-        select: { employeeName: true, employeeRole: true },
-        orderBy: { employeeName: 'asc' },
+        select: { employeeName: true, employeeRole: true, departmentArea: true },
+        orderBy: { createdAt: 'desc' },
       });
       
-      // Manual distinct in memory
+      // Manual distinct in memory — keeps most recent record per employee
       const seen = new Set();
       const uniqueEmployees = allRequests.filter(e => {
         if (seen.has(e.employeeName)) return false;
@@ -409,7 +434,11 @@ export class InternalRequestsService {
         return true;
       });
       
-      return uniqueEmployees.map(e => ({ name: e.employeeName, position: e.employeeRole }));
+      return uniqueEmployees.map(e => ({
+        name: e.employeeName,
+        position: e.employeeRole,
+        department: e.departmentArea || '',
+      }));
     } catch (error) {
       console.error('[InternalRequestsService] getUniqueEmployees error:', error);
       throw error;

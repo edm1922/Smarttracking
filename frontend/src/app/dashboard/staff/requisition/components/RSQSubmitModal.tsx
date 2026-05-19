@@ -1,11 +1,13 @@
 import React from 'react';
-import { X, CheckCircle, ImageIcon, Trash2, Send, AlertTriangle, Plus, Printer } from 'lucide-react';
+import { X, CheckCircle, ImageIcon, Trash2, Send, AlertTriangle, Plus, Printer, User, MapPin, ShoppingBag } from 'lucide-react';
+import { SelectedItem, Employee } from './RSQTypes';
 
 interface RSQSubmitModalProps {
   isOpen: boolean;
   onClose: () => void;
   form: any;
-  setForm: (form: any) => void;
+  employees: Employee[];
+  selectedItems: SelectedItem[];
   attachmentFile: File | null;
   attachmentPreview: string | null;
   handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -21,7 +23,8 @@ export const RSQSubmitModal: React.FC<RSQSubmitModalProps> = ({
   isOpen,
   onClose,
   form,
-  setForm,
+  employees,
+  selectedItems,
   attachmentFile,
   attachmentPreview,
   handleFileChange,
@@ -33,6 +36,10 @@ export const RSQSubmitModal: React.FC<RSQSubmitModalProps> = ({
   onSubmit,
 }) => {
   if (!isOpen) return null;
+
+  const totalItems = selectedItems.reduce((sum, item) => {
+    return sum + Object.values(item.quantities || {}).reduce((a, b) => a + b, 0);
+  }, 0);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-gray-900/40 backdrop-blur-md animate-in fade-in duration-300">
@@ -55,49 +62,90 @@ export const RSQSubmitModal: React.FC<RSQSubmitModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-10 space-y-10 max-h-[80vh] overflow-y-auto custom-scrollbar">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-4">
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Direct Supervisor</label>
-              <input
-                type="text"
-                placeholder="SUPERVISOR NAME..."
-                value={form.supervisorName}
-                onChange={e => setForm({ ...form, supervisorName: e.target.value.toUpperCase() })}
-                className="w-full bg-gray-50/50 border border-gray-200 rounded-2xl px-5 py-3.5 text-sm font-semibold text-gray-900 outline-none hover:border-gray-300 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all placeholder:text-gray-400"
-              />
+          {/* Context Preview */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider ml-1 flex items-center gap-2">
+                <User className="h-3 w-3" /> Direct Supervisor
+              </label>
+              <p className="text-sm font-extrabold text-gray-900 uppercase ml-1">{form.supervisorName || '—'}</p>
             </div>
-            <div className="space-y-4">
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Dept / Area</label>
-              <input
-                type="text"
-                placeholder="REQUISITION AREA..."
-                list="dept-options"
-                value={form.departmentArea}
-                onChange={e => setForm({ ...form, departmentArea: e.target.value.toUpperCase() })}
-                className="w-full bg-gray-50/50 border border-gray-200 rounded-2xl px-5 py-3.5 text-sm font-semibold text-gray-900 outline-none hover:border-gray-300 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all placeholder:text-gray-400 uppercase"
-              />
-              <datalist id="dept-options">
-                <option value="MAIN OFFICE" />
-                <option value="LOGISTICS" />
-                <option value="OPERATIONS" />
-                <option value="HR" />
-                <option value="IT" />
-              </datalist>
+            <div className="space-y-2">
+              <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider ml-1 flex items-center gap-2">
+                <MapPin className="h-3 w-3" /> Dept / Area
+              </label>
+              <p className="text-sm font-extrabold text-gray-900 uppercase ml-1">{form.departmentArea || '—'}</p>
             </div>
           </div>
 
-          {/* Print options */}
-          <div className="bg-blue-50/50 border border-blue-100 rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 no-print">
+          {/* Requisition Summary Preview */}
+          <div className="bg-gray-50/80 border border-gray-100 rounded-3xl p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 bg-primary/10 rounded-xl flex items-center justify-center">
+                <ShoppingBag className="h-4 w-4 text-primary" />
+              </div>
+              <h4 className="text-[10px] font-black text-gray-900 uppercase tracking-wider">Requisition Summary</h4>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white rounded-2xl p-4 border border-gray-100 text-center">
+                <p className="text-2xl font-black text-gray-900">{employees.length}</p>
+                <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mt-1">Employees</p>
+              </div>
+              <div className="bg-white rounded-2xl p-4 border border-gray-100 text-center">
+                <p className="text-2xl font-black text-gray-900">{selectedItems.length}</p>
+                <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mt-1">Products</p>
+              </div>
+              <div className="bg-white rounded-2xl p-4 border border-gray-100 text-center">
+                <p className="text-2xl font-black text-gray-900">{totalItems}</p>
+                <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mt-1">Total Qty</p>
+              </div>
+              <div className="bg-white rounded-2xl p-4 border border-gray-100 text-center">
+                <p className="text-2xl font-black text-gray-900">{form.shift || '—'}</p>
+                <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mt-1">Shift</p>
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50 max-h-36 overflow-y-auto custom-scrollbar">
+              {employees.map(emp => {
+                const empItems = selectedItems.filter(item => (item.quantities[emp.name] || 0) > 0);
+                if (empItems.length === 0) return null;
+                return (
+                  <div key={emp.name} className="px-5 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-7 w-7 bg-primary/5 rounded-lg flex items-center justify-center shrink-0">
+                        <User className="h-3.5 w-3.5 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold text-gray-900 uppercase truncate">{emp.name}</p>
+                        <p className="text-[8px] font-bold text-gray-400 uppercase truncate">{emp.position}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-[9px] font-bold text-gray-500">{empItems.length} items</span>
+                      <span className="text-[10px] font-black text-primary">{empItems.reduce((s, i) => s + (i.quantities[emp.name] || 0), 0)} pcs</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Print CTA */}
+          <div className="bg-gradient-to-r from-primary/5 to-blue-500/5 border-2 border-primary/20 rounded-3xl p-8 text-center no-print space-y-4">
+            <div className="h-14 w-14 bg-primary text-white rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-primary/20">
+              <Printer className="h-7 w-7" />
+            </div>
             <div>
-              <p className="text-xs font-bold text-gray-900 uppercase tracking-wide">Need Signatures First?</p>
-              <p className="text-[10px] text-gray-500 font-medium uppercase mt-0.5">Generate the populated slip to print and sign physically</p>
+              <p className="text-sm font-black text-gray-900 uppercase tracking-wide">Print &amp; Sign</p>
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mt-1 max-w-md mx-auto">
+                Print the populated requisition slip, have your supervisor sign it, then upload the signed copy below
+              </p>
             </div>
             <button
               type="button"
               onClick={() => window.print()}
-              className="px-6 py-3 bg-gradient-to-r from-primary to-blue-500 text-white rounded-2xl text-[10px] font-extrabold uppercase tracking-widest shadow-md shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all flex items-center gap-2 hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-px active:scale-100"
+              className="inline-flex items-center gap-3 px-10 py-4 bg-gradient-to-r from-gray-900 to-black text-white rounded-2xl text-[11px] font-extrabold uppercase tracking-widest shadow-xl shadow-gray-900/30 transition-all duration-300 ease-out hover:shadow-2xl hover:shadow-gray-900/40 hover:-translate-y-1 hover:scale-[1.02] active:translate-y-px active:scale-100 focus:outline-none focus:ring-4 focus:ring-gray-900/30 animate-pulse"
             >
-              <Printer className="h-4 w-4" /> Print Requisition
+              <Printer className="h-5 w-5" /> Print Requisition
             </button>
           </div>
 

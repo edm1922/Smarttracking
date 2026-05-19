@@ -12,7 +12,7 @@ const routeMap: Record<string, string> = {
   'locations': 'Warehouses',
   'custom-fields': 'Fields',
   'batches': 'Batch Management',
-  'rsq': 'Fabric & Tailoring',
+  'rsq': 'Fabric & RSQ',
   'staff': 'Staff Portal',
   'requisition': 'Requisition',
   'unit-requisition': 'Unit QR',

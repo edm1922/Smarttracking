@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Filter, Download, Trash2, Package, Tag, Database, History, Info, ChevronRight, Eye, ImageIcon, X, CheckCircle, Clock, AlertTriangle, User } from 'lucide-react';
+import { Search, Plus, Filter, Download, Trash2, Package, Tag, Database, History, Info, ChevronRight, Eye, ImageIcon, X, CheckCircle, Clock, AlertTriangle, User, Bell } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import { ProductHeader } from './components/ProductHeader';
@@ -348,6 +348,31 @@ export default function ProductsPage() {
   const [editingLog, setEditingLog] = useState<any>(null);
   const [isEditLogModalOpen, setIsEditLogModalOpen] = useState(false);
   const [isDeletingLog, setIsDeletingLog] = useState(false);
+  const [notifyDuration, setNotifyDuration] = useState(24);
+  const [isNotifying, setIsNotifying] = useState(false);
+
+  const handleNotifyStaff = async () => {
+    if (!editingLog) return;
+    setIsNotifying(true);
+    try {
+      const typeLabel = editingLog.type === 'IN' ? 'Stock In' : 'Stock Out';
+      await api.post('/stock-notifications', {
+        productTransactionId: editingLog.id,
+        productId: editingLog.productId || editingLog.product?.id,
+        productName: editingLog.product?.name || editingLog.productName || 'Unknown Item',
+        type: editingLog.type === 'IN' ? 'STOCK_IN' : 'STOCK_OUT',
+        quantity: editingLog.quantity,
+        message: `${typeLabel}: ${editingLog.quantity} ${editingLog.product?.unit || 'pcs'} of ${editingLog.product?.name || 'Unknown'}`,
+        durationHours: notifyDuration,
+      });
+      toast.success('Staff notified successfully');
+      setIsEditLogModalOpen(false);
+    } catch {
+      toast.error('Failed to send notification');
+    } finally {
+      setIsNotifying(false);
+    }
+  };
 
   const handleLogDoubleClick = (log: any) => {
     setEditingLog({
@@ -578,7 +603,37 @@ export default function ProductsPage() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-3">
+            <div className="space-y-4">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-5 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 bg-blue-100 rounded-xl flex items-center justify-center">
+                    <Bell className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <h4 className="text-[10px] font-black text-gray-800 uppercase tracking-wider">Notify Staff</h4>
+                </div>
+                <div className="flex items-center gap-3">
+                  <select
+                    value={notifyDuration}
+                    onChange={e => setNotifyDuration(parseInt(e.target.value))}
+                    className="flex-1 px-4 py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100 transition-all cursor-pointer"
+                  >
+                    <option value={24}>24 Hours</option>
+                    <option value={48}>48 Hours</option>
+                    <option value={72}>72 Hours</option>
+                    <option value={168}>1 Week</option>
+                    <option value={336}>2 Weeks</option>
+                  </select>
+                  <button
+                    onClick={handleNotifyStaff}
+                    disabled={isNotifying}
+                    className="px-5 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl text-[10px] font-extrabold uppercase tracking-widest shadow-lg shadow-blue-600/20 hover:shadow-xl hover:shadow-blue-600/30 hover:-translate-y-0.5 active:translate-y-px transition-all duration-300 disabled:opacity-50 disabled:hover:translate-y-0 disabled:shadow-none flex items-center gap-2 shrink-0"
+                  >
+                    <Bell className="h-4 w-4" />
+                    {isNotifying ? 'Sending...' : 'Notify'}
+                  </button>
+                </div>
+              </div>
+
               <button onClick={handleUpdateLog} className="w-full py-5 bg-primary text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all">Update Log Entry</button>
               <button disabled={isDeletingLog} onClick={handleDeleteLog} className="w-full py-4 text-red-500 font-black text-[10px] uppercase tracking-widest hover:bg-red-50 rounded-2xl transition-all flex items-center justify-center gap-2">
                 <Trash2 className="h-4 w-4" /> {isDeletingLog ? 'Purging...' : 'Purge Entry from Archives'}

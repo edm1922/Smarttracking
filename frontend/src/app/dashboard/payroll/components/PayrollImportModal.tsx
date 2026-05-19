@@ -43,6 +43,8 @@ export const PayrollImportModal: React.FC<PayrollImportModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
+  const allFieldsFilled = clientLabel && periodStart && periodEnd && releaseDate;
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col max-h-[95vh] animate-in zoom-in-95 duration-300">
@@ -67,32 +69,21 @@ export const PayrollImportModal: React.FC<PayrollImportModalProps> = ({
         {/* Modal Body */}
         <div className="p-10 space-y-10 flex-1 overflow-y-auto custom-scrollbar">
           {/* Client & Metadata */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-3">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Company / Entity</label>
-              <select 
-                value={clientLabel}
-                onChange={e => setClientLabel(e.target.value)}
-                className="w-full bg-gray-50 border-2 border-transparent rounded-2xl px-6 py-4 text-xs font-black text-gray-900 outline-none focus:bg-white focus:border-primary transition-all appearance-none uppercase shadow-sm"
-              >
-                <option value="">SELECT RECIPIENT...</option>
-                {companies.map(c => (
-                  <option key={c.id} value={c.name}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-3">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Release Date (Staff Only)</label>
-              <input 
-                type="date" 
-                value={releaseDate}
-                onChange={e => setReleaseDate(e.target.value)}
-                className="w-full bg-gray-50 border-2 border-transparent rounded-2xl px-6 py-4 text-xs font-black text-gray-900 outline-none focus:bg-white focus:border-primary transition-all shadow-sm"
-              />
-            </div>
+          <div className="space-y-3">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Company / Entity</label>
+            <select 
+              value={clientLabel}
+              onChange={e => setClientLabel(e.target.value)}
+              className="w-full bg-gray-50 border-2 border-transparent rounded-2xl px-6 py-4 text-xs font-black text-gray-900 outline-none focus:bg-white focus:border-primary transition-all appearance-none uppercase shadow-sm"
+            >
+              <option value="">SELECT RECIPIENT...</option>
+              {companies.map(c => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
+            </select>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="space-y-3">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
                 <Calendar className="h-3 w-3" /> Period Start
@@ -115,28 +106,47 @@ export const PayrollImportModal: React.FC<PayrollImportModalProps> = ({
                 className="w-full bg-gray-50 border-2 border-transparent rounded-2xl px-6 py-4 text-xs font-black text-gray-900 outline-none focus:bg-white focus:border-primary transition-all shadow-sm"
               />
             </div>
+            <div className="space-y-3">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Release Date</label>
+              <input 
+                type="date" 
+                value={releaseDate}
+                onChange={e => setReleaseDate(e.target.value)}
+                className="w-full bg-gray-50 border-2 border-transparent rounded-2xl px-6 py-4 text-xs font-black text-gray-900 outline-none focus:bg-white focus:border-primary transition-all shadow-sm"
+              />
+            </div>
           </div>
 
           {/* File Upload */}
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Payload Source (Excel/CSV)</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Payload Source (PDF)</label>
             </div>
-            <label className="block cursor-pointer">
-              <input type="file" className="hidden" onChange={onFileSelect} accept=".xlsx,.xls,.csv" />
-              <div className={`w-full py-16 border-2 border-dashed rounded-[2.5rem] flex flex-col items-center justify-center gap-6 transition-all ${selectedFiles.length > 0 ? 'bg-green-50/50 border-green-200 text-green-600' : 'bg-gray-50 border-gray-100 text-gray-400 hover:border-primary hover:bg-white hover:shadow-2xl hover:shadow-primary/5'}`}>
+            <label className={`block ${allFieldsFilled ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
+              <input type="file" className="hidden" onChange={onFileSelect} accept=".pdf" disabled={!allFieldsFilled} />
+              <div className={`w-full py-16 border-2 border-dashed rounded-[2.5rem] flex flex-col items-center justify-center gap-6 transition-all ${
+                selectedFiles.length > 0
+                  ? 'bg-green-50/50 border-green-200 text-green-600'
+                  : allFieldsFilled
+                    ? 'bg-gray-50 border-gray-100 text-gray-400 hover:border-primary hover:bg-white hover:shadow-2xl hover:shadow-primary/5'
+                    : 'bg-gray-100 border-gray-200 text-gray-300'
+              }`}>
                 {selectedFiles.length > 0 ? (
                   <div className="h-24 w-24 bg-white rounded-[2rem] flex items-center justify-center shadow-xl">
                     <CheckCircle2 className="h-10 w-10" />
                   </div>
                 ) : (
-                  <div className="h-24 w-24 bg-white rounded-[2rem] flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform">
-                    <Upload className="h-10 w-10 opacity-40" />
+                  <div className="h-24 w-24 bg-white rounded-[2rem] flex items-center justify-center shadow-xl">
+                    <Upload className={`h-10 w-10 ${allFieldsFilled ? 'opacity-40' : 'opacity-20'}`} />
                   </div>
                 )}
                 <div className="text-center">
-                  <p className="text-sm font-black uppercase tracking-widest mb-1">{selectedFiles.length > 0 ? selectedFiles[0].name : 'Select Data File'}</p>
-                  <p className="text-[10px] font-bold opacity-60 uppercase tracking-tighter">Click to browse your local storage</p>
+                  <p className="text-sm font-black uppercase tracking-widest mb-1">
+                    {selectedFiles.length > 0 ? selectedFiles[0].name : allFieldsFilled ? 'Select Data File' : 'Fill in fields above first'}
+                  </p>
+                  <p className="text-[10px] font-bold opacity-60 uppercase tracking-tighter">
+                    {allFieldsFilled ? 'Click to browse your local storage' : 'Complete the metadata to proceed'}
+                  </p>
                 </div>
               </div>
             </label>
@@ -147,7 +157,7 @@ export const PayrollImportModal: React.FC<PayrollImportModalProps> = ({
         <div className="p-10 bg-gray-50 border-t border-gray-100">
           <button
             onClick={onUpload}
-            disabled={uploading || selectedFiles.length === 0 || !clientLabel || !periodStart || !periodEnd}
+            disabled={uploading || selectedFiles.length === 0 || !clientLabel || !periodStart || !periodEnd || !releaseDate}
             className="w-full py-6 bg-primary text-white rounded-[2rem] text-xs font-black uppercase tracking-[0.2em] shadow-2xl shadow-primary/30 hover:bg-primary-dark hover:-translate-y-1 transition-all active:translate-y-0 disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none"
           >
             {uploading ? (

@@ -79,9 +79,13 @@ export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
              !employees.some(e => e.name === emp.name)
   );
 
+  const canTagEmployees = form.shift?.trim() && form.supervisorName?.trim();
+  const shiftEmpty = !form.shift?.trim();
+  const supervisorEmpty = !form.supervisorName?.trim();
+
   return (
-    <div className="bg-white rounded-3xl border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden flex flex-col transition-all duration-500">
-      <div className="bg-gradient-to-r from-primary to-blue-500 px-8 py-6">
+    <div className="bg-white rounded-3xl border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col transition-all duration-500">
+      <div className="bg-gradient-to-r from-primary to-blue-500 px-8 py-6 overflow-hidden rounded-t-3xl">
         <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center">
           <UserPlus className="mr-3 h-5 w-5" />
           Requisition Context
@@ -90,11 +94,11 @@ export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
       
       <div className="p-8 space-y-10">
         {/* Context Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="space-y-3">
             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Source Location</label>
             <div className="relative group">
-              <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
+              <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <select 
                 value={form.locationId} 
                 onChange={e => setForm({...form, locationId: e.target.value})}
@@ -109,16 +113,23 @@ export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
           </div>
 
           <div className="space-y-3">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Operational Shift</label>
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1 flex items-center gap-2">
+              Operational Shift
+              {shiftEmpty && <span className="px-2 py-0.5 bg-red-100 text-red-600 rounded-lg text-[7px] font-black">REQUIRED</span>}
+            </label>
             <div className="relative group">
-              <Clock className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
+              <Clock className={`absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 transition-colors ${shiftEmpty ? 'text-red-400 group-focus-within:text-red-500' : 'text-gray-400 group-focus-within:text-primary'}`} />
               <input 
                 type="text"
                 placeholder="ENTER SHIFT..."
                 list="shift-options"
                 value={form.shift} 
                 onChange={e => setForm({...form, shift: e.target.value.toUpperCase()})}
-                className="w-full bg-gray-50/50 border border-gray-200 rounded-2xl pl-12 pr-6 py-3.5 text-xs font-semibold text-gray-900 outline-none hover:border-gray-300 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all uppercase placeholder:text-gray-400"
+                className={`w-full border rounded-2xl pl-12 pr-6 py-3.5 text-xs font-semibold text-gray-900 outline-none transition-all uppercase placeholder:text-gray-400 ${
+                  shiftEmpty
+                    ? 'bg-red-50/50 border-red-300 focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/20 animate-pulse'
+                    : 'bg-gray-50/50 border-gray-200 hover:border-gray-300 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10'
+                }`}
               />
               <datalist id="shift-options">
                 <option value="SHIFT 1" />
@@ -131,28 +142,64 @@ export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
           </div>
 
           <div className="space-y-3">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Supervisor Name</label>
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1 flex items-center gap-2">
+              Supervisor Name
+              {!shiftEmpty && supervisorEmpty && <span className="px-2 py-0.5 bg-red-100 text-red-600 rounded-lg text-[7px] font-black">REQUIRED</span>}
+            </label>
             <div className="relative group">
-              <User className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
+              <User className={`absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 transition-colors ${!shiftEmpty && supervisorEmpty ? 'text-red-400 group-focus-within:text-red-500' : 'text-gray-400 group-focus-within:text-primary'}`} />
               <input 
                 type="text"
                 placeholder="ENTER SUPERVISOR..."
                 value={form.supervisorName || ''} 
                 onChange={e => setForm({...form, supervisorName: e.target.value.toUpperCase()})}
+                className={`w-full border rounded-2xl pl-12 pr-6 py-3.5 text-xs font-semibold text-gray-900 outline-none transition-all uppercase placeholder:text-gray-400 ${
+                  !shiftEmpty && supervisorEmpty
+                    ? 'bg-red-50/50 border-red-300 focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/20 animate-pulse'
+                    : 'bg-gray-50/50 border-gray-200 hover:border-gray-300 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10'
+                }`}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Department / Area</label>
+            <div className="relative group">
+              <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
+              <input 
+                type="text"
+                placeholder="ENTER DEPARTMENT..."
+                list="dept-options"
+                value={form.departmentArea || ''}
+                onChange={e => setForm({...form, departmentArea: e.target.value.toUpperCase()})}
                 className="w-full bg-gray-50/50 border border-gray-200 rounded-2xl pl-12 pr-6 py-3.5 text-xs font-semibold text-gray-900 outline-none hover:border-gray-300 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all uppercase placeholder:text-gray-400"
               />
+              <datalist id="dept-options">
+                <option value="MAIN OFFICE" />
+                <option value="LOGISTICS" />
+                <option value="OPERATIONS" />
+                <option value="HR" />
+                <option value="IT" />
+              </datalist>
             </div>
           </div>
         </div>
 
         {/* Employee Entry */}
-        <div className="space-y-6">
+        <div className={`space-y-6 transition-all duration-500 ${!canTagEmployees ? 'pointer-events-none opacity-40 select-none' : ''}`}>
           <div className="flex items-center justify-between">
             <h3 className="text-[11px] font-bold text-gray-900 uppercase tracking-wider flex items-center">
               <User className="mr-2 h-4 w-4 text-primary" />
               Tag Employees
             </h3>
-            <span className="text-[9px] font-medium text-gray-400 uppercase tracking-wide italic">Type to search existing staff</span>
+            {!canTagEmployees && (
+              <span className="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-[8px] font-bold uppercase tracking-wider">
+                Complete shift &amp; supervisor first
+              </span>
+            )}
+            {canTagEmployees && (
+              <span className="text-[9px] font-medium text-gray-400 uppercase tracking-wide italic">Type to search existing staff</span>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
@@ -187,46 +234,26 @@ export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
                 </div>
               )}
             </div>
-            <div className="md:col-span-3">
-              <div className="relative group">
-                <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
-                <input 
-                  type="text" 
-                  placeholder="POSITION..." 
-                  value={positionInput} 
-                  onChange={e => setPositionInput(e.target.value.toUpperCase())}
-                  className="w-full bg-gray-50/50 border border-gray-200 rounded-2xl pl-10 pr-4 py-3.5 text-xs font-semibold text-gray-900 outline-none hover:border-gray-300 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all placeholder:text-gray-400"
-                />
+            <div className="md:col-span-7">
+              <div className="flex gap-4">
+                <div className="flex-1 relative group">
+                  <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
+                  <input 
+                    type="text" 
+                    placeholder="POSITION..." 
+                    value={positionInput} 
+                    onChange={e => setPositionInput(e.target.value.toUpperCase())}
+                    className="w-full bg-gray-50/50 border border-gray-200 rounded-2xl pl-10 pr-4 py-3.5 text-xs font-semibold text-gray-900 outline-none hover:border-gray-300 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all placeholder:text-gray-400"
+                  />
+                </div>
+                <button 
+                  onClick={addEmployee}
+                  title="Tag Employee"
+                  className="px-6 py-3.5 bg-gradient-to-br from-gray-900 to-black text-white rounded-2xl text-[10px] font-extrabold uppercase tracking-widest flex items-center gap-2 hover:shadow-xl hover:shadow-gray-900/30 transition-all duration-300 ease-out hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-px active:scale-100 outline-none focus:ring-4 focus:ring-gray-900/30 shrink-0"
+                >
+                  ADD
+                </button>
               </div>
-            </div>
-            <div className="md:col-span-3">
-              <div className="relative group">
-                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
-                <input 
-                  type="text" 
-                  placeholder="DEPARTMENT..." 
-                  list="department-options"
-                  value={departmentInput} 
-                  onChange={e => setDepartmentInput(e.target.value.toUpperCase())}
-                  className="w-full bg-gray-50/50 border border-gray-200 rounded-2xl pl-10 pr-4 py-3.5 text-xs font-semibold text-gray-900 outline-none hover:border-gray-300 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all placeholder:text-gray-400"
-                />
-                <datalist id="department-options">
-                  <option value="MAIN OFFICE" />
-                  <option value="LOGISTICS" />
-                  <option value="OPERATIONS" />
-                  <option value="HR" />
-                  <option value="IT" />
-                </datalist>
-              </div>
-            </div>
-            <div className="md:col-span-1">
-              <button 
-                onClick={addEmployee}
-                title="Tag Employee"
-                className="w-full h-full py-3.5 bg-gradient-to-br from-gray-900 to-black text-white rounded-2xl flex items-center justify-center hover:shadow-xl hover:shadow-gray-900/30 transition-all duration-300 ease-out hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-px active:scale-100 outline-none focus:ring-4 focus:ring-gray-900/30"
-              >
-                <Plus className="h-5 w-5" />
-              </button>
             </div>
           </div>
 
@@ -272,8 +299,8 @@ export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
                   <ClipboardList className="h-6 w-6" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">Drafting Workflow</h4>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Assigning materials to: <span className="text-primary">{draftEntry.name}</span></p>
+                  <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">{draftEntry.name}</h4>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Assigning materials</p>
                 </div>
               </div>
               <button onClick={() => setDraftEntry(null)} className="p-2 hover:bg-red-50 text-red-500 rounded-xl transition-all">
@@ -354,15 +381,7 @@ export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
         )}
       </div>
 
-      <div className="p-8 bg-gray-50 border-t border-gray-100 space-y-6">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Overall Remarks</label>
-            <textarea 
-              placeholder="ENTER ANY ADDITIONAL NOTES OR SPECIAL INSTRUCTIONS..."
-              value={form.remarks}
-              onChange={e => setForm({...form, remarks: e.target.value})}
-              className="w-full h-32 bg-gray-50/50 border border-gray-200 rounded-3xl p-6 text-xs font-semibold text-gray-900 outline-none hover:border-gray-300 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all resize-none placeholder:text-gray-400"
-            />
-      </div>
+
     </div>
   );
 };

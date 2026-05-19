@@ -90,6 +90,11 @@ export class InternalRequestsController {
     return this.internalRequestsService.remove(id);
   }
 
+  @Get('most-requested')
+  getMostRequested(@Query('take') take?: string) {
+    return this.internalRequestsService.getMostRequested(take ? parseInt(take, 10) : 30);
+  }
+
   @Get('employees')
   getEmployees() {
     return this.internalRequestsService.getUniqueEmployees();

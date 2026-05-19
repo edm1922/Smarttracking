@@ -10,6 +10,8 @@ import { RSQItemExplorer } from './components/RSQItemExplorer';
 import { RSQCartSection } from './components/RSQCartSection';
 import { RSQSubmitModal } from './components/RSQSubmitModal';
 import { PrintableRequisition } from './components/PrintableRequisition';
+import { BlankRequisitionForm } from './components/BlankRequisitionForm';
+import { X, FolderOpen } from 'lucide-react';
 import { Product, Location, Employee, SelectedItem, DraftEntry } from './components/RSQTypes';
 
 export default function StaffRequisitionPage() {
@@ -61,6 +63,20 @@ function RSQContent() {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [savedDrafts, setSavedDrafts] = useState<string[]>([]);
+  const [showDraftModal, setShowDraftModal] = useState(false);
+  const [draftNameInput, setDraftNameInput] = useState('');
+  const [requestCountMap, setRequestCountMap] = useState<Record<string, number>>({});
+  const [sortBy, setSortBy] = useState<string>('name-asc');
+  const [printMode, setPrintMode] = useState<'filled' | 'blank'>('filled');
+
+  const handlePrintBlank = () => {
+    setPrintMode('blank');
+    setTimeout(() => {
+      window.print();
+      window.onafterprint = () => setPrintMode('filled');
+    }, 100);
+  };
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
   const [additionalFiles, setAdditionalFiles] = useState<File[]>([]);
@@ -88,6 +104,13 @@ function RSQContent() {
       }
       
       setProducts(prodsRes.data.data || prodsRes.data || []);
+
+      const mostReqRes = await api.get('/internal-requests/most-requested', { params: { take: 50 } });
+      const mostReqMap: Record<string, number> = {};
+      (mostReqRes.data || []).forEach((item: any) => {
+        mostReqMap[item.productId] = item.requestCount;
+      });
+      setRequestCountMap(mostReqMap);
     } catch (err) {
       console.error('Failed to fetch data', err);
     } finally {
@@ -111,6 +134,13 @@ function RSQContent() {
     } catch (e) {
       console.error('Failed to load saved requisition', e);
     }
+    // Load saved drafts list
+    try {
+      const drafts = localStorage.getItem('requisition_drafts_list');
+      if (drafts) setSavedDrafts(JSON.parse(drafts));
+    } catch (e) {
+      console.error('Failed to load drafts list', e);
+    }
   }, []);
 
   // Save to local storage
@@ -122,29 +152,64 @@ function RSQContent() {
     localStorage.setItem('requisition_items', JSON.stringify(selectedItems));
   }, [selectedItems]);
 
+  const refreshDraftsList = () => {
+    try {
+      const drafts = localStorage.getItem('requisition_drafts_list');
+      const list = drafts ? JSON.parse(drafts) : [];
+      setSavedDrafts(list);
+    } catch {}
+  };
+
+  const handleSaveDraft = () => {
+    const name = draftNameInput.trim().toUpperCase();
+    if (!name) return toast.warning('Enter a draft name');
+    try {
+      const allDrafts = JSON.parse(localStorage.getItem('requisition_drafts') || '{}');
+      allDrafts[name] = {
+        employees,
+        selectedItems,
+        form: { departmentArea: form.departmentArea, shift: form.shift, supervisorName: form.supervisorName, remarks: form.remarks },
+        activeEmployeeNames,
+      };
+      localStorage.setItem('requisition_drafts', JSON.stringify(allDrafts));
+      const list = Object.keys(allDrafts);
+      localStorage.setItem('requisition_drafts_list', JSON.stringify(list));
+      setSavedDrafts(list);
+      setShowDraftModal(false);
+      setDraftNameInput('');
+      toast.success(`Draft "${name}" saved`);
+    } catch { toast.error('Failed to save draft'); }
+  };
+
+  const handleLoadDraft = (name: string) => {
+    try {
+      const allDrafts = JSON.parse(localStorage.getItem('requisition_drafts') || '{}');
+      const draft = allDrafts[name];
+      if (!draft) return toast.error('Draft not found');
+      setEmployees(draft.employees || []);
+      setSelectedItems(draft.selectedItems || []);
+      if (draft.form) setForm(prev => ({ ...prev, ...draft.form }));
+      if (draft.activeEmployeeNames) setActiveEmployeeNames(draft.activeEmployeeNames);
+      toast.success(`Draft "${name}" loaded`);
+    } catch { toast.error('Failed to load draft'); }
+  };
+
+  const handleDeleteDraft = (name: string) => {
+    try {
+      const allDrafts = JSON.parse(localStorage.getItem('requisition_drafts') || '{}');
+      delete allDrafts[name];
+      localStorage.setItem('requisition_drafts', JSON.stringify(allDrafts));
+      const list = Object.keys(allDrafts);
+      localStorage.setItem('requisition_drafts_list', JSON.stringify(list));
+      setSavedDrafts(list);
+      toast.success(`Draft "${name}" deleted`);
+    } catch { toast.error('Failed to delete draft'); }
+  };
+
   useEffect(() => {
     const { departmentArea, shift, supervisorName, remarks } = form;
     localStorage.setItem('requisition_form', JSON.stringify({ departmentArea, shift, supervisorName, remarks }));
   }, [form.departmentArea, form.shift, form.supervisorName, form.remarks]);
-
-  const clearForm = () => {
-    if (confirm('Are you sure you want to clear all entries and start a new requisition?')) {
-      setEmployees([]);
-      setSelectedItems([]);
-      setForm({
-        date: new Date().toISOString().split('T')[0],
-        locationId: locations[0]?.id || '',
-        departmentArea: '',
-        shift: 'SHIFT 1',
-        supervisorName: '',
-        remarks: ''
-      });
-      localStorage.removeItem('requisition_employees');
-      localStorage.removeItem('requisition_items');
-      localStorage.removeItem('requisition_form');
-      toast.info('Portal reset successful');
-    }
-  };
 
   const addEmployee = () => {
     const trimmedName = employeeInput.trim().toUpperCase();
@@ -159,10 +224,9 @@ function RSQContent() {
   };
 
   const selectExistingEmployee = (emp: Employee) => {
-    setDraftEntry({ name: emp.name.toUpperCase(), position: emp.position.toUpperCase(), department: emp.department?.toUpperCase() || '', items: [] });
-    setEmployeeInput('');
-    setPositionInput('');
-    setDepartmentInput('');
+    setEmployeeInput(emp.name.toUpperCase());
+    setPositionInput(emp.position.toUpperCase());
+    setDepartmentInput((emp.department || '').toUpperCase());
     setShowEmployeeDropdown(false);
   };
 
@@ -341,7 +405,14 @@ function RSQContent() {
   const displayProducts = products
     .map(p => ({ ...p, totalStock: p.stocks.find(s => s.location?.id === form.locationId)?.quantity || 0 }))
     .filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.sku.toLowerCase().includes(productSearch.toLowerCase()))
-    .sort((a, b) => b.totalStock! - a.totalStock!);
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'name-desc': return b.name.localeCompare(a.name);
+        case 'stock-high': return (b.totalStock || 0) - (a.totalStock || 0);
+        case 'stock-low': return (a.totalStock || 0) - (b.totalStock || 0);
+        default: return a.name.localeCompare(b.name);
+      }
+    });
 
   const quickDisplayProducts = products
     .map(p => ({ ...p, totalStock: p.stocks.find(s => s.location?.id === form.locationId)?.quantity || 0 }))
@@ -353,7 +424,7 @@ function RSQContent() {
   return (
     <div className="max-w-[1600px] mx-auto space-y-12 animate-in fade-in duration-700 pb-20">
       <div className="no-print">
-        <RSQHeader onClear={clearForm} onPrintBlank={() => window.print()} />
+        <RSQHeader onPrintBlank={handlePrintBlank} />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-7 space-y-10">
@@ -386,21 +457,28 @@ function RSQContent() {
                 setShowSubmitModal(true);
               }}
               isSubmitting={isSubmitting}
+              onSaveDraft={() => setShowDraftModal(true)}
+              savedDrafts={savedDrafts}
+              onLoadDraft={handleLoadDraft}
+              onDeleteDraft={handleDeleteDraft}
             />
           </div>
 
           <div className="lg:col-span-5">
             <RSQItemExplorer 
               productSearch={productSearch} setProductSearch={setProductSearch}
-              displayProducts={displayProducts} addItemToCart={addItemToCart}
+              displayProducts={displayProducts}
               setViewItem={setViewItem}
+              sortBy={sortBy} setSortBy={setSortBy}
             />
           </div>
         </div>
 
         <RSQSubmitModal 
           isOpen={showSubmitModal} onClose={() => setShowSubmitModal(false)}
-          form={form} setForm={setForm}
+          form={form}
+          employees={employees}
+          selectedItems={selectedItems}
           attachmentFile={attachmentFile} attachmentPreview={attachmentPreview}
           handleFileChange={e => {
             if (e.target.files?.[0]) {
@@ -421,13 +499,70 @@ function RSQContent() {
           }}
           isSubmitting={isSubmitting} onSubmit={handleFinalSubmit}
         />
+
+        {showDraftModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-gray-900/40 backdrop-blur-md animate-in fade-in duration-300">
+            <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-gray-100 overflow-hidden animate-in zoom-in-95 duration-300">
+              <div className="bg-gradient-to-r from-amber-600 to-amber-500 px-8 py-6 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="h-10 w-10 bg-white/10 rounded-xl flex items-center justify-center">
+                    <FolderOpen className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">Save as Draft</h3>
+                    <p className="text-[9px] font-medium text-white/60 uppercase tracking-widest mt-0.5">Name your draft for quick recall</p>
+                  </div>
+                </div>
+                <button onClick={() => { setShowDraftModal(false); setDraftNameInput(''); }} className="p-1.5 text-white/60 hover:text-white transition-colors">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="p-8 space-y-6">
+                <input
+                  type="text"
+                  placeholder="DRAFT NAME..."
+                  value={draftNameInput}
+                  onChange={e => setDraftNameInput(e.target.value.toUpperCase())}
+                  onKeyDown={e => { if (e.key === 'Enter') handleSaveDraft(); }}
+                  className="w-full bg-gray-50/50 border border-gray-200 rounded-2xl px-6 py-4 text-sm font-bold text-gray-900 outline-none hover:border-gray-300 focus:bg-white focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all placeholder:text-gray-400 uppercase"
+                  autoFocus
+                />
+                {savedDrafts.includes(draftNameInput.trim().toUpperCase()) && (
+                  <p className="text-[10px] font-bold text-amber-600 flex items-center gap-2">
+                    A draft with this name already exists — saving will overwrite it.
+                  </p>
+                )}
+              </div>
+              <div className="p-8 pt-0 flex gap-3">
+                <button onClick={() => { setShowDraftModal(false); setDraftNameInput(''); }} className="flex-1 py-4 bg-gray-100 text-gray-600 rounded-2xl text-[10px] font-extrabold uppercase tracking-widest hover:bg-gray-200 transition-all">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveDraft}
+                  disabled={!draftNameInput.trim()}
+                  className="flex-1 py-4 bg-gradient-to-r from-amber-600 to-amber-500 text-white rounded-2xl text-[10px] font-extrabold uppercase tracking-widest shadow-lg shadow-amber-600/20 transition-all hover:shadow-xl hover:shadow-amber-600/30 hover:-translate-y-0.5 active:translate-y-px disabled:opacity-50 disabled:hover:translate-y-0 disabled:shadow-none"
+                >
+                  Save Draft
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      <PrintableRequisition 
-        form={form} 
-        employees={employees} 
-        selectedItems={selectedItems} 
-      />
+      <div style={printMode === 'blank' ? { display: 'none' } : undefined}>
+        <PrintableRequisition 
+          form={form} 
+          employees={employees} 
+          selectedItems={selectedItems} 
+        />
+      </div>
+
+      {printMode === 'blank' && (
+        <div className="print-only">
+          <BlankRequisitionForm />
+        </div>
+      )}
 
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }

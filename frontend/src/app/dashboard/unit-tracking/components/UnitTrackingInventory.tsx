@@ -140,6 +140,7 @@ export const UnitTrackingInventory: React.FC<UnitTrackingInventoryProps> = ({
                   {/* Asset List */}
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                     {product.items
+                      .filter((item: any) => item.qty > 0)
                       .filter((item: any) => {
                         return Object.entries(filters).every(([fKey, fVal]) => {
                           return item.fieldValues.some((fv: any) => {

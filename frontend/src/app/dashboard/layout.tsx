@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { LayoutDashboard, LogOut, Package, Printer, User, Box, Settings, MapPin, FileText, QrCode, ClipboardList, Database, Activity, Users, Info, X, ShieldCheck, Wallet } from 'lucide-react';
 import AdminNotifications from './AdminNotifications';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
+import api from '@/lib/api';
 
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
@@ -17,6 +18,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [userId, setUserId] = useState('');
   const [role, setRole] = useState('');
   const [showDevNotice, setShowDevNotice] = useState(false);
+  const [pendingPullOutCount, setPendingPullOutCount] = useState(0);
 
 
 useEffect(() => {
@@ -67,6 +69,19 @@ useEffect(() => {
   const isAdmin = role === 'admin';
   const isPayrollUser = role === 'payroll_admin' || role === 'payroll_staff';
 
+  useEffect(() => {
+    if (!isStaff) return;
+    const checkPending = async () => {
+      try {
+        const res = await api.get('/pull-out-requests/mine', { params: { status: 'PENDING', take: 0 } });
+        setPendingPullOutCount(res.data?.total || 0);
+      } catch { setPendingPullOutCount(0); }
+    };
+    checkPending();
+    const interval = setInterval(checkPending, 30000);
+    return () => clearInterval(interval);
+  }, [isStaff]);
+
   const staffItems = [
     { 
       name: 'Staff Requisition', 
@@ -102,22 +117,13 @@ useEffect(() => {
       ]
     },
     { 
-      name: 'RSQ', 
-      href: '/dashboard/rsq', 
-      icon: ClipboardList,
-      subItems: [
-        { name: 'Fabric Inventory', href: '/dashboard/rsq?tab=fabrics' },
-        { name: 'Tailoring Hub', href: '/dashboard/rsq?tab=requests' },
-        { name: 'Transaction History', href: '/dashboard/rsq?tab=transactions' },
-      ]
-    },
-    { 
       name: 'Transmittal', 
       href: '/dashboard/transmittal', 
       icon: FileText,
       subItems: [
         { name: 'Stock Transmittal', href: '/dashboard/transmittal/product' },
         { name: 'PR Transmittal', href: '/dashboard/transmittal/purchase-request' },
+        { name: 'Fabric & RSQ', href: '/dashboard/rsq' },
       ]
     },
   ];
@@ -343,7 +349,7 @@ useEffect(() => {
                     <div key={item.name} className="space-y-1">
                       <Link
                         href={item.href}
-                        className={`flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                        className={`relative flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                           isActive && !item.subItems
                             ? 'bg-primary text-white'
                             : isActive && item.subItems
@@ -353,6 +359,15 @@ useEffect(() => {
                       >
                         <Icon className="mr-3 h-5 w-5" />
                         {item.name}
+                        {item.name === 'Unit Requisition (QR)' && pendingPullOutCount > 0 && (
+                          <span className="ml-auto inline-flex items-center gap-1">
+                            <span className="relative flex h-2.5 w-2.5">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600"></span>
+                            </span>
+                            <span className="text-[9px] font-bold text-red-600">{pendingPullOutCount}</span>
+                          </span>
+                        )}
                       </Link>
                       {item.subItems && isActive && (
                         <div className="ml-8 space-y-1 mt-1">

@@ -471,8 +471,8 @@ function UnitTrackingContent() {
       const end = new Date(dateRange.end); end.setHours(23, 59, 59, 999);
       filtered = filtered.filter(r => new Date(r.createdAt) <= end);
     }
-    if (requisitionSubTab === 'pending') filtered = filtered.filter(r => r.status === 'SUBMITTED');
-    else filtered = filtered.filter(r => r.status !== 'SUBMITTED');
+    if (requisitionSubTab === 'pending') filtered = filtered.filter(r => r.status === 'PENDING' || r.status === 'SUBMITTED');
+    else filtered = filtered.filter(r => r.status === 'APPROVED' || r.status === 'REJECTED');
     return filtered;
   }, [requests, dateRange, requisitionSubTab]);
 

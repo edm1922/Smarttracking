@@ -16,6 +16,7 @@ import { UsersModule } from './users/users.module';
 import { PullOutRequestsModule } from './pull-out-requests/pull-out-requests.module';
 import { StaffInventoryModule } from './staff-inventory/staff-inventory.module';
 import { RsqModule } from './rsq/rsq.module';
+import { StockNotificationsModule } from './stock-notifications/stock-notifications.module';
 
 import { ReportsModule } from './reports/reports.module';
 import { SystemAnalyticsModule } from './system-analytics/system-analytics.module';
@@ -44,6 +45,7 @@ import { TrafficInterceptor } from './common/interceptors/traffic.interceptor';
     PullOutRequestsModule,
     StaffInventoryModule,
     RsqModule,
+    StockNotificationsModule,
 
     ReportsModule,
     SystemAnalyticsModule,

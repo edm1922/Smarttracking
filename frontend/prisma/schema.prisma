@@ -669,6 +669,7 @@ model Product {
   InternalRequest    InternalRequest[]
   stocks             ProductStock[]
   ProductTransaction ProductTransaction[]
+  StockNotification  StockNotification[]
 
   @@schema("public")
 }
@@ -699,6 +700,7 @@ model ProductTransaction {
   location   Location @relation(fields: [locationId], references: [id])
   product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   user       User     @relation(fields: [userId], references: [id])
+  StockNotification StockNotification[]
 
   @@index([locationId, createdAt])
   @@index([productId, createdAt])
@@ -915,6 +917,27 @@ model profiles {
   updated_at DateTime? @default(now()) @db.Timestamptz(6)
   users      users     @relation(fields: [id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
+  @@schema("public")
+}
+
+model StockNotification {
+  id                   String              @id @default(uuid())
+  productTransactionId String?
+  productId            String
+  productName          String
+  type                 String
+  quantity             Int
+  message              String
+  durationHours        Int                 @default(24)
+  createdAt            DateTime            @default(now())
+  expiresAt            DateTime
+  createdBy            String
+  dismissed            Boolean             @default(false)
+  product              Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productTransaction   ProductTransaction? @relation(fields: [productTransactionId], references: [id], onDelete: SetNull)
+
+  @@index([expiresAt])
+  @@index([dismissed])
   @@schema("public")
 }
 

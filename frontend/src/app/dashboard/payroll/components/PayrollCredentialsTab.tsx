@@ -130,7 +130,7 @@ export const PayrollCredentialsTab: React.FC<PayrollCredentialsTabProps> = ({
               <div className="w-full bg-gray-50/50 rounded-3xl p-6 text-left border border-gray-100/50 space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-[9px] font-black uppercase text-gray-400 tracking-[0.2em]">Portal ID</span>
-                  <code className="text-xs font-black text-gray-900 uppercase tracking-tighter">{user.username}</code>
+                  <code className="text-xs font-black text-gray-900 tracking-tighter">{user.username.toLowerCase()}</code>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-[9px] font-black uppercase text-gray-400 tracking-[0.2em]">Passkey</span>
