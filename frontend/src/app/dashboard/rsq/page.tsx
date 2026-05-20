@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import api from '@/lib/api';
 
 import { 
   Plus, 
@@ -153,19 +154,13 @@ export default function RSQPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch fabrics (needed for both inventory calculations and auto-completions)
-      const fabRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/fabrics`);
-      const fabData = await fabRes.json();
+      const [fabData, reqData, txData] = await Promise.all([
+        api.get('/rsq/fabrics').then(r => r.data),
+        api.get('/rsq/requests').then(r => r.data),
+        api.get('/rsq/transactions').then(r => r.data),
+      ]);
       setFabrics(fabData);
-
-      // Fetch active job requests (needed for checking matching printouts)
-      const reqRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/requests`);
-      const reqData = await reqRes.json();
       setRequests(reqData);
-
-      // Fetch transactions
-      const txRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/transactions`);
-      const txData = await txRes.json();
       setTransactions(txData);
     } catch (error) {
       console.error('Error fetching RSQ data:', error);
@@ -176,9 +171,8 @@ export default function RSQPage() {
 
   const fetchTailors = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/tailors`);
-      const data = await res.json();
-      setTailors(data);
+      const res = await api.get('/rsq/tailors');
+      setTailors(res.data);
     } catch (e) {
       console.error('Error fetching tailors:', e);
     }
@@ -335,22 +329,11 @@ function TransactionSheetList({
   const handleDeleteSelected = async () => {
     setIsDeleting(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/transactions/bulk-delete`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ ids: selectedIds }),
-      });
-      
-      if (res.ok) {
-        setSelectedIds([]);
-        setIsConfirmDeleteOpen(false);
-        if (onRefresh) {
-          onRefresh();
-        }
-      } else {
-        alert('Failed to delete transactions. Please try again.');
+      await api.post('/rsq/transactions/bulk-delete', { ids: selectedIds });
+      setSelectedIds([]);
+      setIsConfirmDeleteOpen(false);
+      if (onRefresh) {
+        onRefresh();
       }
     } catch (err) {
       console.error('Error during deletion:', err);
@@ -645,25 +628,15 @@ function EditTransactionModal({ row, fabrics, onClose, onSuccess }: {
       // Re-encode remarks with separate fields
       const encodedRemarks = `RSQ: ${rsqNo || '—'} | Month: ${applicableMonth || '—'} | Apparel: ${apparelName || '—'} | Remarks: ${customRemarks || ''}`;
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/transactions/${row.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fabricId,
-          type,
-          quantity: parseFloat(quantity) || 0,
-          unit: selectedFabric?.unit || row.unit || 'Roll',
-          remarks: encodedRemarks,
-          date,
-        }),
+      await api.patch(`/rsq/transactions/${row.id}`, {
+        fabricId,
+        type,
+        quantity: parseFloat(quantity) || 0,
+        unit: selectedFabric?.unit || row.unit || 'Roll',
+        remarks: encodedRemarks,
+        date,
       });
-
-      if (res.ok) {
-        onSuccess();
-      } else {
-        const err = await res.json();
-        alert(`Failed to update: ${err.message || 'Unknown error'}`);
-      }
+      onSuccess();
     } catch (e) {
       console.error(e);
       alert('Network error while updating transaction.');
@@ -867,10 +840,9 @@ function BatchTransactionModal({ onClose, fabrics, tailors: initialTailors, onSu
   useEffect(() => {
     const fetchSeq = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/next-sequence`);
-        const data = await res.json();
-        setSequenceData(data);
-        setTransactionNo(data.nextTransactionNo);
+        const res = await api.get('/rsq/next-sequence');
+        setSequenceData(res.data);
+        setTransactionNo(res.data.nextTransactionNo);
       } catch (err) {
         console.error('Failed to fetch sequences', err);
       }
@@ -975,18 +947,8 @@ function BatchTransactionModal({ onClose, fabrics, tailors: initialTailors, onSu
         apparelName: row.apparelName || undefined
       }));
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/batch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: itemsToSubmit })
-      });
-
-      if (res.ok) {
-        onSuccess();
-      } else {
-        const err = await res.json();
-        alert(`Failed to save: ${err.message || 'Unknown error'}`);
-      }
+      await api.post('/rsq/batch', { items: itemsToSubmit });
+      onSuccess();
     } catch (e) {
       console.error(e);
       alert('Network error while saving batch.');
@@ -1206,18 +1168,10 @@ function BatchTransactionModal({ onClose, fabrics, tailors: initialTailors, onSu
                                 const name = prompt('Enter the name of the new tailor:');
                                 if (!name) return;
                                 try {
-                                  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rsq/tailors`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ name: name.toUpperCase() })
-                                  });
-                                  if (res.ok) {
-                                    const newTailor = await res.json();
-                                    setTailorsList(prev => [...prev, newTailor].sort((a, b) => a.name.localeCompare(b.name)));
-                                    handleUpdateRow(idx, { tailorId: newTailor.id });
-                                  } else {
-                                    alert('Failed to save new tailor.');
-                                  }
+                                  const res = await api.post('/rsq/tailors', { name: name.toUpperCase() });
+                                  const newTailor = res.data;
+                                  setTailorsList(prev => [...prev, newTailor].sort((a, b) => a.name.localeCompare(b.name)));
+                                  handleUpdateRow(idx, { tailorId: newTailor.id });
                                 } catch (err) {
                                   console.error(err);
                                   alert('Error saving new tailor.');

@@ -94,14 +94,14 @@ export async function exportRSQToExcel(rsq: any) {
     };
 
     // 1. Header Information Block (Centro Services)
-    merge('A', 0, 'D', 0);
+    merge('A', 0, 'E', 0);
     const cellA1 = cell('A', 0);
     cellA1.value = 'CENTRO SERVICES COOPERATIVE';
-    cellA1.font = { name: 'Segoe UI', size: 16, bold: true, color: { argb: 'FF0F172A' } };
+    cellA1.font = { name: 'Segoe UI', size: 14, bold: true, color: { argb: 'FF0F172A' } };
     cellA1.alignment = { horizontal: 'left', vertical: 'middle' };
     ws.getRow(r(0)).height = 34;
 
-    merge('A', 1, 'D', 1);
+    merge('A', 1, 'E', 1);
     const cellA2 = cell('A', 1);
     cellA2.value = 'Purok Camachile, Brgy. Tambler, General Santos City';
     cellA2.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF64748B' } };

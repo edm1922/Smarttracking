@@ -1,23 +1,27 @@
 ## graphify
 
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+Knowledge graph at `graphify-out/` with god nodes and community structure. When the user types `/graphify`, invoke `skill("graphify")` first.
 
-When the user types `/graphify`, invoke the `skill` tool with `skill: "graphify"` before doing anything else.
+- Always read `graphify-out/GRAPH_REPORT.md` before searching source files
+- If `graphify-out/wiki/index.md` exists, use it instead of raw files
+- For cross-module questions, prefer `graphify query "<q>"` over grep
+- After modifying code, run `graphify update .` (AST-only, no API cost)
 
-Rules:
-- ALWAYS read graphify-out/GRAPH_REPORT.md before reading any source files, running grep/glob searches, or answering codebase questions. The graph is your primary map of the codebase.
-- IF graphify-out/wiki/index.md EXISTS, navigate it instead of reading raw files
-- For cross-module "how does X relate to Y" questions, prefer `graphify query "<question>"`, `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` over grep — these traverse the graph's EXTRACTED + INFERRED edges instead of scanning files
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+**Graph may be stale** — built from commit `67d5e60e`; compare `git rev-parse HEAD` to check.
 
 ## Project structure
 
-Monorepo with two packages, both deployed to Vercel:
+Monorepo with three directories deployed to Vercel:
 
-- `backend/` — NestJS 11 API, port 3001, entry `src/main.ts`
-- `frontend/` — Next.js 16 App Router, port 3000
+| Dir | Tech | Port | Entry |
+|-----|------|------|-------|
+| `backend/` | NestJS 11 | 3001 | `src/main.ts` |
+| `frontend/` | Next.js 16 | 3000 | App Router |
+| `payroll-portal/` | Next.js (standalone) | — | App Router |
 
-Root `package.json` is empty (only Vercel analytics deps). All development happens in the subdirectories.
+Root `package.json` only has Vercel analytics deps. All dev happens in subdirectories.
+
+Also notable: `brain/` (unspecified utility code), `scratch/` (gitignored scratch).
 
 ## Local dev
 
@@ -29,49 +33,56 @@ cd backend; npm run start:dev
 cd frontend; npm run dev
 ```
 
-The frontend proxies API calls to `localhost:3001` via `NEXT_PUBLIC_API_URL` (defaults to `http://localhost:3001`).
+Frontend proxies API to `NEXT_PUBLIC_API_URL` (defaults to `http://localhost:3001`).
 
 ## Database
 
-PostgreSQL via Supabase, accessed through Prisma with `multiSchema` feature (`auth` + `public` schemas).
+PostgreSQL via Supabase, accessed through Prisma with `multiSchema` (`auth` + `public`).
 
-**Two duplicate Prisma schemas** — `backend/prisma/schema.prisma` and `frontend/prisma/schema.prisma`. Both must be kept in sync. Both have `multiSchema` enabled.
+**Two Prisma schemas** — `backend/prisma/schema.prisma` and `frontend/prisma/schema.prisma`. They should reflect the same database but are **not identical**: the frontend schema is a subset (missing `Fabric`, `Tailor`, `FabricTransaction`, `TailoringRequest`, `PayrollRequest`, `Company`, some `Document`/`StorageBatch`/`User` fields). Keep the superset (backend) as source of truth.
 
 Required env vars: `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `SUPABASE_URL`, `SUPABASE_KEY`.
 
-Backend `postinstall` runs `prisma generate` automatically. Frontend `build` also runs `prisma generate`.
+Backend `postinstall` runs `prisma generate`; Frontend `build` also runs `prisma generate`.
 
 ## Auth
 
-Custom JWT-based auth (not Supabase Auth client-side). Token stored in `localStorage`, sent as `Authorization: Bearer <token>` via Axios interceptor in `src/lib/api.ts`. Backend guards use `@nestjs/jwt`.
+Custom JWT (not Supabase Auth client-side). Token in `localStorage`, sent as `Authorization: Bearer <token>` via Axios interceptor (`frontend/src/lib/api.ts`). Backend guards use `@nestjs/jwt`.
 
 ## Backend quirks
 
-- **CORS** is handled manually in a middleware at `backend/src/main.ts:8-24`, not via NestJS `enableCors()`
-- **Body limit** is set to `50mb` for base64 evidence images (`backend/src/main.ts:27-28`)
-- **Vercel dual-mode** — when `process.env.VERCEL` is set, the app exports a serverless handler; otherwise it listens directly on port 3001
-- ESLint has `@typescript-eslint/no-explicit-any: off` — `any` is allowed throughout
+- **CORS** handled in a manual middleware at `backend/src/main.ts`, not NestJS `enableCors()`
+- **Body limit** 50mb for base64 evidence images (`backend/src/main.ts`)
+- **Vercel dual-mode** — if `process.env.VERCEL` is set, exports a serverless handler instead of listening
+- **ESLint flat config** (`eslint.config.mjs`) — `@typescript-eslint/no-explicit-any: off`, Prettier with `endOfLine: "auto"`
+- **Global CacheModule** with 60s TTL — API responses may be cached for 1 minute
+- **TrafficInterceptor** logs every request to `TrafficLog` table (global `APP_INTERCEPTOR`)
+- **`vercel-build` script**: `prisma generate && nest build`
 
 ## Frontend quirks
 
-- Tailwind CSS **v4** with `@tailwindcss/postcss` — not the classic Tailwind config approach
-- Next.js 16 is recent; check `node_modules/next/dist/docs/` for API changes before writing code
-- Uses `sonner` for toast notifications, `framer-motion` for animations, `lucide-react` for icons
-- `@/*` path alias maps to `./src/*`
-- Server actions have a `10mb` body limit (configured in `next.config.ts`)
-- ESLint extends `eslint-config-next` core-web-vitals + typescript presets
+- **See also `frontend/AGENTS.md`** — warns about Next.js 16 breaking changes
+- **Tailwind CSS v4** with `@tailwindcss/postcss` (no classic config file)
+- **ESLint flat config** (`eslint.config.mjs`) — `eslint-config-next` core-web-vitals + typescript
+- **`@/*`** maps to `./src/*`
+- Server actions have **10mb** body limit (`next.config.ts`)
+- Uses `sonner` (toasts), `framer-motion` (animations), `lucide-react` (icons)
 
 ## Testing
 
-- Backend unit tests: `cd backend; npm test` (Jest, `*.spec.ts` in `src/`)
-- Backend E2E tests: `cd backend; npm run test:e2e` (Jest, `test/` directory)
+- Backend unit: `cd backend; npm test` (Jest, `*.spec.ts` in `src/`)
+- Backend E2E: `cd backend; npm run test:e2e` (Jest, `test/*.e2e-spec.ts`)
 - No frontend tests found
 
 ## Deployment
 
-Both packages have `.vercel/` directories and `vercel.json` / `next.config.ts`. The backend CORS origin is pinned to `https://smarttracking-frontend.vercel.app` in `vercel.json`.
+- Both `backend/` and `frontend/` have `.vercel/` dirs and `vercel.json` / `next.config.ts`
+- Backend CORS origin pinned to `https://smarttracking-frontend.vercel.app` in `vercel.json`
+- Backend `vercel-build` hook: `prisma generate && nest build`
+- No CI/CD workflows found (`.github/workflows/` absent)
 
 ## Style
 
-- Backend uses Prettier + ESLint with `endOfLine: "auto"` (Windows compat)
-- No code comments convention observed — avoid adding comments unless clarifying non-obvious logic
+- Backend: Prettier + ESLint with `endOfLine: "auto"` (Windows compat)
+- No code comments convention — avoid adding comments
+- `.xlsx` / `.xlsb` files are gitignored (Excel exports not committed)
