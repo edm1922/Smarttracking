@@ -206,6 +206,7 @@ export class PullOutRequestsService {
           attachmentUrl: true,
           additionalImages: true,
           createdAt: true,
+          updatedAt: true,
           supervisor: true,
           item: {
             select: { 
@@ -222,7 +223,7 @@ export class PullOutRequestsService {
             }
           },
           user: {
-            select: { id: true, username: true }
+            select: { id: true, username: true, role: true }
           }
         },
         orderBy: { createdAt: 'desc' },
