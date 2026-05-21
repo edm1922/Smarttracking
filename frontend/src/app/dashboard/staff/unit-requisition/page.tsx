@@ -425,6 +425,22 @@ function UnitRequisitionContent() {
             productFilters={productFilters} toggleFilter={toggleFilter}
             getFilteredQty={getFilteredQty}
             setCart={setCart}
+            addPendingScanToCart={(item) => {
+              setCart(prev => {
+                if (prev.some(c => c.id === item.id)) return prev;
+                return [...prev, {
+                  id: item.id,
+                  slug: item.item?.slug || item.itemId,
+                  manualSlug: item.item?.slug || item.itemId,
+                  productName: item.item?.name || '',
+                  qty: item.qty,
+                  unit: item.unit,
+                  status: 'success',
+                  imageUrl: item.imageUrl,
+                }];
+              });
+              toast.success('Added to list');
+            }}
           />
         )}
 

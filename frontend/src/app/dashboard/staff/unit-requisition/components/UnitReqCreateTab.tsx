@@ -24,6 +24,7 @@ interface UnitReqCreateTabProps {
   toggleFilter: (pName: string, sKey: string, sValue: string) => void;
   getFilteredQty: (p: any) => number;
   setCart: (cart: any[]) => void;
+  addPendingScanToCart: (item: any) => void;
 }
 
 export const UnitReqCreateTab: React.FC<UnitReqCreateTabProps> = ({
@@ -46,6 +47,7 @@ export const UnitReqCreateTab: React.FC<UnitReqCreateTabProps> = ({
   toggleFilter,
   getFilteredQty,
   setCart,
+  addPendingScanToCart,
 }) => {
   const pendingFromScans = myRequests.filter(r => r.status === 'PENDING' && !cart.some(c => c.id === r.id));
 
@@ -96,12 +98,21 @@ export const UnitReqCreateTab: React.FC<UnitReqCreateTabProps> = ({
                           </p>
                         </div>
                       </div>
-                      <button 
-                        onClick={() => handleDeleteRequest(item.id)}
-                        className="p-3 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => addPendingScanToCart(item)}
+                          className="p-3 text-gray-300 hover:text-primary hover:bg-primary/5 rounded-xl transition-all"
+                          title="Add to list"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteRequest(item.id)}
+                          className="p-3 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
