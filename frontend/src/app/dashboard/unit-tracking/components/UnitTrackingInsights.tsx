@@ -398,10 +398,17 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                           <th className="px-6 py-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Start</th>
                           <th className="px-6 py-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Move</th>
                           <th className="px-6 py-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Result</th>
+                          <th className="px-6 py-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Breakdown</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
-                        {productSummary.filter(p => p.inToday > 0 || p.outToday > 0).map((p, idx) => (
+                        {productSummary.filter(p => p.inToday > 0 || p.outToday > 0).map((p, idx) => {
+                          const breakdownParts = [
+                            ...Object.entries(p.movementBreakdown || {}).map(([spec, qty]) => `OUT ${spec}: ${qty}`),
+                            ...Object.entries(p.inBreakdown || {}).map(([spec, qty]) => `IN ${spec}: +${qty}`),
+                          ];
+                          const breakdownStr = breakdownParts.join(' | ') || '—';
+                          return (
                           <tr key={p.name} className="hover:bg-gray-50/50 transition-all">
                             <td className="px-6 py-4 text-[11px] font-black text-gray-900 uppercase">{p.name}</td>
                             <td className="px-6 py-4 text-[11px] font-bold text-gray-400 text-right">{p.totalInStock + p.outToday - p.inToday}</td>
@@ -411,8 +418,10 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                               </span>
                             </td>
                             <td className="px-6 py-4 text-[11px] font-black text-gray-900 text-right">{p.totalInStock}</td>
+                            <td className="px-6 py-4 text-[9px] font-bold text-gray-500 text-right max-w-[200px] truncate" title={breakdownStr}>{breakdownStr}</td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
