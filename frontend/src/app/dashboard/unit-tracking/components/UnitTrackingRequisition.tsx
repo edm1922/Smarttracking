@@ -22,6 +22,8 @@ interface UnitTrackingRequisitionProps {
   setLogSearch: (val: string) => void;
   dateRange: { start: string, end: string };
   setDateRange: (range: { start: string, end: string }) => void;
+  selectedRequest: any;
+  setSelectedRequest: (req: any) => void;
 }
 
 export const UnitTrackingRequisition: React.FC<UnitTrackingRequisitionProps> = ({
@@ -42,6 +44,8 @@ export const UnitTrackingRequisition: React.FC<UnitTrackingRequisitionProps> = (
   setLogSearch,
   dateRange,
   setDateRange,
+  selectedRequest,
+  setSelectedRequest,
 }) => {
   return (
     <div className="space-y-10 animate-in fade-in duration-500">
@@ -166,7 +170,7 @@ export const UnitTrackingRequisition: React.FC<UnitTrackingRequisitionProps> = (
             </thead>
             <tbody className="divide-y divide-gray-50">
               {displayRequests.map(req => (
-                <tr key={req.id} className="hover:bg-gray-50/50 transition-all group">
+                <tr key={req.id} onDoubleClick={() => setSelectedRequest(req)} className="hover:bg-gray-50/50 transition-all group cursor-pointer">
                   <td className="px-10 py-6">
                     <input 
                       type="checkbox" 

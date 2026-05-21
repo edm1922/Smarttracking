@@ -9,6 +9,7 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
+import { X, FileText, ImageIcon, CheckCircle, Clock, User, Box, ClipboardList } from 'lucide-react';
 
 import { UnitTrackingHeader } from './components/UnitTrackingHeader';
 import { UnitTrackingStats } from './components/UnitTrackingStats';
@@ -35,6 +36,7 @@ function UnitTrackingContent() {
 
   const [requests, setRequests] = useState<any[]>([]);
   const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
+  const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [stockInLogs, setStockInLogs] = useState<any[]>([]);
 
   // Filters & State
@@ -508,6 +510,7 @@ function UnitTrackingContent() {
           selectedRequestIds={selectedRequestIds} 
           toggleRequestSelection={(id) => setSelectedRequestIds(prev => prev.includes(id) ? prev.filter(rid => rid !== id) : [...prev, id])}
           handleApprove={handleApprove} handleReject={handleReject}
+          selectedRequest={selectedRequest} setSelectedRequest={setSelectedRequest}
           handleBulkApprove={async () => {
             setModalConfig({
               isOpen: true, title: "Bulk Authorization", message: `Authorize release for ${selectedRequestIds.length} selected assets?`,
@@ -580,6 +583,154 @@ function UnitTrackingContent() {
         isDestructive={modalConfig.isDestructive}
         requireConfirmationText={modalConfig.requireConfirmationText}
       />
+
+      {selectedRequest && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
+            <div className="bg-primary px-10 py-8 flex items-center justify-between flex-shrink-0">
+              <div>
+                <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center">
+                  <ClipboardList className="mr-3 h-5 w-5" />
+                  Requisition Details
+                </h3>
+                <p className="text-[10px] text-white/60 font-bold uppercase tracking-widest mt-1.5">
+                  {selectedRequest.user?.username || 'Unknown'} &mdash; {selectedRequest.status}
+                </p>
+              </div>
+              <button onClick={() => setSelectedRequest(null)} className="text-white/60 hover:text-white transition-colors">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-gray-100 custom-scrollbar">
+              <div className="p-8 space-y-6 flex-1 bg-white">
+                <div>
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Personnel Information</h3>
+                  <div className="bg-gray-50/50 rounded-2xl p-5 border border-gray-100 space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-xs font-bold text-gray-500">Name</span>
+                      <span className="text-xs font-black text-gray-900 uppercase">{selectedRequest.user?.username || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-xs font-bold text-gray-500">Role</span>
+                      <span className="text-xs font-black text-gray-900 uppercase">{selectedRequest.user?.role || 'Staff Member'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-xs font-bold text-gray-500">Supervisor</span>
+                      <span className="text-xs font-black text-gray-900 uppercase">{selectedRequest.supervisor || 'N/A'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Item Details</h3>
+                  <div className="bg-gray-50/50 rounded-2xl p-5 border border-gray-100 space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-xs font-bold text-gray-500">Item</span>
+                      <span className="text-xs font-black text-gray-900 uppercase">{selectedRequest.item?.name || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-xs font-bold text-gray-500">Slug</span>
+                      <span className="text-xs font-black text-gray-900 font-mono">{selectedRequest.item?.slug || 'N/A'}</span>
+                    </div>
+                    {selectedRequest.item?.fieldValues?.slice(0, 4).map((fv: any, idx: number) => {
+                      const val = fv.value;
+                      const displayVal = val && typeof val === 'object' ? (val.main ?? val.qty) : val;
+                      if (!displayVal) return null;
+                      return (
+                        <div key={idx} className="flex justify-between">
+                          <span className="text-xs font-bold text-gray-500">{fv.name}</span>
+                          <span className="text-xs font-black text-gray-900 uppercase">{String(displayVal)}</span>
+                        </div>
+                      );
+                    })}
+                    <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                      <span className="text-xs font-black text-gray-500 uppercase">Quantity Requested</span>
+                      <span className="text-lg font-black text-primary">{selectedRequest.qty} {selectedRequest.unit || 'pcs'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Status</h3>
+                  <div className={`p-4 rounded-2xl border flex items-center gap-3 ${
+                    selectedRequest.status === 'SUBMITTED' ? 'bg-orange-50 border-orange-200 text-orange-600' :
+                    selectedRequest.status === 'APPROVED' ? 'bg-green-50 border-green-200 text-green-600' :
+                    'bg-red-50 border-red-200 text-red-600'
+                  }`}>
+                    {selectedRequest.status === 'SUBMITTED' && <Clock className="h-5 w-5" />}
+                    {selectedRequest.status === 'APPROVED' && <CheckCircle className="h-5 w-5" />}
+                    {selectedRequest.status === 'REJECTED' && <X className="h-5 w-5" />}
+                    <span className="font-black text-xs uppercase tracking-widest">{selectedRequest.status}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between text-[10px] font-bold text-gray-400">
+                  <span>Requested: {new Date(selectedRequest.createdAt).toLocaleDateString()}</span>
+                  <span>Updated: {new Date(selectedRequest.updatedAt).toLocaleDateString()}</span>
+                </div>
+
+                {selectedRequest.remarks && (
+                  <div>
+                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Remarks</h3>
+                    <p className="text-xs text-gray-700 bg-yellow-50/50 p-4 rounded-2xl border border-yellow-100 leading-relaxed">{selectedRequest.remarks}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 flex flex-col bg-gray-50/50 p-8">
+                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex justify-between items-center">
+                  <span>Attached Document</span>
+                  {selectedRequest.attachmentUrl && (
+                    <a href={selectedRequest.attachmentUrl} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700 underline text-[9px]">Open in new tab</a>
+                  )}
+                </h3>
+
+                <div className="flex-1 bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-inner flex items-center justify-center min-h-[300px]">
+                  {selectedRequest.attachmentUrl ? (
+                    selectedRequest.attachmentUrl.toLowerCase().endsWith('.pdf') ? (
+                      <iframe src={selectedRequest.attachmentUrl} className="w-full h-full border-0 min-h-[400px]" title="Attached Document" />
+                    ) : (
+                      <img src={selectedRequest.attachmentUrl} alt="Attached Document" className="max-w-full max-h-full object-contain p-2" />
+                    )
+                  ) : (
+                    <div className="text-center text-gray-400 p-8">
+                      <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                      <p className="text-xs font-black uppercase tracking-widest">No document attached</p>
+                    </div>
+                  )}
+                </div>
+
+                {selectedRequest.imageUrl && !selectedRequest.attachmentUrl && (
+                  <div className="mt-4">
+                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center">
+                      <ImageIcon className="mr-2 h-3 w-3" />
+                      QR Scan Image
+                    </h3>
+                    <img src={selectedRequest.imageUrl} alt="QR Scan" className="max-h-48 rounded-2xl border border-gray-200 object-contain bg-white" />
+                  </div>
+                )}
+
+                {selectedRequest.additionalImages && selectedRequest.additionalImages.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center">
+                      <ImageIcon className="mr-2 h-3 w-3" />
+                      Support Photos
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      {selectedRequest.additionalImages.map((url: string, idx: number) => (
+                        <a key={idx} href={url} target="_blank" rel="noreferrer" className="aspect-square rounded-2xl border border-gray-200 overflow-hidden hover:opacity-80 transition-opacity bg-white">
+                          <img src={url} alt={`Support ${idx + 1}`} className="w-full h-full object-cover" />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
