@@ -239,134 +239,26 @@ export class PullOutRequestsService {
     return { data, total };
   }
 
-  async approve(id: string, adminId: string) {
+  async approve(id: string) {
     const request = await this.prisma.pullOutRequest.findUnique({
       where: { id },
-      include: { item: { include: { fieldValues: { include: { field: true } } } } },
     });
 
     if (!request) throw new NotFoundException('Request not found');
     if (request.status !== 'PENDING' && request.status !== 'SUBMITTED') throw new BadRequestException('Request is already processed');
 
-    // OCC: Atomic claim to prevent double-execution
-    const claimResult = await this.prisma.pullOutRequest.updateMany({
-      where: {
-        id,
-        status: request.status
-      },
-      data: { status: 'PROCESSING' }
-    });
-
-    if (claimResult.count === 0) {
-      throw new BadRequestException('Request is currently being processed by another user');
-    }
-
-    try {
-      const item = request.item;
-      const qty = request.qty;
-    
-    const unitField = item.fieldValues.find((fv: any) => {
-        const val = fv.value as any;
-        return val && typeof val === 'object' && val.useUnitQty === true;
-    });
-
-    if (!unitField) throw new BadRequestException('Item does not have unit tracking enabled');
-    
-    const unitData = unitField.value as any;
-    const remaining = (unitData.qty || 0) - qty;
-
-    if (remaining < 0) throw new BadRequestException('Insufficient stock');
-
-    const finalStatus = remaining > 0 ? 'Available' : 'Released';
-
-    await this.itemsService.update(
-        item.slug,
-        {
-            status: finalStatus,
-            logAction: `PULL_OUT_${qty}_${request.unit.toUpperCase()}`,
-            fieldValues: item.fieldValues.map((fv: any) => {
-                if (fv.fieldId === unitField.fieldId) {
-                    return {
-                        fieldId: fv.fieldId,
-                        value: { ...unitData, qty: remaining }
-                    };
-                }
-                return { fieldId: fv.fieldId, value: fv.value };
-            })
-        },
-        adminId,
-        'admin'
-    );
-
-    await this.prisma.pullOutRequest.update({
+    const result = await this.prisma.pullOutRequest.update({
       where: { id },
       data: { status: 'APPROVED' },
-    });
-
-    // Calculate specs for independent instance
-    const specs = item.fieldValues
-      .filter((fv: any) => {
-        const val = fv.value as any;
-        // Exclude the unit tracking qty field from specs string
-        return !(val && typeof val === 'object' && val.useUnitQty === true);
-      })
-      .map((fv: any) => {
-        const val = fv.value;
-        const fieldName = fv.field?.name || 'Unknown';
-        let displayVal = '';
-        
-        if (val && typeof val === 'object') {
-          displayVal = val.main || JSON.stringify(val);
-        } else {
-          displayVal = String(val);
-        }
-        
-        return `${fieldName}: ${displayVal}`;
-      })
-      .join(', ');
-
-    const productName = item.name || 'Unknown Product';
-    const finalSpecs = specs || 'No Specs';
-
-    // Automatically transfer to StaffInventory as an independent instance
-    const result = await this.prisma.staffInventory.upsert({
-      where: { 
-        userId_productName_specs: {
-          userId: request.userId,
-          productName: productName,
-          specs: finalSpecs
-        }
-      },
-      update: {
-        qty: { increment: qty }
-      },
-      create: {
-        userId: request.userId,
-        productName: productName,
-        specs: finalSpecs,
-        qty: qty,
-        unit: request.unit
-      }
     });
 
     await this.logActivity(
       request.userId,
       'REQUEST_APPROVED',
-      `Pull Request for ${qty} ${request.unit} of ${productName} was approved`,
-      productName,
-      finalSpecs,
-      qty,
-      request.unit
+      `Pull Request for ${request.qty} ${request.unit} was approved`,
     );
 
-      return result;
-    } catch (error) {
-      await this.prisma.pullOutRequest.update({
-        where: { id },
-        data: { status: request.status }
-      });
-      throw error;
-    }
+    return result;
   }
 
   async reject(id: string, adminId: string) {
@@ -466,11 +358,11 @@ export class PullOutRequestsService {
     return { data, total };
   }
 
-  async bulkApprove(ids: string[], adminId: string) {
+  async bulkApprove(ids: string[]) {
     const results = [];
     for (const id of ids) {
       try {
-        const res = await this.approve(id, adminId);
+        const res = await this.approve(id);
         results.push({ id, status: 'success', data: res });
       } catch (err) {
         results.push({ id, status: 'error', error: err.message });

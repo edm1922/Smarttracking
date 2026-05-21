@@ -72,8 +72,8 @@ export class PullOutRequestsController {
   }
 
   @Post('bulk-approve')
-  async bulkApprove(@Body() data: { ids: string[] }, @Req() req: any) {
-    return this.pullOutRequestsService.bulkApprove(data.ids, req.user.sub);
+  async bulkApprove(@Body() data: { ids: string[] }) {
+    return this.pullOutRequestsService.bulkApprove(data.ids);
   }
 
   @Post('bulk-reject')
@@ -82,8 +82,8 @@ export class PullOutRequestsController {
   }
 
   @Patch(':id/approve')
-  async approve(@Param('id') id: string, @Req() req: any) {
-    return this.pullOutRequestsService.approve(id, req.user.sub);
+  async approve(@Param('id') id: string) {
+    return this.pullOutRequestsService.approve(id);
   }
 
   @Patch(':id/reject')
