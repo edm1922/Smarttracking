@@ -407,55 +407,6 @@ function UnitTrackingContent() {
       ]
     });
 
-    // 5. Signatories Section
-    let currentSigRow = lastDataRow + 3;
-    sheet.getCell(`A${currentSigRow}`).value = 'SIGNATORIES';
-    sheet.getCell(`A${currentSigRow}`).font = { bold: true, size: 11, name: 'Aptos' };
-    sheet.getRow(currentSigRow).height = 25;
-    
-    currentSigRow += 2;
-    const signatoriesList = ['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy'].filter(f => (enabledSignatories as any)[f]);
-    
-    // Group signatories in pairs
-    for (let i = 0; i < signatoriesList.length; i += 2) {
-      const sig1 = signatoriesList[i];
-      const sig2 = signatoriesList[i + 1];
-      
-      const label1 = sig1.replace(/By$/, ' By');
-      const name1 = (transmittalHeader as any)[sig1] || '____________________';
-      
-      sheet.getCell(`A${currentSigRow}`).value = label1.toUpperCase();
-      sheet.getCell(`A${currentSigRow}`).font = { size: 9, bold: true, color: { argb: 'FF64748B' } };
-      
-      sheet.getCell(`A${currentSigRow + 2}`).value = name1.toUpperCase();
-      sheet.getCell(`A${currentSigRow + 2}`).font = { size: 10, bold: true, name: 'Aptos' };
-      sheet.getCell(`A${currentSigRow + 2}`).alignment = { horizontal: 'center' };
-      sheet.getCell(`A${currentSigRow + 2}`).border = { bottom: { style: 'thin' } };
-      
-      sheet.getCell(`A${currentSigRow + 3}`).value = 'Signature / Date';
-      sheet.getCell(`A${currentSigRow + 3}`).font = { size: 8, italic: true, color: { argb: 'FF94A3B8' } };
-      sheet.getCell(`A${currentSigRow + 3}`).alignment = { horizontal: 'center' };
-
-      if (sig2) {
-        const label2 = sig2.replace(/By$/, ' By');
-        const name2 = (transmittalHeader as any)[sig2] || '____________________';
-        
-        sheet.getCell(`D${currentSigRow}`).value = label2.toUpperCase();
-        sheet.getCell(`D${currentSigRow}`).font = { size: 9, bold: true, color: { argb: 'FF64748B' } };
-        
-        sheet.getCell(`D${currentSigRow + 2}`).value = name2.toUpperCase();
-        sheet.getCell(`D${currentSigRow + 2}`).font = { size: 10, bold: true, name: 'Aptos' };
-        sheet.getCell(`D${currentSigRow + 2}`).alignment = { horizontal: 'center' };
-        sheet.getCell(`D${currentSigRow + 2}`).border = { bottom: { style: 'thin' } };
-        
-        sheet.getCell(`D${currentSigRow + 3}`).value = 'Signature / Date';
-        sheet.getCell(`D${currentSigRow + 3}`).font = { size: 8, italic: true, color: { argb: 'FF94A3B8' } };
-        sheet.getCell(`D${currentSigRow + 3}`).alignment = { horizontal: 'center' };
-      }
-      
-      currentSigRow += 6;
-    }
-
     // Column Widths
     sheet.getColumn(1).width = 35; // Reference
     sheet.getColumn(2).width = 18; // Starting
