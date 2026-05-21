@@ -258,6 +258,14 @@ function UnitTrackingContent() {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Stock Health Report');
 
+    sheet.pageSetup = {
+      orientation: 'landscape',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      paperSize: 9, // A4
+    };
+
     // 1. Header Section
     sheet.mergeCells('A1:E1');
     const titleCell = sheet.getCell('A1');
