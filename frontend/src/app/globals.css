@@ -83,6 +83,10 @@ input::placeholder, textarea::placeholder {
 
 /* Print utilities */
 @media print {
+  @page {
+    size: landscape;
+    margin: 12mm 15mm;
+  }
   .no-print {
     display: none !important;
   }
@@ -91,6 +95,17 @@ input::placeholder, textarea::placeholder {
   }
   body {
     background: white;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  table {
+    width: 100% !important;
+    table-layout: fixed !important;
+    font-size: 8px !important;
+  }
+  th, td {
+    padding: 4px 6px !important;
+    word-break: break-word !important;
   }
 }
 @keyframes pulse-slow {
