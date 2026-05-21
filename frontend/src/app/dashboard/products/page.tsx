@@ -102,7 +102,7 @@ export default function ProductsPage() {
     setError(null);
     try {
       const [prodRes, locRes] = await Promise.all([
-        api.get('/products', { params: { page, limit: pageSize, search: searchTerm } }),
+        api.get('/products', { params: { skip: (page - 1) * pageSize, take: pageSize, search: searchTerm } }),
         api.get('/locations')
       ]);
       setProducts(prodRes.data.data || prodRes.data);
@@ -235,7 +235,7 @@ export default function ProductsPage() {
       setReleaseSearchLoading(true);
       try {
         const res = await api.get('/products', { 
-          params: { search: releaseSearchInput, limit: 10, stockFilter: releaseBulkForm.sourceLocationId } 
+          params: { search: releaseSearchInput, take: 10, stockFilter: releaseBulkForm.sourceLocationId } 
         });
         setReleaseSearchResults(res.data.data || res.data);
       } catch (err) {
