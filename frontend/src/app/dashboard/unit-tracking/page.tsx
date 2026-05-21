@@ -173,7 +173,12 @@ function UnitTrackingContent() {
       const res = await api.get('/items/unit-inventory', { params: { skip, take: pageSize, search: debouncedInventorySearch } });
       setInventory(res.data.data || []);
       setInvTotal(res.data.total || 0);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+      if (err && typeof err === 'object' && 'response' in err && !err.response) {
+        toast.error('Cannot reach server — data may be stale');
+      }
+    }
   };
 
   const fetchRequests = async () => {
@@ -182,14 +187,24 @@ function UnitTrackingContent() {
       const res = await api.get('/pull-out-requests', { params: { skip, take: pageSize, search: debouncedLogSearch } });
       setRequests(res.data.data);
       setTotalRequests(res.data.total);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+      if (err && typeof err === 'object' && 'response' in err && !err.response) {
+        toast.error('Cannot reach server — data may be stale');
+      }
+    }
   };
 
   const fetchStockInLogs = async () => {
     try {
       const res = await api.get('/logs', { params: { action: 'STOCK_IN,SUBMIT_CONTENT,CREATE_ITEM', startDate: stockHealthRange.start, endDate: stockHealthRange.end, take: 10000 } });
       setStockInLogs(res.data.data || []);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+      if (err && typeof err === 'object' && 'response' in err && !err.response) {
+        toast.error('Cannot reach server — data may be stale');
+      }
+    }
   };
 
   useEffect(() => {
