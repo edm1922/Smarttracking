@@ -10,11 +10,6 @@ import { SupabaseService } from '../prisma/supabase.service';
 export class InternalRequestsService {
   private cachedAdminId: string | null = null;
   
-  // O(1) OPTIMIZATION: Cache for issuance counts
-  private issuanceCache: Map<string, number> | null = null;
-  private cacheTimestamp: number = 0;
-  private readonly CACHE_TTL = 60000; // 1 minute
-  
   constructor(
     private prisma: PrismaService,
     private supabaseService: SupabaseService,
@@ -86,7 +81,7 @@ export class InternalRequestsService {
       ];
     }
 
-    const safeTake = Math.min(take ?? 20, 100);
+    const safeTake = Math.min(take ?? 20, 500);
     const start = Date.now();
 
     const [requests, total] = await Promise.all([
@@ -115,35 +110,35 @@ export class InternalRequestsService {
       console.warn(`[InternalRequestsService] Slow findAll query: ${duration}ms`);
     }
 
-    // O(1) OPTIMIZATION: Use cached issuance counts with periodic refresh
-    const now = Date.now();
-    if (!this.issuanceCache || now - this.cacheTimestamp > this.CACHE_TTL) {
-      const issuanceGroups = await this.prisma.internalRequest.groupBy({
-        by: ['employeeName', 'date'],
-        where: { status: 'FULFILLED' },
+    // Compute sequential issuance number for each record
+    const employeeNames = [...new Set(requests.map(r => r.employeeName))];
+    const issuanceOrderMap = new Map<string, Map<string, number>>();
+
+    if (employeeNames.length > 0) {
+      const allFulfilled = await this.prisma.internalRequest.findMany({
+        where: {
+          employeeName: { in: employeeNames },
+          status: 'FULFILLED',
+        },
+        select: { id: true, employeeName: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
       });
 
-      this.issuanceCache = new Map();
-      issuanceGroups.forEach((i) => {
-        const count = this.issuanceCache!.get(i.employeeName) || 0;
-        this.issuanceCache!.set(i.employeeName, count + 1);
+      allFulfilled.forEach((r) => {
+        if (!issuanceOrderMap.has(r.employeeName)) {
+          issuanceOrderMap.set(r.employeeName, new Map());
+        }
+        issuanceOrderMap.get(r.employeeName)!.set(r.id, issuanceOrderMap.get(r.employeeName)!.size + 1);
       });
-      this.cacheTimestamp = now;
     }
 
     const data = requests.map((req) => {
-      let count = (this.issuanceCache as any).get(req.employeeName) ?? 0;
-      
-      // If this specific request is already FULFILLED, it's included in the count.
-      // We subtract 1 to get the number of PREVIOUS issuances.
-      if (req.status === 'FULFILLED' && count > 0) {
-        count--;
+      const seq = issuanceOrderMap.get(req.employeeName)?.get(req.id);
+      if (seq !== undefined) {
+        return { ...req, previousIssuancesCount: seq - 1 };
       }
-
-      return {
-        ...req,
-        previousIssuancesCount: count,
-      };
+      const totalFulfilled = issuanceOrderMap.get(req.employeeName)?.size ?? 0;
+      return { ...req, previousIssuancesCount: totalFulfilled };
     });
 
     return { data, total };

@@ -6,9 +6,9 @@ import { toast } from 'sonner';
 import { useDebounce } from '@/hooks/useDebounce';
 import { PageHeaderSkeleton } from '@/components/ui/LoadingSkeletons';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
-import * as XLSX from 'xlsx';
-import ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
+import jsPDF from 'jspdf';
+import { applyPlugin } from 'jspdf-autotable';
+applyPlugin(jsPDF);
 import { X, FileText, ImageIcon, CheckCircle, Clock, User, Box, ClipboardList } from 'lucide-react';
 
 import { UnitTrackingHeader } from './components/UnitTrackingHeader';
@@ -69,6 +69,7 @@ function UnitTrackingContent() {
     receivedBy: true,
     approvedBy: false
   });
+  const [exportType, setExportType] = useState<'all' | 'stock-in' | 'stock-out'>('all');
 
   const [invPage, setInvPage] = useState(1);
   const [invTotal, setInvTotal] = useState(0);
@@ -254,172 +255,184 @@ function UnitTrackingContent() {
     });
   };
 
-  const handleExportExcel = async () => {
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Stock Health Report');
+  const handleExportPDF = () => {
+    const doc = new jsPDF('landscape', 'mm', 'a4');
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    const usableWidth = pageWidth - margin * 2;
 
-    sheet.pageSetup = {
-      orientation: 'landscape',
-      fitToPage: true,
-      fitToWidth: 1,
-      fitToHeight: 0,
-      paperSize: 9, // A4
-    };
+    // ── Title ──
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.text('UNIFORM TRANSACTION', pageWidth / 2, 22, { align: 'center' });
 
-    // 1. Header Section
-    sheet.mergeCells('A1:E1');
-    const titleCell = sheet.getCell('A1');
-    titleCell.value = 'STOCK HEALTH & TRANSMITTAL REPORT';
-    titleCell.font = { name: 'Aptos', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
-    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    titleCell.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF1E293B' } // Dark Slate 800
-    };
-    sheet.getRow(1).height = 40;
+    doc.setFontSize(16);
+    const subtitle = exportType === 'stock-in' ? 'STOCK IN REPORT'
+      : exportType === 'stock-out' ? 'STOCK OUT REPORT'
+      : 'STOCK HEALTH REPORT';
+    doc.text(subtitle, pageWidth / 2, 32, { align: 'center' });
 
-    // 2. Metadata Section (Info)
-    const metaData = [
-      ['Transmittal No:', transmittalHeader.transmittalNo],
-      ['Date Covered:', stockHealthRange.start === stockHealthRange.end ? stockHealthRange.start : `${stockHealthRange.start} to ${stockHealthRange.end}`],
-      ['Department:', transmittalHeader.department || 'N/A'],
-      ['Recipient:', transmittalHeader.recipient || 'N/A'],
-      ['Remarks:', transmittalHeader.remarks || 'None'],
+    // ── Separator line ──
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, 36, pageWidth - margin, 36);
+
+    // ── Metadata ──
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+
+    const leftMeta = [
+      `Recipient: ${transmittalHeader.recipient || 'N/A'}`,
+      `Department: ${transmittalHeader.department || 'N/A'}`,
+      `Date Covered: ${stockHealthRange.start === stockHealthRange.end ? stockHealthRange.start : `${stockHealthRange.start} to ${stockHealthRange.end}`}`,
+    ];
+    const rightMeta = [
+      `Transaction No.: ${transmittalHeader.transmittalNo}`,
+      `Created by: ${typeof window !== 'undefined' ? (localStorage.getItem('username')?.toUpperCase() || 'N/A') : 'N/A'}`,
+      `Created at: ${new Date().toLocaleString('en-US', {
+        weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      }).toUpperCase()}`,
     ];
 
-    metaData.forEach((row, i) => {
-      const rowIndex = i + 2;
-      sheet.getCell(`A${rowIndex}`).value = row[0];
-      sheet.getCell(`B${rowIndex}`).value = row[1];
-      
-      sheet.getCell(`A${rowIndex}`).font = { bold: true, size: 10, name: 'Aptos' };
-      sheet.getCell(`B${rowIndex}`).font = { size: 10, name: 'Aptos' };
-      sheet.getCell(`A${rowIndex}`).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFF8FAFC' }
-      };
-      sheet.getRow(rowIndex).height = 20;
+    const metaStartY = 42;
+    leftMeta.forEach((line, i) => {
+      doc.text(line, margin, metaStartY + i * 6);
+    });
+    rightMeta.forEach((line, i) => {
+      doc.text(line, pageWidth - margin, metaStartY + i * 6, { align: 'right' });
     });
 
-    // Spacer
-    sheet.getRow(7).height = 10;
-
-    // 3. Stock Movement Header
-    sheet.mergeCells('A8:E8');
-    const tableTitle = sheet.getCell('A8');
-    tableTitle.value = 'STOCK MOVEMENT DATA';
-    tableTitle.font = { bold: true, size: 11, name: 'Aptos', color: { argb: 'FF334155' } };
-    tableTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
-    sheet.getRow(8).height = 25;
-
-    // 4. Data Table
-    const headerRow = sheet.getRow(9);
-    headerRow.values = ['Product Reference', 'Starting Stock', 'Movement Qty', 'Resulting Stock', 'Movement Breakdown'];
-    headerRow.height = 30;
-    headerRow.eachCell((cell) => {
-      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10, name: 'Aptos' };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      cell.border = {
-        top: { style: 'thin' },
-        bottom: { style: 'thin' },
-        left: { style: 'thin' },
-        right: { style: 'thin' }
-      };
-    });
-
-    const dataRows = productSummary.filter(i => i.inToday > 0 || i.outToday > 0).map(item => {
-      const breakdownStr = Object.entries(item.movementBreakdown)
-        .map(([spec, qty]) => `${spec}: ${qty}`)
-        .join(' | ');
-        
-      return [
-        item.name,
-        item.totalInStock + item.outToday - item.inToday,
-        item.inToday - item.outToday,
-        item.totalInStock,
-        breakdownStr || 'No Movement'
-      ];
-    });
-
-    dataRows.forEach((row, i) => {
-      const excelRow = sheet.addRow(row);
-      excelRow.height = 25;
-      excelRow.eachCell((cell, colNumber) => {
-        cell.font = { name: 'Aptos', size: 10 };
-        cell.alignment = { vertical: 'middle', horizontal: colNumber === 1 || colNumber === 5 ? 'left' : 'right' };
-        cell.border = {
-          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } }
-        };
-        
-        // Product Reference bold
-        if (colNumber === 1) cell.font = { bold: true, name: 'Aptos' };
-        
-        // Movement Qty Red if negative
-        if (colNumber === 3 && typeof cell.value === 'number' && cell.value < 0) {
-          cell.font = { color: { argb: 'FFEF4444' }, bold: true, name: 'Aptos' };
-        }
-
-        // Breakdown wrapping
-        if (colNumber === 5) {
-          cell.alignment = { wrapText: true, vertical: 'top', horizontal: 'left' };
-          excelRow.height = Math.max(25, (String(cell.value).length / 40) * 15);
-        }
-
-        // Alternating row colors
-        if (i % 2 === 0) {
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
-        }
+    // ── Data Table ──
+    const dataRows = productSummary
+      .filter((item: any) =>
+        exportType === 'stock-in' ? item.inToday > item.outToday
+        : exportType === 'stock-out' ? item.outToday > item.inToday
+        : item.inToday > 0 || item.outToday > 0
+      )
+      .map((item: any, idx: number) => {
+        const breakdownParts = exportType === 'stock-in'
+          ? Object.entries(item.inBreakdown || {}).map(([s, q]) => `IN ${s}: +${q}`)
+          : exportType === 'stock-out'
+          ? Object.entries(item.movementBreakdown || {}).map(([s, q]) => `OUT ${s}: ${q}`)
+          : [
+              ...Object.entries(item.movementBreakdown || {}).map(([s, q]) => `OUT ${s}: ${q}`),
+              ...Object.entries(item.inBreakdown || {}).map(([s, q]) => `IN ${s}: +${q}`),
+            ];
+        const breakdownStr = breakdownParts.join('; ') || '\u2014';
+        const opening = item.totalInStock + item.outToday - item.inToday;
+        const movement = item.inToday - item.outToday;
+        const movementStr = movement > 0 ? `+${movement}` : String(movement);
+        return [
+          `${idx + 1}.`,
+          item.name,
+          String(opening),
+          movementStr,
+          String(item.totalInStock),
+          breakdownStr,
+        ];
       });
-    });
 
-    // Enable Autofilter
-    sheet.autoFilter = 'A9:E9';
+    const tableStartY = metaStartY + leftMeta.length * 6 + 8;
 
-    // Conditional Formatting for Resulting Stock
-    const lastDataRow = 9 + dataRows.length;
-    sheet.addConditionalFormatting({
-      ref: `D10:D${lastDataRow}`,
-      rules: [
-        {
-          priority: 1,
-          type: 'cellIs',
-          operator: 'lessThan',
-          formulae: ['20'], // Low stock example
-          style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFFEE2E2' } }, font: { color: { argb: 'FF991B1B' }, bold: true } }
+    if (dataRows.length > 0) {
+      (doc as any).autoTable({
+        startY: tableStartY,
+        head: [['NO.', 'PRODUCT REFERENCE', 'OPENING', 'MOVEMENT', 'CLOSING', 'BREAKDOWN']],
+        body: dataRows,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [30, 41, 59],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 8,
+          halign: 'center',
         },
-        {
-          priority: 2,
-          type: 'cellIs',
-          operator: 'between',
-          formulae: ['20', '50'],
-          style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFFEF3C7' } }, font: { color: { argb: 'FF92400E' }, bold: true } }
+        bodyStyles: {
+          fontSize: 7.5,
+          lineColor: [220, 220, 220],
+          lineWidth: 0.1,
         },
-        {
-          priority: 3,
-          type: 'cellIs',
-          operator: 'greaterThan',
-          formulae: ['50'],
-          style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFDCFCE7' } }, font: { color: { argb: 'FF166534' }, bold: true } }
-        }
-      ]
+        columnStyles: {
+          0: { cellWidth: 12, halign: 'center' },
+          1: { cellWidth: 70, halign: 'left' },
+          2: { cellWidth: 25, halign: 'right' },
+          3: { cellWidth: 25, halign: 'right' },
+          4: { cellWidth: 25, halign: 'right' },
+          5: { cellWidth: 'auto', halign: 'left' },
+        },
+        margin: { left: margin, right: margin },
+        pageBreak: 'auto',
+      });
+    }
+
+    // ── Summary / Total ──
+    const totalY = dataRows.length > 0
+      ? (doc as any).lastAutoTable.finalY + 8
+      : tableStartY + 10;
+
+    if (dataRows.length === 0) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(10);
+      doc.text('No stock movement recorded in selected range.', pageWidth / 2, totalY, { align: 'center' });
+    } else {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text(`TOTAL ITEMS RECORDED: ${dataRows.length}`, margin, totalY);
+    }
+
+    // ── Signatory Section ──
+    const signFields = ['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy']
+      .filter(f => (enabledSignatories as any)[f]);
+
+    if (signFields.length > 0) {
+      const signY = totalY + 14;
+      const signColWidth = usableWidth / signFields.length;
+
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.5);
+
+      signFields.forEach((field, i) => {
+        const x = margin + i * signColWidth;
+        const label = field === 'preparedBy' ? 'Prepared by:'
+          : field === 'checkedBy' ? 'Checked by:'
+          : field === 'receivedBy' ? 'Received by:'
+          : 'Approved by:';
+        const name = (transmittalHeader as any)[field] || '____________________';
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.text(label, x, signY);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.text(name, x, signY + 6);
+
+        doc.line(x, signY + 9, x + signColWidth - 5, signY + 9);
+
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(6);
+        doc.text('Signature Over Printed Name', x, signY + 13);
+      });
+    }
+
+    // ── Footer ──
+    const footerY = pageHeight - 10;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    const dateStr = new Date().toLocaleDateString('en-US', {
+      month: '2-digit', day: '2-digit', year: '2-digit'
     });
+    const timeStr = new Date().toLocaleTimeString('en-US', {
+      hour: '2-digit', minute: '2-digit'
+    });
+    doc.text(`${dateStr}, ${timeStr}`, margin, footerY);
+    doc.text(`Uniform Transaction - ${transmittalHeader.transmittalNo}`, pageWidth / 2, footerY, { align: 'center' });
+    doc.text('1/1', pageWidth - margin, footerY, { align: 'right' });
 
-    // Column Widths
-    sheet.getColumn(1).width = 35; // Reference
-    sheet.getColumn(2).width = 18; // Starting
-    sheet.getColumn(3).width = 18; // Movement
-    sheet.getColumn(4).width = 18; // Resulting
-    sheet.getColumn(5).width = 65; // Breakdown
-
-    // Remove Gridlines
-    sheet.views = [{ ...sheet.views[0], showGridLines: false }];
-
-    // Generate Buffer and Save
-    const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), `${transmittalHeader.transmittalNo}_Transmittal_Report.xlsx`);
+    // ── Print ──
+    doc.autoPrint();
+    window.open(doc.output('bloburl'), '_blank');
     setIsBuildingTransmittal(false);
   };
 
@@ -536,14 +549,16 @@ function UnitTrackingContent() {
           productSummary={productSummary} 
           stockHealthRange={stockHealthRange} 
           setStockHealthRange={setStockHealthRange}
-          handleExportExcel={() => setIsBuildingTransmittal(true)}
+          handleExportPDF={() => setIsBuildingTransmittal(true)}
           isBuildingTransmittal={isBuildingTransmittal}
           setIsBuildingTransmittal={setIsBuildingTransmittal}
           transmittalHeader={transmittalHeader}
           setTransmittalHeader={setTransmittalHeader}
           enabledSignatories={enabledSignatories}
           setEnabledSignatories={setEnabledSignatories}
-          onConfirmExport={handleExportExcel}
+          exportType={exportType}
+          setExportType={setExportType}
+          onConfirmExport={handleExportPDF}
         />
       )}
 

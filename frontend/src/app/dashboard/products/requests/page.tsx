@@ -74,6 +74,8 @@ export default function RequestsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [selectedEmployeeRequests, setSelectedEmployeeRequests] = useState<Request[] | null>(null);
+  const [employeeHistoryLoading, setEmployeeHistoryLoading] = useState(false);
 
   // Form state
   const [form, setForm] = useState({
@@ -348,6 +350,21 @@ export default function RequestsPage() {
     printWindow.document.close();
   };
 
+  const fetchEmployeeHistory = async (employeeName: string) => {
+    setEmployeeHistoryLoading(true);
+    try {
+      const res = await api.get('/internal-requests', {
+        params: { search: employeeName, take: 500 }
+      });
+      const allRequests: Request[] = res.data.data || [];
+      setSelectedEmployeeRequests(allRequests.filter(r => r.employeeName === employeeName));
+    } catch (err) {
+      console.error('Failed to fetch employee history', err);
+    } finally {
+      setEmployeeHistoryLoading(false);
+    }
+  };
+
   const filteredRequests = requests;
 
 
@@ -428,122 +445,189 @@ export default function RequestsPage() {
           )}
 
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-4 w-10 text-center">
-                    <input type="checkbox" checked={selectedIds.length === filteredRequests.length && filteredRequests.length > 0} onChange={toggleSelectAll} className="rounded border-gray-300 text-primary" />
-                  </th>
-                  <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Request Info</th>
-                  <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Employee / Dept</th>
-                  <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Stock Item</th>
-                  <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Qty</th>
-                  <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                  <th className="px-6 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {loading ? (
-                  <TableSkeleton columns={7} rows={6} />
-                ) : filteredRequests.length === 0 ? (
-                  <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-gray-400 italic">No requests found.</td></tr>
-                ) : (
-                  filteredRequests.map((req) => (
-                    <tr key={req.id} onDoubleClick={() => setSelectedRequest(req)} className={`hover:bg-gray-50 transition-colors group cursor-pointer ${selectedIds.includes(req.id) ? 'bg-primary/5' : ''}`}>
-                      <td className="px-6 py-4 text-center">
-                        <input type="checkbox" checked={selectedIds.includes(req.id)} onChange={() => toggleSelectOne(req.id)} className="rounded border-gray-300 text-primary" />
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-xs font-bold text-gray-900 flex items-center gap-2">
-                          {req.requestNo}
-                          {req.attachmentUrl && (
-                            <a href={req.attachmentUrl} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700 p-0.5 rounded-sm bg-blue-50 hover:bg-blue-100 transition-colors" title="View Signed Document">
-                              <ClipboardList className="h-3.5 w-3.5" />
-                            </a>
-                          )}
-                        </div>
-                        <div className="text-[10px] text-gray-500">{new Date(req.date).toLocaleDateString()}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-xs font-bold text-gray-900">{req.employeeName}</div>
-                        <div className="text-[10px] text-gray-500 uppercase">
-                          {req.departmentArea} • {req.shift}
-                        </div>
-                        {req.targetLocation && (
-                          <div className="mt-1 flex items-center gap-1 text-[9px] font-black text-primary uppercase">
-                            <ArrowDownToLine className="h-3 w-3" />
-                            To: {req.targetLocation.name}
+            {activeTab === 'FULFILLED' ? (
+              /* ── Issuance Log: Employee List ── */
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Employee Name</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Department</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Items Issued</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Requests</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Last Issuance</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {loading ? (
+                    <TableSkeleton columns={5} rows={6} />
+                  ) : filteredRequests.length === 0 ? (
+                    <tr><td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-400 italic">No issuance records found.</td></tr>
+                  ) : (
+                    (() => {
+                      const groups: { [name: string]: Request[] } = {};
+                      filteredRequests.forEach(r => {
+                        if (!groups[r.employeeName]) groups[r.employeeName] = [];
+                        groups[r.employeeName].push(r);
+                      });
+                      return Object.entries(groups)
+                        .sort((a, b) => a[0].localeCompare(b[0]))
+                        .map(([name, reqs]) => {
+                          const totalQty = reqs.reduce((s, r) => s + r.quantity, 0);
+                          const lastDate = reqs.reduce((latest, r) => new Date(r.date) > new Date(latest.date) ? r : latest).date;
+                          const dept = reqs[0].departmentArea;
+                          return (
+                            <tr
+                              key={name}
+                              onDoubleClick={() => fetchEmployeeHistory(name)}
+                              className="hover:bg-gray-50 transition-colors cursor-pointer"
+                              title="Double-click to view issuance history"
+                            >
+                              <td className="px-6 py-5">
+                                <div className="flex items-center gap-3">
+                                  <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <User className="h-4 w-4 text-primary" />
+                                  </div>
+                                  <span className="text-sm font-black text-gray-900">{name}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-5">
+                                <span className="text-xs font-bold text-gray-500 uppercase">{dept}</span>
+                              </td>
+                              <td className="px-6 py-5">
+                                <span className="text-sm font-black text-primary">{totalQty}</span>
+                              </td>
+                              <td className="px-6 py-5">
+                                <span className="text-xs font-black text-gray-700">{reqs.length}</span>
+                              </td>
+                              <td className="px-6 py-5">
+                                <span className="text-xs font-medium text-gray-500">{new Date(lastDate).toLocaleDateString()}</span>
+                              </td>
+                            </tr>
+                          );
+                        });
+                    })()
+                  )}
+                </tbody>
+              </table>
+            ) : (
+              /* ── Standard Request List ── */
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-4 w-10 text-center">
+                      <input type="checkbox" checked={selectedIds.length === filteredRequests.length && filteredRequests.length > 0} onChange={toggleSelectAll} className="rounded border-gray-300 text-primary" />
+                    </th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Request Info</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Employee / Dept</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Stock Item</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Qty</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                    <th className="px-6 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {loading ? (
+                    <TableSkeleton columns={7} rows={6} />
+                  ) : filteredRequests.length === 0 ? (
+                    <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-gray-400 italic">No requests found.</td></tr>
+                  ) : (
+                    filteredRequests.map((req) => (
+                      <tr key={req.id} onDoubleClick={() => setSelectedRequest(req)} className={`hover:bg-gray-50 transition-colors group cursor-pointer ${selectedIds.includes(req.id) ? 'bg-primary/5' : ''}`}>
+                        <td className="px-6 py-4 text-center">
+                          <input type="checkbox" checked={selectedIds.includes(req.id)} onChange={() => toggleSelectOne(req.id)} className="rounded border-gray-300 text-primary" />
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-xs font-bold text-gray-900 flex items-center gap-2">
+                            {req.requestNo}
+                            {req.attachmentUrl && (
+                              <a href={req.attachmentUrl} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700 p-0.5 rounded-sm bg-blue-50 hover:bg-blue-100 transition-colors" title="View Signed Document">
+                                <ClipboardList className="h-3.5 w-3.5" />
+                              </a>
+                            )}
                           </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-xs font-bold text-gray-900">{req.product.name}</div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-gray-400 font-mono">{req.product.sku}</span>
-                          <span className={`text-[9px] font-black px-1.5 rounded-full ${
-                            (req.previousIssuancesCount || 0) === 0 ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'
-                          }`}>
-                            {(req.previousIssuancesCount || 0) + 1 === 1 ? '1st Issuance' : `${getOrdinal((req.previousIssuancesCount || 0) + 1)} Issuance`}
+                          <div className="text-[10px] text-gray-500">{new Date(req.date).toLocaleDateString()}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-xs font-bold text-gray-900">{req.employeeName}</div>
+                          <div className="text-[10px] text-gray-500 uppercase">
+                            {req.departmentArea} • {req.shift}
+                          </div>
+                          {req.targetLocation && (
+                            <div className="mt-1 flex items-center gap-1 text-[9px] font-black text-primary uppercase">
+                              <ArrowDownToLine className="h-3 w-3" />
+                              To: {req.targetLocation.name}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-xs font-bold text-gray-900">{req.product.name}</div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-gray-400 font-mono">{req.product.sku}</span>
+                            <span className={`text-[9px] font-black px-1.5 rounded-full ${
+                              (req.previousIssuancesCount || 0) === 0 ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {(req.previousIssuancesCount || 0) + 1 === 1 ? '1st Issuance' : `${getOrdinal((req.previousIssuancesCount || 0) + 1)} Issuance`}
+                            </span>
+                          </div>
+                          {req.product.description && (
+                            <div className="text-[10px] text-gray-500 mt-1 italic leading-tight">
+                              {req.product.description}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="text-xs font-black text-primary">{req.quantity}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black border uppercase ${getStatusColor(req.status)}`}>
+                            {req.status}
                           </span>
-                        </div>
-                        {req.product.description && (
-                          <div className="text-[10px] text-gray-500 mt-1 italic leading-tight">
-                            {req.product.description}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="text-xs font-black text-primary">{req.quantity}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black border uppercase ${getStatusColor(req.status)}`}>
-                          {req.status}
-                        </span>
-                        {req.remarks && (
-                          <div className="text-[9px] text-gray-500 mt-1 italic max-w-[150px] leading-tight" title={req.remarks}>
-                            "{req.remarks}"
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {actionLoading === req.id ? (
-                            <div className="p-1"><Spinner className="h-4 w-4" /></div>
-                          ) : (
-                            <>
-                              {req.status === 'PENDING' ? (
-                                <>
-                                  <button onClick={() => handleUpdateStatus(req.id, 'APPROVED')} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Approve"><CheckCircle className="h-4 w-4" /></button>
-                                  <button onClick={() => handleUpdateStatus(req.id, 'REJECTED')} className="p-1 text-red-600 hover:bg-red-50 rounded" title="Reject"><X className="h-4 w-4" /></button>
-                                </>
-                              ) : (
-                                <button 
-                                  onClick={() => {
-                                    if(confirm('Undo this action and move back to Pending? Stock will be reverted if previously issued.')) {
-                                      handleUpdateStatus(req.id, 'PENDING');
-                                    }
-                                  }} 
-                                  className="flex items-center text-[10px] font-black text-gray-400 hover:text-primary uppercase tracking-tighter"
-                                >
-                                  <History className="mr-1 h-3 w-3" />
-                                  Undo / Reset
-                                </button>
-                              )}
-                              {req.status === 'APPROVED' && (
-                                <button onClick={() => handleUpdateStatus(req.id, 'FULFILLED')} className="text-[10px] font-black text-green-600 hover:underline">ISSUE</button>
-                              )}
-                              <button onClick={() => handleDelete(req.id)} className="p-1 text-gray-300 hover:text-red-500 rounded transition-colors" title="Delete">
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </>
+                          {req.remarks && (
+                            <div className="text-[9px] text-gray-500 mt-1 italic max-w-[150px] leading-tight" title={req.remarks}>
+                              "{req.remarks}"
+                            </div>
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {actionLoading === req.id ? (
+                              <div className="p-1"><Spinner className="h-4 w-4" /></div>
+                            ) : (
+                              <>
+                                {req.status === 'PENDING' ? (
+                                  <>
+                                    <button onClick={() => handleUpdateStatus(req.id, 'APPROVED')} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Approve"><CheckCircle className="h-4 w-4" /></button>
+                                    <button onClick={() => handleUpdateStatus(req.id, 'REJECTED')} className="p-1 text-red-600 hover:bg-red-50 rounded" title="Reject"><X className="h-4 w-4" /></button>
+                                  </>
+                                ) : (
+                                  <button 
+                                    onClick={() => {
+                                      if(confirm('Undo this action and move back to Pending? Stock will be reverted if previously issued.')) {
+                                        handleUpdateStatus(req.id, 'PENDING');
+                                      }
+                                    }} 
+                                    className="flex items-center text-[10px] font-black text-gray-400 hover:text-primary uppercase tracking-tighter"
+                                  >
+                                    <History className="mr-1 h-3 w-3" />
+                                    Undo / Reset
+                                  </button>
+                                )}
+                                {req.status === 'APPROVED' && (
+                                  <button onClick={() => handleUpdateStatus(req.id, 'FULFILLED')} className="text-[10px] font-black text-green-600 hover:underline">ISSUE</button>
+                                )}
+                                <button onClick={() => handleDelete(req.id)} className="p-1 text-gray-300 hover:text-red-500 rounded transition-colors" title="Delete">
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
 
           <div className="flex items-center justify-between mt-4">
@@ -689,6 +773,92 @@ export default function RequestsPage() {
             
             <div className="p-4 border-t border-gray-100 bg-white flex justify-end">
               <button onClick={() => setSelectedRequest(null)} className="px-6 py-2 bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-gray-800 transition-colors shadow-sm">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedEmployeeRequests && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
+              <div className="flex items-center gap-4">
+                <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center">
+                  <User className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-gray-900 tracking-tight">{selectedEmployeeRequests[0]?.employeeName || 'Employee'}</h2>
+                  <p className="text-xs text-gray-500 mt-0.5 uppercase font-bold tracking-widest">{selectedEmployeeRequests[0]?.departmentArea || ''} • {selectedEmployeeRequests.length} request{selectedEmployeeRequests.length !== 1 ? 's' : ''}</p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedEmployeeRequests(null)} className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-200 rounded-full transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Request No.</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Item</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Qty</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Issuance #</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {employeeHistoryLoading ? (
+                    <TableSkeleton columns={6} rows={4} />
+                  ) : selectedEmployeeRequests.length === 0 ? (
+                    <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-400 italic">No records found.</td></tr>
+                  ) : (
+                    selectedEmployeeRequests.map((r) => (
+                      <tr key={r.id} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-xs font-bold text-gray-700">{new Date(r.date).toLocaleDateString()}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-gray-900">{r.requestNo}</span>
+                            {r.attachmentUrl && (
+                              <a href={r.attachmentUrl} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700" title="View Attached Document">
+                                <FileText className="h-3.5 w-3.5" />
+                              </a>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-xs font-bold text-gray-900">{r.product.name}</div>
+                          <div className="text-[10px] text-gray-400 font-mono">{r.product.sku}</div>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="text-sm font-black text-primary">{r.quantity}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black border uppercase ${getStatusColor(r.status)}`}>
+                            {r.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`text-[10px] font-black px-2 py-1 rounded-full ${
+                            (r.previousIssuancesCount || 0) === 0 ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {(r.previousIssuancesCount || 0) + 1 === 1 ? '1st' : `${getOrdinal((r.previousIssuancesCount || 0) + 1)}`}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-4 border-t border-gray-100 bg-white flex justify-end">
+              <button onClick={() => setSelectedEmployeeRequests(null)} className="px-6 py-2 bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-gray-800 transition-colors shadow-sm">
                 Close
               </button>
             </div>

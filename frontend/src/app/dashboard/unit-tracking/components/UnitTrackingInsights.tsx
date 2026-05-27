@@ -9,13 +9,15 @@ interface UnitTrackingInsightsProps {
   productSummary: any[];
   stockHealthRange: { start: string, end: string };
   setStockHealthRange: (range: { start: string, end: string }) => void;
-  handleExportExcel: () => void;
+  handleExportPDF: () => void;
   isBuildingTransmittal: boolean;
   setIsBuildingTransmittal: (val: boolean) => void;
   transmittalHeader: any;
   setTransmittalHeader: (val: any) => void;
   enabledSignatories: any;
   setEnabledSignatories: (val: any) => void;
+  exportType: 'all' | 'stock-in' | 'stock-out';
+  setExportType: (val: 'all' | 'stock-in' | 'stock-out') => void;
   onConfirmExport: () => void;
 }
 
@@ -23,13 +25,15 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
   productSummary,
   stockHealthRange,
   setStockHealthRange,
-  handleExportExcel,
+  handleExportPDF,
   isBuildingTransmittal,
   setIsBuildingTransmittal,
   transmittalHeader,
   setTransmittalHeader,
   enabledSignatories,
   setEnabledSignatories,
+  exportType,
+  setExportType,
   onConfirmExport,
 }) => {
   const [selectedMovementItem, setSelectedMovementItem] = useState<any | null>(null);
@@ -80,11 +84,11 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
         </div>
 
         <button 
-          onClick={handleExportExcel}
+          onClick={handleExportPDF}
           className="px-10 py-5 bg-gray-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-[0.2em] shadow-2xl shadow-gray-900/20 hover:bg-black hover:-translate-y-1 transition-all flex items-center gap-3 no-print"
         >
           <FileSpreadsheet className="h-5 w-5" />
-          Generate Health Report (XLSX)
+          PRINT
         </button>
       </div>
 
@@ -161,7 +165,7 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                   </td>
                 </tr>
               ))}
-              {productSummary.filter(item => item.inToday > 0 || item.outToday > 0).length === 0 && (
+              {productSummary.filter(item => exportType === 'stock-in' ? item.inToday > item.outToday : exportType === 'stock-out' ? item.outToday > item.inToday : item.inToday > 0 || item.outToday > 0).length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-10 py-40 text-center">
                     <div className="max-w-xs mx-auto space-y-6 opacity-30">
@@ -281,7 +285,27 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
               </button>
             </div>
             
-            <div className="p-10 overflow-y-auto flex-1 bg-white grid grid-cols-1 md:grid-cols-3 gap-10 custom-scrollbar">
+            <div className="p-10 overflow-y-auto flex-1 bg-white custom-scrollbar">
+              {/* Export Type Toggle */}
+              <div className="flex items-center justify-center mb-10">
+                <div className="inline-flex bg-gray-100 rounded-2xl p-1.5 gap-1 shadow-inner">
+                  {(['all', 'stock-in', 'stock-out'] as const).map(type => (
+                    <button
+                      key={type}
+                      onClick={() => setExportType(type)}
+                      className={`px-8 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
+                        exportType === type
+                          ? 'bg-white text-gray-900 shadow-xl shadow-gray-900/10'
+                          : 'text-gray-400 hover:text-gray-600'
+                      }`}
+                    >
+                      {type === 'all' ? 'All Movement' : type === 'stock-in' ? 'Stock In' : 'Stock Out'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
               {/* Configuration Form */}
               <div className="md:col-span-1 space-y-8 pr-4 border-r border-gray-50">
                 <div className="space-y-6">
@@ -385,7 +409,7 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                     Stock Movement Preview
                   </h3>
                   <div className="px-4 py-1.5 bg-white rounded-full border border-gray-100 text-[9px] font-black text-gray-400 uppercase tracking-widest">
-                    {productSummary.filter(p => p.inToday > 0 || p.outToday > 0).length} Product Groups
+                    {productSummary.filter(p => exportType === 'stock-in' ? p.inToday > p.outToday : exportType === 'stock-out' ? p.outToday > p.inToday : p.inToday > 0 || p.outToday > 0).length} Product Groups
                   </div>
                 </div>
 
@@ -402,11 +426,15 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
-                        {productSummary.filter(p => p.inToday > 0 || p.outToday > 0).map((p, idx) => {
-                          const breakdownParts = [
-                            ...Object.entries(p.movementBreakdown || {}).map(([spec, qty]) => `OUT ${spec}: ${qty}`),
-                            ...Object.entries(p.inBreakdown || {}).map(([spec, qty]) => `IN ${spec}: +${qty}`),
-                          ];
+                        {productSummary.filter(p => exportType === 'stock-in' ? p.inToday > p.outToday : exportType === 'stock-out' ? p.outToday > p.inToday : p.inToday > 0 || p.outToday > 0).map((p, idx) => {
+                          const breakdownParts = exportType === 'stock-in'
+                            ? Object.entries(p.inBreakdown || {}).map(([spec, qty]) => `IN ${spec}: +${qty}`)
+                            : exportType === 'stock-out'
+                            ? Object.entries(p.movementBreakdown || {}).map(([spec, qty]) => `OUT ${spec}: ${qty}`)
+                            : [
+                                ...Object.entries(p.movementBreakdown || {}).map(([spec, qty]) => `OUT ${spec}: ${qty}`),
+                                ...Object.entries(p.inBreakdown || {}).map(([spec, qty]) => `IN ${spec}: +${qty}`),
+                              ];
                           const breakdownStr = breakdownParts.join(' | ') || '—';
                           return (
                           <tr key={p.name} className="hover:bg-gray-50/50 transition-all">
@@ -438,14 +466,15 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                         onClick={onConfirmExport}
                         className="px-12 py-5 bg-gray-900 text-white rounded-[1.5rem] text-xs font-black uppercase tracking-widest shadow-2xl shadow-gray-900/30 hover:bg-black hover:-translate-y-1 transition-all flex items-center gap-3"
                     >
-                        <FileSpreadsheet className="h-5 w-5" />
-                        Finalize & Generate Report
+                        <Printer className="h-5 w-5" />
+                        PRINT
                     </button>
                 </div>
               </div>
             </div>
           </div>
         </div>
+      </div>
       )}
     </div>
   );
