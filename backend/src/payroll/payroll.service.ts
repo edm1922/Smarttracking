@@ -93,6 +93,10 @@ export class PayrollService {
     );
 
     let batch;
+
+    const sourcePdfDoc = await PDFDocument.load(pdfBuffer);
+    const totalPages = sourcePdfDoc.getPageCount();
+
     if (resumeBatchId) {
       if (this.activeBatches.has(resumeBatchId)) {
         this.logger.warn(
@@ -103,7 +107,6 @@ export class PayrollService {
           HttpStatus.CONFLICT,
         );
       }
-
       batch = await this.prisma.storageBatch.findUnique({
         where: { id: resumeBatchId },
       });
@@ -132,9 +135,6 @@ export class PayrollService {
       });
       this.activeBatches.add(batch.id);
     }
-
-    const sourcePdfDoc = await PDFDocument.load(pdfBuffer);
-    const totalPages = sourcePdfDoc.getPageCount();
     const results = [];
     let finalStatus: '[BATCH_STATUS:COMPLETED]' | '[BATCH_STATUS:FAILED]' =
       '[BATCH_STATUS:COMPLETED]';
