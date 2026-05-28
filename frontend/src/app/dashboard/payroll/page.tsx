@@ -69,6 +69,7 @@ function PayrollContent() {
   // Refs for throttling
   const prevProcessingIds = useRef<string[]>([]);
   const lastRunsFetch = useRef(0);
+  const lastResumeAttempt = useRef<Record<string, number>>({});
 
   // API Fetches
   const fetchRuns = async () => {
@@ -120,13 +121,35 @@ function PayrollContent() {
         const finished = prev.some((id: string) => !ids.includes(id));
         const now = Date.now();
 
-        // Fetch runs when processing starts/ends (immediately) or throttle to 30s during active processing
-        if (started || finished || (ids.length > 0 && now - lastRunsFetch.current > 30000)) {
+        // Fetch runs more often during active processing (10s instead of 30s)
+        if (started || finished || (ids.length > 0 && now - lastRunsFetch.current > 10000)) {
           lastRunsFetch.current = now;
           fetchRuns();
         }
         prevProcessingIds.current = ids;
         setProcessingBatchIds(ids);
+
+        // Auto-resume partial batches (Vercel Hobby 10s timeout workaround)
+        if (ids.length > 0 && runs.length > 0) {
+          for (const batchId of ids) {
+            const batch = runs.find((r) => r.id === batchId);
+            if (!batch) continue;
+            const totalPagesMatch = batch.remark?.match(/\[TOTAL_PAGES:(\d+)\]/);
+            const total = totalPagesMatch ? parseInt(totalPagesMatch[1], 10) : 0;
+            const done = batch._count?.documents || 0;
+            if (total > 0 && done < total) {
+              const lastTry = lastResumeAttempt.current[batchId] || 0;
+              if (now - lastTry > 15000) {
+                lastResumeAttempt.current[batchId] = now;
+                fetch(`${apiUrl}/payroll/process-uploaded`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ resumeBatchId: batchId }),
+                }).catch(() => {});
+              }
+            }
+          }
+        }
       }
     } catch (err) { console.error('Failed to fetch processing status:', err); }
   };

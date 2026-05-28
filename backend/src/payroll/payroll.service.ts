@@ -9,6 +9,7 @@ import { LogsService } from '../logs/logs.service';
 @Injectable()
 export class PayrollService {
   private readonly logger = new Logger(PayrollService.name);
+  private readonly TIME_BUDGET_MS = 8000;
   private supabaseAdmin;
 
   constructor(
@@ -138,6 +139,7 @@ export class PayrollService {
     const results = [];
     let finalStatus: '[BATCH_STATUS:COMPLETED]' | '[BATCH_STATUS:FAILED]' =
       '[BATCH_STATUS:COMPLETED]';
+    let timedOut = false;
 
     try {
       // Pre-fetch existing documents in this batch if resuming
@@ -172,6 +174,7 @@ export class PayrollService {
 
       // Cache for user lookups to avoid redundant DB calls
       const userCache = new Map<string, any>();
+      const loopStartTime = Date.now();
 
       // Process each page individually
       for (let i = 0; i < totalPages; i++) {
@@ -204,11 +207,9 @@ export class PayrollService {
               status: 'skipped',
               reason: 'No ID found',
             });
-            continue;
-          }
-
-          // For each ID found on this page, upload/map it
-          for (let employeeId of idsOnPage) {
+          } else {
+            // For each ID found on this page, upload/map it
+            for (let employeeId of idsOnPage) {
             employeeId = this.normalizeSysId(employeeId);
 
             if (
@@ -287,6 +288,7 @@ export class PayrollService {
               status: 'success',
             });
           }
+          }
         } catch (err) {
           this.logger.error(
             `Error processing page ${pageNumber}: ${err.message}`,
@@ -309,6 +311,35 @@ export class PayrollService {
             break;
           }
         }
+
+        // Update progress in the batch remark after each page
+        try {
+          const currentRemark = (await this.prisma.storageBatch.findUnique({
+            where: { id: batch.id },
+            select: { remark: true },
+          }))?.remark || '';
+          const baseRemark = currentRemark
+            .replace(/\[BATCH_STATUS:[A-Z]+\]\s*/g, '')
+            .replace(/\[TOTAL_PAGES:\d+\]\s*/g, '')
+            .replace(/\[PROGRESS:\d+\]\s*/g, '')
+            .replace(/\[FILEPATH:[^\]]+\]\s*/g, '')
+            .trim();
+          const filepathToken = batch.remark?.match(/\[FILEPATH:[^\]]+\]/)?.[0] || '';
+          const newRemark = `[BATCH_STATUS:PROCESSING] [TOTAL_PAGES:${totalPages}] [PROGRESS:${pageNumber}] ${filepathToken} ${baseRemark}`.replace(/\s+/g, ' ').trim();
+          await this.prisma.storageBatch.update({
+            where: { id: batch.id },
+            data: { remark: newRemark },
+          });
+        } catch (updateErr) {
+          this.logger.error(`Failed to update progress for page ${pageNumber}: ${updateErr.message}`);
+        }
+
+        // Check time budget — stop early on Vercel serverless (10s limit)
+        if (Date.now() - loopStartTime > this.TIME_BUDGET_MS) {
+          this.logger.log(`Time budget exceeded at page ${pageNumber}/${totalPages}. Will resume later.`);
+          timedOut = true;
+          break;
+        }
       }
 
       const added = results.filter((r) => r.status === 'success').length;
@@ -326,6 +357,7 @@ export class PayrollService {
         added,
         skipped,
         errors,
+        timedOut,
         details: results,
       };
     } catch (outerError) {
@@ -333,8 +365,12 @@ export class PayrollService {
       throw outerError;
     } finally {
       this.activeBatches.delete(batch.id);
-      this.logger.log(`Finished processing batch ${batch.id}. Lock released.`);
-      await this.updateBatchStatusToken(batch.id, finalStatus);
+      if (timedOut) {
+        this.logger.log(`Batch ${batch.id} partially processed (${results.length}/${totalPages}). Keeping PROCESSING status for resume.`);
+      } else {
+        this.logger.log(`Finished processing batch ${batch.id}. Lock released.`);
+        await this.updateBatchStatusToken(batch.id, finalStatus);
+      }
     }
   }
 
@@ -781,7 +817,32 @@ export class PayrollService {
     };
   }
 
-  async processRemoteMasterPdf(remotePath: string, batchData: any) {
+  async processRemoteMasterPdf(remotePath: string | undefined, batchData: any) {
+    // If no remotePath but resuming, extract filepath from batch remark
+    if (!remotePath && batchData.resumeBatchId) {
+      const existing = await this.prisma.storageBatch.findUnique({
+        where: { id: batchData.resumeBatchId },
+        select: { remark: true },
+      });
+      const fp = existing?.remark?.match(/\[FILEPATH:([^\]]+)\]/)?.[1];
+      if (fp) {
+        remotePath = fp;
+        this.logger.log(`Resolved remote file path from remark: ${remotePath}`);
+      } else {
+        throw new HttpException(
+          'Cannot resume: no source file path found in batch remark',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    }
+
+    if (!remotePath) {
+      throw new HttpException(
+        'No file path provided for processing',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     this.logger.log(`Downloading remote PDF from Supabase: ${remotePath}`);
     const { data, error: downloadError } = await this.supabaseAdmin.storage
       .from('payroll-documents')
@@ -797,21 +858,44 @@ export class PayrollService {
     const buffer = Buffer.from(await data.arrayBuffer());
 
     try {
+      // Store the filepath in the batch remark for resume
+      if (!batchData.resumeBatchId) {
+        const batch = await this.processMasterPdf(buffer, batchData);
+        // On first run, store filepath for later resume
+        if (batch && batch.batchId) {
+          const current = await this.prisma.storageBatch.findUnique({
+            where: { id: batch.batchId },
+            select: { remark: true },
+          });
+          const remark = current?.remark || '';
+          if (!remark.includes('[FILEPATH:')) {
+            const updated = `${remark} [FILEPATH:${remotePath}]`.trim();
+            await this.prisma.storageBatch.update({
+              where: { id: batch.batchId },
+              data: { remark: updated },
+            });
+          }
+        }
+        return batch;
+      }
+
       const result = await this.processMasterPdf(buffer, batchData);
 
-      // Clean up temp file
-      this.logger.log(`Cleaning up remote PDF: ${remotePath}`);
-      await this.supabaseAdmin.storage
-        .from('payroll-documents')
-        .remove([remotePath]);
+      if (result.timedOut) {
+        this.logger.log(
+          `Batch ${result.batchId} partially processed (${result.processed}/${result.totalPages}). Keeping source file for resume.`,
+        );
+      } else {
+        // Clean up temp file only when fully processed
+        this.logger.log(`Cleaning up remote PDF: ${remotePath}`);
+        await this.supabaseAdmin.storage
+          .from('payroll-documents')
+          .remove([remotePath]);
+      }
 
       return result;
     } catch (err) {
       this.logger.error(`Error processing remote PDF: ${err.message}`);
-      // Also cleanup on error
-      await this.supabaseAdmin.storage
-        .from('payroll-documents')
-        .remove([remotePath]);
       throw err;
     }
   }
