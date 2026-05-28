@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { PageHeaderSkeleton } from '@/components/ui/LoadingSkeletons';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { toast } from 'sonner';
@@ -66,6 +66,10 @@ function PayrollContent() {
   const isStaff = userRole.toLowerCase() === 'payroll_staff';
   const isAdmin = userRole.toLowerCase() === 'admin' || userRole.toLowerCase() === 'payroll_admin';
 
+  // Refs for throttling
+  const prevProcessingIds = useRef<string[]>([]);
+  const lastRunsFetch = useRef(0);
+
   // API Fetches
   const fetchRuns = async () => {
     setLoadingRuns(true);
@@ -111,8 +115,18 @@ function PayrollContent() {
       const res = await fetch(`${apiUrl}/payroll/processing-status`);
       if (res.ok) {
         const ids = await res.json();
+        const prev = prevProcessingIds.current;
+        const started = ids.some((id: string) => !prev.includes(id));
+        const finished = prev.some((id: string) => !ids.includes(id));
+        const now = Date.now();
+
+        // Fetch runs when processing starts/ends (immediately) or throttle to 30s during active processing
+        if (started || finished || (ids.length > 0 && now - lastRunsFetch.current > 30000)) {
+          lastRunsFetch.current = now;
+          fetchRuns();
+        }
+        prevProcessingIds.current = ids;
         setProcessingBatchIds(ids);
-        if (ids.length > 0) fetchRuns();
       }
     } catch (err) { console.error('Failed to fetch processing status:', err); }
   };
@@ -134,6 +148,19 @@ function PayrollContent() {
   }, [activeTab]);
 
   // Handlers
+  const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs = 120000) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeout);
+      return res;
+    } catch (err) {
+      clearTimeout(timeout);
+      throw err;
+    }
+  };
+
   const handleUpload = async () => {
     if (isStaff) {
       await handleRequestUploadApproval();
@@ -142,7 +169,7 @@ function PayrollContent() {
     setModalConfig({
       isOpen: true,
       title: "Initialize Ingestion",
-      message: "Process this payroll batch in the secure background? Automated notifications will trigger upon completion.",
+      message: "Upload the PDF to the secure cloud storage, then process each page in the background. This may take a few minutes for large files.",
       confirmText: "Initialize",
       onConfirm: executeUpload,
     });
@@ -153,22 +180,43 @@ function PayrollContent() {
     setModalConfig((prev: any) => ({ ...prev, isOpen: false }));
     try {
       const file = selectedFiles[0];
+      if (!file) throw new Error('No file selected');
       const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
-      const urlRes = await fetch(`${apiUrl}/payroll/get-upload-url`, {
+      if (!apiUrl) throw new Error('API URL is not configured');
+
+      // Step 1: Get signed upload URL
+      const urlRes = await fetchWithTimeout(`${apiUrl}/payroll/get-upload-url`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileName: file.name })
       });
+      if (!urlRes.ok) throw new Error(`Failed to get upload URL: ${urlRes.status} ${urlRes.statusText}`);
       const { signedUrl, filePath } = await urlRes.json();
-      await fetch(signedUrl, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
-      await fetch(`${apiUrl}/payroll/process-uploaded`, {
+      if (!signedUrl) throw new Error('Invalid signed URL response from server');
+
+      // Step 2: Upload PDF to Supabase via signed URL
+      const uploadRes = await fetchWithTimeout(signedUrl, {
+        method: 'PUT', body: file, headers: { 'Content-Type': file.type }
+      }, 300000);
+      if (!uploadRes.ok) throw new Error(`Upload to cloud storage failed: ${uploadRes.status} ${uploadRes.statusText}`);
+
+      // Step 3: Tell backend to process the uploaded file
+      const processRes = await fetchWithTimeout(`${apiUrl}/payroll/process-uploaded`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filePath, client_name: clientLabel, period_start: periodStart, period_end: periodEnd, release_date: releaseDate })
       });
+      if (!processRes.ok) throw new Error(`Failed to start background processing: ${processRes.status} ${processRes.statusText}`);
+
       setIsImportModalOpen(false);
       setSelectedFiles([]);
       fetchRuns();
-      toast.success('Ingestion initialized successfully!');
-    } catch (err: any) { toast.error(err.message); }
+      toast.success('PDF uploaded! Processing in background — check runs table for status.');
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        toast.error('Upload timed out. The file may be too large — try a smaller PDF.');
+      } else {
+        toast.error(err.message || 'Upload failed. Please try again.');
+      }
+    }
     finally { setUploading(false); }
   };
 

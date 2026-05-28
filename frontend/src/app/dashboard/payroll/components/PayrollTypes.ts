@@ -6,6 +6,7 @@ export interface PayrollRun {
   period_end: string;
   release_date?: string;
   created_at: string;
+  remark?: string;
   _count?: {
     documents: number;
   };

@@ -127,7 +127,7 @@ export class PayrollService {
           period_end: periodEnd ? new Date(periodEnd) : null,
           release_date: releaseDate ? new Date(releaseDate) : null,
           label: label,
-          remark: `[BATCH_STATUS:PROCESSING] ${remark || ''}`.trim(),
+          remark: `[BATCH_STATUS:PROCESSING] [TOTAL_PAGES:${totalPages}] ${remark || ''}`.trim(),
         },
       });
       this.activeBatches.add(batch.id);

@@ -197,20 +197,27 @@ export const PayrollStorageTab: React.FC<PayrollStorageTabProps> = ({
                       </td>
                       <td className="px-10 py-6 text-right">
                         <div className="flex flex-col items-end gap-1">
-                          {processingBatchIds.includes(run.id) ? (
-                            <div className="flex items-center gap-2 group/stop">
-                              <Loader2 className="h-3 w-3 animate-spin text-primary group-hover/stop:hidden" />
-                              <span className="text-[10px] font-black text-primary uppercase animate-pulse group-hover/stop:hidden">Syncing...</span>
-                              <button 
-                                onClick={() => onStop(run.id)}
-                                className="hidden group-hover/stop:flex items-center gap-2 bg-red-50 text-red-600 px-3 py-1 rounded-xl border border-red-100 hover:bg-red-600 hover:text-white transition-all text-[9px] font-black uppercase"
-                              >
-                                Stop
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-sm font-black text-gray-900">{run._count?.documents || 0}</span>
-                          )}
+                          {(() => {
+                            const totalPagesMatch = run.remark?.match(/\[TOTAL_PAGES:(\d+)\]/);
+                            const totalPages = totalPagesMatch ? parseInt(totalPagesMatch[1], 10) : 0;
+                            const done = run._count?.documents || 0;
+                            return processingBatchIds.includes(run.id) ? (
+                              <div className="flex items-center gap-2 group/stop">
+                                <Loader2 className="h-3 w-3 animate-spin text-primary group-hover/stop:hidden" />
+                                <span className="text-[10px] font-black text-primary group-hover/stop:hidden">
+                                  {totalPages ? `${done} / ${totalPages}` : `${done} done`} <span className="animate-pulse uppercase">Syncing...</span>
+                                </span>
+                                <button 
+                                  onClick={() => onStop(run.id)}
+                                  className="hidden group-hover/stop:flex items-center gap-2 bg-red-50 text-red-600 px-3 py-1 rounded-xl border border-red-100 hover:bg-red-600 hover:text-white transition-all text-[9px] font-black uppercase"
+                                >
+                                  Stop
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-sm font-black text-gray-900">{done}</span>
+                            );
+                          })()}
                         </div>
                       </td>
                       <td className="px-10 py-6 text-right">

@@ -163,7 +163,7 @@ export const PayrollImportModal: React.FC<PayrollImportModalProps> = ({
             {uploading ? (
               <div className="flex items-center justify-center gap-3">
                 <Loader2 className="h-5 w-5 animate-spin" />
-                Processing Data...
+                Uploading &amp; Processing...
               </div>
             ) : (
               isStaff ? 'Request Ingestion Approval' : 'Officially Initialize Import'
