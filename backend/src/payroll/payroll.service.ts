@@ -22,7 +22,7 @@ export class PayrollService {
   private readonly TIME_BUDGET_MS = process.env.VERCEL ? 30000 : 600000;
   // Process this many pages in parallel inside the loop. Each page does a
   // Supabase upload + 1-2 Prisma queries, all I/O bound, so concurrency helps.
-  private readonly PAGE_CONCURRENCY = 5;
+  private readonly PAGE_CONCURRENCY = 1;
   // Update the [PROGRESS:N] token in the batch remark every N pages instead of
   // on every page (saves ~270 DB writes per 278-page batch).
   private readonly PROGRESS_UPDATE_EVERY = 10;
@@ -228,6 +228,18 @@ export class PayrollService {
         this.logger.log(
           `Pre-fetched ${existingDocs.length} existing documents (${processedPageNumbers.size} unique pages) for batch ${batch.id}.`,
         );
+
+        // Also skip pages that errored in previous calls (persisted as [ERRORED_PAGES:...])
+        const erroredMatch = batch.remark?.match(/\[ERRORED_PAGES:([^\]]+)\]/);
+        if (erroredMatch) {
+          erroredMatch[1].split(',').forEach((p) => {
+            const num = parseInt(p.trim(), 10);
+            if (!isNaN(num)) processedPageNumbers.add(num);
+          });
+          this.logger.log(
+            `Skipping ${erroredMatch[1].split(',').length} errored pages from previous calls for batch ${batch.id}.`,
+          );
+        }
       }
 
       // Cache for user lookups to avoid redundant DB calls
@@ -248,14 +260,20 @@ export class PayrollService {
             currentRemark.match(/\[FILEPATH:[^\]]+\]/)?.[0] ||
             batch.remark?.match(/\[FILEPATH:[^\]]+\]/)?.[0] ||
             '';
+          const errorPages = results
+            .filter((r) => r.status === 'error')
+            .map((r) => r.page)
+            .sort((a, b) => a - b);
+          const errorToken = errorPages.length > 0 ? ` [ERRORED_PAGES:${errorPages.join(',')}]` : '';
           const baseRemark = currentRemark
             .replace(/\[BATCH_STATUS:[A-Z]+\]\s*/g, '')
             .replace(/\[TOTAL_PAGES:\d+\]\s*/g, '')
             .replace(/\[PROGRESS:\d+\]\s*/g, '')
             .replace(/\[FILEPATH:[^\]]+\]\s*/g, '')
+            .replace(/\[ERRORED_PAGES:[^\]]+\]\s*/g, '')
             .trim();
           const newRemark =
-            `[BATCH_STATUS:PROCESSING] [TOTAL_PAGES:${totalPages}] [PROGRESS:${currentPage}] ${filepathToken} ${baseRemark}`
+            `[BATCH_STATUS:PROCESSING] [TOTAL_PAGES:${totalPages}] [PROGRESS:${currentPage}]${errorToken} ${filepathToken} ${baseRemark}`
               .replace(/\s+/g, ' ')
               .trim();
           await this.prisma.storageBatch.update({
@@ -387,6 +405,7 @@ export class PayrollService {
             status: 'error',
             error: err.message,
           });
+          processedPageNumbers.add(pageNumber);
           if (
             err.message &&
             err.message.includes('Foreign key constraint') &&
