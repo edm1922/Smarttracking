@@ -1,10 +1,5 @@
 {
   "version": 2,
-  "functions": {
-    "src/main.ts": {
-      "maxDuration": 300
-    }
-  },
   "headers": [
     {
       "source": "/(.*)",
