@@ -380,6 +380,7 @@ function PayrollContent() {
       if (!urlRes.ok) throw new Error(`Failed to get upload URL: ${urlRes.status} ${urlRes.statusText}`);
       const { signedUrl, filePath } = await urlRes.json();
       if (!signedUrl) throw new Error('Invalid signed URL response from server');
+      if (!filePath) throw new Error('Missing file path in upload URL response — cannot start processing');
 
       // Step 2: Upload PDF to Supabase via signed URL
       const uploadRes = await fetchWithTimeout(signedUrl, {

@@ -112,6 +112,7 @@ export class PayrollController {
   @Post('process-uploaded')
   async processUploaded(@Body() body: any) {
     const { filePath, resumeBatchId, ...batchDataRaw } = body;
+    console.log(`[process-uploaded] filePath=${filePath}, resumeBatchId=${resumeBatchId}, body keys=${Object.keys(body).join(',')}`);
 
     const batchData = {
       clientName: batchDataRaw.client_name,

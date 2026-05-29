@@ -960,6 +960,7 @@ export class PayrollService {
 
   async processRemoteMasterPdf(remotePath: string | undefined, batchData: any) {
     const resumeBatchId = batchData.resumeBatchId;
+    this.logger.log(`processRemoteMasterPdf called: remotePath=${remotePath}, resumeBatchId=${resumeBatchId}, sourcePath=${batchData.sourcePath}`);
     if (resumeBatchId) {
       if (this.activeBatches.has(resumeBatchId)) {
         this.logger.warn(
@@ -1031,6 +1032,10 @@ export class PayrollService {
       if (resumeBatchId) {
         this.activeBatches.delete(resumeBatchId);
       }
+      this.logger.error(
+        `No file path for processing (resumeBatchId=${resumeBatchId || 'none'}, sourcePath=${batchData.sourcePath || 'none'}). ` +
+        `If this is a resume call, the batch remark may be missing [FILEPATH:...].`
+      );
       throw new HttpException(
         'No file path provided for processing',
         HttpStatus.BAD_REQUEST,
