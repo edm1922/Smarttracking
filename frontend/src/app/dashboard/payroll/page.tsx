@@ -199,6 +199,7 @@ function PayrollContent() {
         let data: any = null;
         try { data = await res.json(); } catch { /* ignore */ }
         fetchRuns();
+        fetchProcessingStatus();
         // If the backend reports it cannot resume this batch (e.g. missing
         // source file), treat it as a terminal failure — immediately halt it.
         if (data?.cannotResume) {
@@ -224,6 +225,7 @@ function PayrollContent() {
     } finally {
       activeChains.current.delete(batchId);
       fetchRuns();
+      fetchProcessingStatus();
     }
   };
 
@@ -401,6 +403,9 @@ function PayrollContent() {
       try { processData = await processRes.json(); } catch { /* ignore */ }
 
       fetchRuns();
+      // Kick the processing-status poll immediately so the spinner and
+      // processing banner show up right away, not 5 seconds later.
+      fetchProcessingStatus();
 
       // If the first call timed out partway through, chain follow-up calls in the
       // background. Don't await — let the user keep using the UI.
