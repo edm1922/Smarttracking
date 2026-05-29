@@ -9,7 +9,23 @@ import { LogsService } from '../logs/logs.service';
 @Injectable()
 export class PayrollService {
   private readonly logger = new Logger(PayrollService.name);
-  private readonly TIME_BUDGET_MS = 8000;
+  // Vercel Hobby allows up to 60s per serverless function. We use a shorter
+  // budget (30s) to leave headroom for the PDF download at start, the final
+  // status-token write, response serialization, and — critically — to keep
+  // each chain call short enough that concurrent /processing-status polls
+  // don't pile up behind a long-running lambda and trigger browser/Vercel
+  // network resets ("Failed to fetch").
+  // Locally there's no lambda timeout, so treat it as unlimited (10 min).
+  // This avoids all resume-chain overhead — the PDF gets downloaded from
+  // Supabase once, processed in one pass, and done — matching the pre-
+  // chunking performance from May 13.
+  private readonly TIME_BUDGET_MS = process.env.VERCEL ? 30000 : 600000;
+  // Process this many pages in parallel inside the loop. Each page does a
+  // Supabase upload + 1-2 Prisma queries, all I/O bound, so concurrency helps.
+  private readonly PAGE_CONCURRENCY = 5;
+  // Update the [PROGRESS:N] token in the batch remark every N pages instead of
+  // on every page (saves ~270 DB writes per 278-page batch).
+  private readonly PROGRESS_UPDATE_EVERY = 10;
   private supabaseAdmin;
 
   constructor(
@@ -88,6 +104,7 @@ export class PayrollService {
       remark,
       releaseDate,
       resumeBatchId,
+      sourcePath,
     } = batchData;
     this.logger.log(
       `Starting precision 1-page splitting for ${clientName}${resumeBatchId ? ` (RESUMING batch: ${resumeBatchId})` : ''}`,
@@ -99,14 +116,30 @@ export class PayrollService {
     const totalPages = sourcePdfDoc.getPageCount();
 
     if (resumeBatchId) {
-      if (this.activeBatches.has(resumeBatchId)) {
-        this.logger.warn(
-          `Attempted to resume batch ${resumeBatchId} while it is already processing.`,
-        );
-        throw new HttpException(
-          'This batch is already being processed in the background. Please wait for it to complete.',
-          HttpStatus.CONFLICT,
-        );
+      if (!batchData.alreadyLocked) {
+        if (this.activeBatches.has(resumeBatchId)) {
+          // Another in-flight call on this lambda instance is already processing
+          // this batch. Don't 409 — just return a benign "keep polling" response so
+          // the client chain doesn't break, and the existing call finishes its work.
+          this.logger.warn(
+            `Resume requested for batch ${resumeBatchId} while another call is in flight on this instance. Returning early.`,
+          );
+          // Return timedOut:false so the client chain exits cleanly. The polling
+          // safety net will re-attach a chain after 30s if the batch is still
+          // marked PROCESSING. This avoids spinning at 4 calls/sec.
+          return {
+            batchId: resumeBatchId,
+            totalPages: 0,
+            processed: 0,
+            added: 0,
+            skipped: 0,
+            errors: 0,
+            timedOut: false,
+            alreadyRunning: true,
+            details: [],
+          };
+        }
+        this.activeBatches.add(resumeBatchId);
       }
       batch = await this.prisma.storageBatch.findUnique({
         where: { id: resumeBatchId },
@@ -117,13 +150,32 @@ export class PayrollService {
           HttpStatus.NOT_FOUND,
         );
       }
-      this.activeBatches.add(batch.id);
+      // Don't resume FAILED or COMPLETED batches — the safety-net may
+      // rediscover them from a stale processing-ids cache.
+      if (batch.remark?.includes('[BATCH_STATUS:FAILED]') || batch.remark?.includes('[BATCH_STATUS:COMPLETED]')) {
+        this.logger.warn(
+          `Batch ${batch.id} is already ${batch.remark.match(/\[BATCH_STATUS:[A-Z]+\]/)?.[0] || 'TERMINAL'}. Skipping resume.`,
+        );
+        return {
+          batchId: resumeBatchId,
+          totalPages: 0,
+          processed: 0,
+          added: 0,
+          skipped: 0,
+          errors: 0,
+          timedOut: false,
+          alreadyRunning: false,
+          cannotResume: true,
+          details: [],
+        };
+      }
       this.logger.log(
         `Resuming batch ${batch.id}. Will skip already processed documents.`,
       );
       await this.updateBatchStatusToken(batch.id, '[BATCH_STATUS:PROCESSING]');
     } else {
-      // Create the batch record
+      // Create the batch record with FILEPATH embedded from the start
+      const filepathToken = sourcePath ? ` [FILEPATH:${sourcePath}]` : '';
       batch = await this.prisma.storageBatch.create({
         data: {
           client_name: clientName,
@@ -131,12 +183,18 @@ export class PayrollService {
           period_end: periodEnd ? new Date(periodEnd) : null,
           release_date: releaseDate ? new Date(releaseDate) : null,
           label: label,
-          remark: `[BATCH_STATUS:PROCESSING] [TOTAL_PAGES:${totalPages}] ${remark || ''}`.trim(),
+          remark: `[BATCH_STATUS:PROCESSING] [TOTAL_PAGES:${totalPages}]${filepathToken} ${remark || ''}`.trim(),
         },
       });
       this.activeBatches.add(batch.id);
     }
-    const results = [];
+    const results: Array<{
+      page: number;
+      id?: string;
+      status: 'success' | 'skipped' | 'error';
+      reason?: string;
+      error?: string;
+    }> = [];
     let finalStatus: '[BATCH_STATUS:COMPLETED]' | '[BATCH_STATUS:FAILED]' =
       '[BATCH_STATUS:COMPLETED]';
     let timedOut = false;
@@ -144,7 +202,10 @@ export class PayrollService {
     try {
       // Pre-fetch existing documents in this batch if resuming
       const processedPages = new Map<string, Set<number>>();
-      const existingSysIds = new Set<string>();
+      // Set of page numbers already processed (any employee). Used to skip the
+      // expensive PDF extract/scan on resume — critical for large batches because
+      // otherwise every chain step burns its budget re-scanning done pages.
+      const processedPageNumbers = new Set<number>();
       if (resumeBatchId) {
         const existingDocs = await this.prisma.document.findMany({
           where: { batch_id: batch.id },
@@ -153,7 +214,6 @@ export class PayrollService {
 
         existingDocs.forEach((d) => {
           const id = this.normalizeSysId(d.sys_id);
-          existingSysIds.add(id);
           // Extract page number from filename: employeeId_pX_timestamp.pdf
           const pageMatch = d.file_name.match(/_p(\d+)_/);
           const page = pageMatch ? parseInt(pageMatch[1], 10) : 1;
@@ -161,64 +221,101 @@ export class PayrollService {
           if (!processedPages.has(id)) {
             processedPages.set(id, new Set());
           }
-          const pagesSet = processedPages.get(id);
-          if (pagesSet) {
-            pagesSet.add(page);
-          }
+          processedPages.get(id)?.add(page);
+          processedPageNumbers.add(page);
         });
 
         this.logger.log(
-          `Pre-fetched ${existingDocs.length} existing documents for ${processedPages.size} employees in batch ${batch.id}.`,
+          `Pre-fetched ${existingDocs.length} existing documents (${processedPageNumbers.size} unique pages) for batch ${batch.id}.`,
         );
       }
 
       // Cache for user lookups to avoid redundant DB calls
       const userCache = new Map<string, any>();
       const loopStartTime = Date.now();
+      let lastProgressWritten = 0;
 
-      // Process each page individually
-      for (let i = 0; i < totalPages; i++) {
+      const writeProgressToken = async (currentPage: number) => {
+        try {
+          const currentRemark =
+            (
+              await this.prisma.storageBatch.findUnique({
+                where: { id: batch.id },
+                select: { remark: true },
+              })
+            )?.remark || '';
+          const filepathToken =
+            currentRemark.match(/\[FILEPATH:[^\]]+\]/)?.[0] ||
+            batch.remark?.match(/\[FILEPATH:[^\]]+\]/)?.[0] ||
+            '';
+          const baseRemark = currentRemark
+            .replace(/\[BATCH_STATUS:[A-Z]+\]\s*/g, '')
+            .replace(/\[TOTAL_PAGES:\d+\]\s*/g, '')
+            .replace(/\[PROGRESS:\d+\]\s*/g, '')
+            .replace(/\[FILEPATH:[^\]]+\]\s*/g, '')
+            .trim();
+          const newRemark =
+            `[BATCH_STATUS:PROCESSING] [TOTAL_PAGES:${totalPages}] [PROGRESS:${currentPage}] ${filepathToken} ${baseRemark}`
+              .replace(/\s+/g, ' ')
+              .trim();
+          await this.prisma.storageBatch.update({
+            where: { id: batch.id },
+            data: { remark: newRemark },
+          });
+        } catch (updateErr) {
+          this.logger.error(
+            `Failed to update progress at page ${currentPage}: ${updateErr.message}`,
+          );
+        }
+      };
+
+      // Process a single page (extract → scan → upload → persist).
+      // Throws on fatal errors (e.g., batch deleted); other errors are recorded.
+      let fatalAbort = false;
+      const processOnePage = async (i: number) => {
         const pageNumber = i + 1;
 
-        if (this.cancelledBatches.has(batch.id)) {
-          this.logger.warn(
-            `Batch ${batch.id} was cancelled by user. Stopping processing.`,
-          );
-          this.cancelledBatches.delete(batch.id);
-          break;
+        // Fast skip on resume: if this page is already done, don't re-extract or
+        // re-parse it. This is what makes resuming a large batch actually progress.
+        if (resumeBatchId && processedPageNumbers.has(pageNumber)) {
+          results.push({
+            page: pageNumber,
+            status: 'skipped',
+            reason: 'Already processed',
+          });
+          return;
         }
 
         try {
-          // Extract this single page to a new PDF
           const singlePagePdf = await PDFDocument.create();
           const [copiedPage] = await singlePagePdf.copyPages(sourcePdfDoc, [i]);
           singlePagePdf.addPage(copiedPage);
           const pageBytes = await singlePagePdf.save();
 
-          // Scan this specific page for IDs
           const idsOnPage = await this.scanSinglePageForIds(
             Buffer.from(pageBytes),
           );
 
           if (idsOnPage.length === 0) {
             this.logger.warn(`No ID found on page ${pageNumber}, skipping.`);
+            // Mark as "tried" so a future resume of this same batch doesn't
+            // re-extract and re-scan this page (e.g. cover/summary pages).
+            processedPageNumbers.add(pageNumber);
             results.push({
               page: pageNumber,
               status: 'skipped',
               reason: 'No ID found',
             });
-          } else {
-            // For each ID found on this page, upload/map it
-            for (let employeeId of idsOnPage) {
+            return;
+          }
+
+          for (let employeeId of idsOnPage) {
             employeeId = this.normalizeSysId(employeeId);
 
             if (
               resumeBatchId &&
               processedPages.get(employeeId)?.has(pageNumber)
             ) {
-              this.logger.log(
-                `Page ${pageNumber}: ID ${employeeId} already exists in batch ${batch.id}. Skipping.`,
-              );
               results.push({
                 page: pageNumber,
                 id: employeeId,
@@ -231,14 +328,12 @@ export class PayrollService {
             const fileName = `${employeeId}_p${pageNumber}_${Date.now()}.pdf`;
             const filePath = `documents/${batch.id}/${fileName}`;
 
-            // Upload to Supabase
             const { error: uploadError } = await this.supabaseAdmin.storage
               .from('payroll-documents')
               .upload(filePath, pageBytes, {
                 contentType: 'application/pdf',
                 upsert: true,
               });
-
             if (uploadError) throw uploadError;
 
             const {
@@ -247,10 +342,8 @@ export class PayrollService {
               .from('payroll-documents')
               .getPublicUrl(filePath);
 
-            // Get employee from cache or DB
             const cacheKey = `${employeeId}_${label || ''}`;
             let employee = userCache.get(cacheKey);
-
             if (!employee && !userCache.has(cacheKey)) {
               employee = await this.prisma.user.findFirst({
                 where: {
@@ -258,7 +351,7 @@ export class PayrollService {
                   ...(label ? { company_label: label } : {}),
                 },
               });
-              userCache.set(cacheKey, employee || null); // Cache null if not found to avoid re-searching
+              userCache.set(cacheKey, employee || null);
             }
 
             await this.prisma.document.create({
@@ -273,14 +366,11 @@ export class PayrollService {
               },
             });
 
-            // Update processedPages in case there are duplicates within the same PDF
             if (!processedPages.has(employeeId)) {
               processedPages.set(employeeId, new Set());
             }
-            const pagesSet = processedPages.get(employeeId);
-            if (pagesSet) {
-              pagesSet.add(pageNumber);
-            }
+            processedPages.get(employeeId)?.add(pageNumber);
+            processedPageNumbers.add(pageNumber);
 
             results.push({
               page: pageNumber,
@@ -288,8 +378,7 @@ export class PayrollService {
               status: 'success',
             });
           }
-          }
-        } catch (err) {
+        } catch (err: any) {
           this.logger.error(
             `Error processing page ${pageNumber}: ${err.message}`,
           );
@@ -298,46 +387,71 @@ export class PayrollService {
             status: 'error',
             error: err.message,
           });
-
-          // If the batch was deleted mid-processing, stop to prevent orphaned files
           if (
             err.message &&
             err.message.includes('Foreign key constraint') &&
             err.message.includes('batch_id')
           ) {
             this.logger.warn(
-              `Batch ${batch.id} was deleted mid-processing. Aborting remaining pages.`,
+              `Batch ${batch?.id || 'unknown'} was deleted mid-processing. Aborting remaining pages.`,
             );
-            break;
+            fatalAbort = true;
+          }
+          if (
+            err.message &&
+            (err.message.includes('connection pool') ||
+              err.message.includes('connection_limit') ||
+              err.code === 'P2024')
+          ) {
+            this.logger.error(
+              `Database connection pool exhausted at page ${pageNumber}. Aborting remaining pages so client can resume cleanly later.`,
+            );
+            fatalAbort = true;
           }
         }
+      };
 
-        // Update progress in the batch remark after each page
-        try {
-          const currentRemark = (await this.prisma.storageBatch.findUnique({
-            where: { id: batch.id },
-            select: { remark: true },
-          }))?.remark || '';
-          const baseRemark = currentRemark
-            .replace(/\[BATCH_STATUS:[A-Z]+\]\s*/g, '')
-            .replace(/\[TOTAL_PAGES:\d+\]\s*/g, '')
-            .replace(/\[PROGRESS:\d+\]\s*/g, '')
-            .replace(/\[FILEPATH:[^\]]+\]\s*/g, '')
-            .trim();
-          const filepathToken = batch.remark?.match(/\[FILEPATH:[^\]]+\]/)?.[0] || '';
-          const newRemark = `[BATCH_STATUS:PROCESSING] [TOTAL_PAGES:${totalPages}] [PROGRESS:${pageNumber}] ${filepathToken} ${baseRemark}`.replace(/\s+/g, ' ').trim();
-          await this.prisma.storageBatch.update({
-            where: { id: batch.id },
-            data: { remark: newRemark },
-          });
-        } catch (updateErr) {
-          this.logger.error(`Failed to update progress for page ${pageNumber}: ${updateErr.message}`);
+      // Process pages in parallel chunks of PAGE_CONCURRENCY.
+      // After each chunk: check cancellation, throttle progress writes, check time budget.
+      let i = 0;
+      while (i < totalPages) {
+        if (this.cancelledBatches.has(batch.id)) {
+          this.logger.warn(
+            `Batch ${batch.id} was cancelled by user. Stopping processing.`,
+          );
+          this.cancelledBatches.delete(batch.id);
+          break;
+        }
+        if (fatalAbort) break;
+
+        const chunkEnd = Math.min(i + this.PAGE_CONCURRENCY, totalPages);
+        const chunkPromises: Promise<void>[] = [];
+        for (let j = i; j < chunkEnd; j++) {
+          chunkPromises.push(processOnePage(j));
+        }
+        await Promise.all(chunkPromises);
+        i = chunkEnd;
+
+        // Throttled progress write
+        if (
+          i - lastProgressWritten >= this.PROGRESS_UPDATE_EVERY ||
+          i >= totalPages
+        ) {
+          await writeProgressToken(i);
+          lastProgressWritten = i;
         }
 
-        // Check time budget — stop early on Vercel serverless (10s limit)
+        // Time budget check — stop and let the client resume
         if (Date.now() - loopStartTime > this.TIME_BUDGET_MS) {
-          this.logger.log(`Time budget exceeded at page ${pageNumber}/${totalPages}. Will resume later.`);
+          this.logger.log(
+            `Time budget exceeded at page ${i}/${totalPages}. Will resume later.`,
+          );
           timedOut = true;
+          // Final progress write before returning
+          if (i !== lastProgressWritten) {
+            await writeProgressToken(i);
+            lastProgressWritten = i;
+          }
           break;
         }
       }
@@ -364,12 +478,17 @@ export class PayrollService {
       finalStatus = '[BATCH_STATUS:FAILED]';
       throw outerError;
     } finally {
-      this.activeBatches.delete(batch.id);
-      if (timedOut) {
-        this.logger.log(`Batch ${batch.id} partially processed (${results.length}/${totalPages}). Keeping PROCESSING status for resume.`);
-      } else {
-        this.logger.log(`Finished processing batch ${batch.id}. Lock released.`);
-        await this.updateBatchStatusToken(batch.id, finalStatus);
+      const bId = batch?.id || resumeBatchId;
+      if (bId) {
+        this.activeBatches.delete(bId);
+      }
+      if (batch) {
+        if (timedOut) {
+          this.logger.log(`Batch ${batch.id} partially processed (${results.length}/${totalPages}). Keeping PROCESSING status for resume.`);
+        } else {
+          this.logger.log(`Finished processing batch ${batch.id}. Lock released.`);
+          await this.updateBatchStatusToken(batch.id, finalStatus);
+        }
       }
     }
   }
@@ -388,13 +507,35 @@ export class PayrollService {
     return Array.from(new Set([...inMemoryIds, ...dbIds]));
   }
 
-  cancelBatchProcessing(batchId: string) {
+  async cancelBatchProcessing(batchId: string) {
+    // Signal any in-flight lambda to stop
     if (this.activeBatches.has(batchId)) {
       this.cancelledBatches.add(batchId);
-      this.logger.log(`Cancellation requested for batch ${batchId}`);
-      return { status: 'Cancelled', message: 'Cancellation requested' };
     }
-    return { status: 'Error', message: 'Batch not active' };
+    // Always update the DB so the batch stops appearing in /processing-status
+    // even if no lambda is currently processing it (serverless-safe).
+    try {
+      const existing = await this.prisma.storageBatch.findUnique({
+        where: { id: batchId },
+        select: { remark: true },
+      });
+      if (existing) {
+        const cleanRemark = (existing.remark || '')
+          .replace(/\[BATCH_STATUS:[A-Z]+\]\s*/g, '')
+          .replace(/\[PROGRESS:\d+\]\s*/g, '')
+          .trim();
+        await this.prisma.storageBatch.update({
+          where: { id: batchId },
+          data: {
+            remark: `[BATCH_STATUS:FAILED] ${cleanRemark}`,
+          },
+        });
+        this.logger.log(`Batch ${batchId} marked as FAILED in database.`);
+      }
+    } catch (dbErr) {
+      this.logger.error(`Failed to mark batch ${batchId} as FAILED: ${dbErr.message}`);
+    }
+    return { status: 'Cancelled', message: 'Processing halted and batch marked as FAILED.' };
   }
 
   async reviseDocuments(
@@ -818,25 +959,78 @@ export class PayrollService {
   }
 
   async processRemoteMasterPdf(remotePath: string | undefined, batchData: any) {
+    const resumeBatchId = batchData.resumeBatchId;
+    if (resumeBatchId) {
+      if (this.activeBatches.has(resumeBatchId)) {
+        this.logger.warn(
+          `Resume requested for batch ${resumeBatchId} while another call is in flight. Returning early.`,
+        );
+        return {
+          batchId: resumeBatchId,
+          totalPages: 0,
+          processed: 0,
+          added: 0,
+          skipped: 0,
+          errors: 0,
+          timedOut: false,
+          alreadyRunning: true,
+          details: [],
+        };
+      }
+      this.activeBatches.add(resumeBatchId);
+      batchData.alreadyLocked = true;
+    }
+
     // If no remotePath but resuming, extract filepath from batch remark
     if (!remotePath && batchData.resumeBatchId) {
-      const existing = await this.prisma.storageBatch.findUnique({
-        where: { id: batchData.resumeBatchId },
-        select: { remark: true },
-      });
-      const fp = existing?.remark?.match(/\[FILEPATH:([^\]]+)\]/)?.[1];
-      if (fp) {
-        remotePath = fp;
-        this.logger.log(`Resolved remote file path from remark: ${remotePath}`);
-      } else {
-        throw new HttpException(
-          'Cannot resume: no source file path found in batch remark',
-          HttpStatus.BAD_REQUEST,
-        );
+      try {
+        const existing = await this.prisma.storageBatch.findUnique({
+          where: { id: batchData.resumeBatchId },
+          select: { remark: true },
+        });
+        const remark = existing?.remark || '';
+        const fp = remark.match(/\[FILEPATH:([^\]]+)\]/)?.[1];
+        if (fp) {
+          remotePath = fp;
+          this.logger.log(
+            `Resolved remote file path from remark for batch ${batchData.resumeBatchId}: ${remotePath}`,
+          );
+        } else {
+          this.logger.error(
+            `Resume failed for batch ${batchData.resumeBatchId}: remark="${remark.substring(0, 500)}"`,
+          );
+          if (resumeBatchId) {
+            this.activeBatches.delete(resumeBatchId);
+          }
+          // Return a benign "already done" response so the frontend chain stops
+          // trying, instead of retrying forever with a 400. The batch will remain
+          // in PROCESSING status in the DB but the safety-net will give up after
+          // 10 consecutive failures and mark it FAILED.
+          return {
+            batchId: batchData.resumeBatchId,
+            totalPages: 0,
+            processed: 0,
+            added: 0,
+            skipped: 0,
+            errors: 0,
+            timedOut: false,
+            alreadyRunning: false,
+            cannotResume: true,
+            details: [],
+          };
+        }
+      } catch (dbErr) {
+        if (resumeBatchId) {
+          this.activeBatches.delete(resumeBatchId);
+        }
+        throw dbErr;
       }
     }
 
     if (!remotePath) {
+      if (resumeBatchId) {
+        this.activeBatches.delete(resumeBatchId);
+      }
       throw new HttpException(
         'No file path provided for processing',
         HttpStatus.BAD_REQUEST,
@@ -852,41 +1046,53 @@ export class PayrollService {
       this.logger.error(
         `Failed to download remote PDF: ${downloadError.message}`,
       );
-      throw downloadError;
+      if (resumeBatchId) {
+        this.activeBatches.delete(resumeBatchId);
+      }
+      // Source file is gone — mark the batch as FAILED so the frontend stops
+      // retrying, and return a benign response.
+      if (batchData.resumeBatchId) {
+        await this.cancelBatchProcessing(batchData.resumeBatchId);
+      }
+      return {
+        batchId: batchData.resumeBatchId || 'unknown',
+        totalPages: 0,
+        processed: 0,
+        added: 0,
+        skipped: 0,
+        errors: 0,
+        timedOut: false,
+        alreadyRunning: false,
+        cannotResume: true,
+        details: [],
+      };
     }
 
     const buffer = Buffer.from(await data.arrayBuffer());
 
     try {
-      // Store the filepath in the batch remark for resume
-      if (!batchData.resumeBatchId) {
-        const batch = await this.processMasterPdf(buffer, batchData);
-        // On first run, store filepath for later resume
-        if (batch && batch.batchId) {
-          const current = await this.prisma.storageBatch.findUnique({
-            where: { id: batch.batchId },
-            select: { remark: true },
-          });
-          const remark = current?.remark || '';
-          if (!remark.includes('[FILEPATH:')) {
-            const updated = `${remark} [FILEPATH:${remotePath}]`.trim();
-            await this.prisma.storageBatch.update({
-              where: { id: batch.batchId },
-              data: { remark: updated },
-            });
-          }
-        }
-        return batch;
-      }
-
+      // sourcePath is passed via batchData so processMasterPdf can embed
+      // [FILEPATH:...] in the batch remark at creation time — no post-hoc
+      // write needed.
+      batchData.sourcePath = remotePath;
       const result = await this.processMasterPdf(buffer, batchData);
 
-      if (result.timedOut) {
+      const fullyProcessed =
+        typeof result.processed === 'number' &&
+        typeof result.totalPages === 'number' &&
+        result.totalPages > 0 &&
+        result.processed >= result.totalPages;
+
+      if (result.alreadyRunning || result.cannotResume) {
+        this.logger.log(
+          `Batch ${result.batchId} early exit (alreadyRunning/cannotResume). Keeping source file.`,
+        );
+      } else if (result.timedOut || !fullyProcessed) {
         this.logger.log(
           `Batch ${result.batchId} partially processed (${result.processed}/${result.totalPages}). Keeping source file for resume.`,
         );
       } else {
-        // Clean up temp file only when fully processed
+        // Clean up temp file only when processing is actually complete
         this.logger.log(`Cleaning up remote PDF: ${remotePath}`);
         await this.supabaseAdmin.storage
           .from('payroll-documents')
@@ -895,6 +1101,9 @@ export class PayrollService {
 
       return result;
     } catch (err) {
+      if (resumeBatchId) {
+        this.activeBatches.delete(resumeBatchId);
+      }
       this.logger.error(`Error processing remote PDF: ${err.message}`);
       throw err;
     }

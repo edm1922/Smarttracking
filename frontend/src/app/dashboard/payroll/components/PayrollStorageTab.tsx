@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   Plus, Search, Filter, Calendar, History, Trash2, 
-  Upload, Loader2, X, AlertCircle, CheckCircle2, ShieldAlert
+  Upload, Loader2, X, AlertCircle, CheckCircle2, ShieldAlert, Clock
 } from 'lucide-react';
 import { PayrollRun, PayrollRequest } from './PayrollTypes';
 
@@ -23,6 +23,7 @@ interface PayrollStorageTabProps {
   isAdmin: boolean;
   pendingRequests: PayrollRequest[];
   onRespondRequest: (id: string, approved: boolean) => void;
+  uploading: boolean;
 }
 
 export const PayrollStorageTab: React.FC<PayrollStorageTabProps> = ({
@@ -43,6 +44,7 @@ export const PayrollStorageTab: React.FC<PayrollStorageTabProps> = ({
   isAdmin,
   pendingRequests,
   onRespondRequest,
+  uploading,
 }) => {
   const filteredRuns = runs.filter(run => {
     let matches = true;
@@ -54,6 +56,14 @@ export const PayrollStorageTab: React.FC<PayrollStorageTabProps> = ({
     if (historyEnd) matches = matches && new Date(run.period_end) <= new Date(historyEnd);
     return matches;
   });
+
+  const processingRuns = runs.filter(r => processingBatchIds.includes(r.id));
+  const totalDone = processingRuns.reduce((sum, r) => sum + (r._count?.documents || 0), 0);
+  const totalPages = processingRuns.reduce((sum, r) => {
+    const m = r.remark?.match(/\[TOTAL_PAGES:(\d+)\]/);
+    return sum + (m ? parseInt(m[1], 10) : 0);
+  }, 0);
+  const progressPercent = totalPages > 0 ? Math.round((totalDone / totalPages) * 100) : 0;
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500">
@@ -86,6 +96,51 @@ export const PayrollStorageTab: React.FC<PayrollStorageTabProps> = ({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Processing Banner */}
+      {(uploading || processingBatchIds.length > 0) && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-[2.5rem] p-8 space-y-4 animate-in fade-in duration-500">
+          <div className="flex items-center gap-5">
+            <div className="h-14 w-14 bg-blue-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
+              <Loader2 className="h-7 w-7 animate-spin" />
+            </div>
+            <div className="flex-1">
+              {uploading ? (
+                <>
+                  <h3 className="text-sm font-black text-blue-900 uppercase tracking-widest">Uploading to Cloud Storage</h3>
+                  <p className="text-[11px] font-bold text-blue-700 mt-1">
+                    Transferring PDF to secure cloud storage — typically 5–30 seconds.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-sm font-black text-blue-900 uppercase tracking-widest">Processing Payroll Ingestion</h3>
+                  <p className="text-[11px] font-bold text-blue-700 mt-1">
+                    Extracting {totalPages > 0 ? `${totalPages} pages` : 'documents'} in the background.
+                    The runs table below updates automatically as each page completes.
+                  </p>
+                </>
+              )}
+            </div>
+            {!uploading && totalPages > 0 && (
+              <div className="hidden sm:flex items-center gap-2 px-5 py-3 bg-blue-500/10 rounded-2xl border border-blue-200">
+                <Clock className="h-4 w-4 text-blue-500" />
+                <span className="text-[10px] font-black text-blue-600 uppercase tracking-wider">
+                  {totalDone} / {totalPages} pages
+                </span>
+              </div>
+            )}
+          </div>
+          {!uploading && totalPages > 0 && (
+            <div className="w-full h-2 bg-blue-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                style={{ width: `${progressPercent}%` }}
+              ></div>
+            </div>
+          )}
         </div>
       )}
 
@@ -173,7 +228,7 @@ export const PayrollStorageTab: React.FC<PayrollStorageTabProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {loadingRuns ? (
+                {loadingRuns && runs.length === 0 ? (
                   Array(5).fill(0).map((_, i) => (
                     <tr key={i} className="animate-pulse">
                       <td colSpan={4} className="px-10 py-8"><div className="h-4 bg-gray-100 rounded-lg w-full"></div></td>

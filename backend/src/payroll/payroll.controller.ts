@@ -112,7 +112,7 @@ export class PayrollController {
   @Post('process-uploaded')
   async processUploaded(@Body() body: any) {
     const { filePath, resumeBatchId, ...batchDataRaw } = body;
-    
+
     const batchData = {
       clientName: batchDataRaw.client_name,
       periodStart: batchDataRaw.period_start,
@@ -120,15 +120,27 @@ export class PayrollController {
       releaseDate: batchDataRaw.release_date,
       label: batchDataRaw.label || batchDataRaw.client_name,
       remark: batchDataRaw.remark,
-      resumeBatchId: resumeBatchId
+      resumeBatchId: resumeBatchId,
+      sourcePath: filePath,
     };
 
-    // Fire and forget - processing happens in background
-    this.payrollService.processRemoteMasterPdf(filePath, batchData).catch(err => {
-      console.error('Background PDF processing failed:', err);
-    });
-
-    return { status: 'Accepted', message: 'Processing started in background' };
+    // IMPORTANT: On Vercel serverless, fire-and-forget Promises are killed when the
+    // response is sent. We must AWAIT the work so the lambda stays alive. The service
+    // returns when its time budget is hit; the client re-invokes this endpoint with
+    // resumeBatchId until processing is complete.
+    try {
+      const result = await this.payrollService.processRemoteMasterPdf(
+        filePath,
+        batchData,
+      );
+      return result;
+    } catch (err: any) {
+      console.error('PDF processing failed:', err);
+      throw new HttpException(
+        err?.message || 'Failed to process PDF',
+        err?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Post('stop-processing/:id')
