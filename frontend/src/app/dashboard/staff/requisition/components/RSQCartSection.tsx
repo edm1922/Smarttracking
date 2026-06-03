@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ShoppingBag, Trash2, User, ChevronRight, Send, AlertTriangle, Save, FolderOpen, ChevronDown } from 'lucide-react';
-import { SelectedItem, Employee } from './RSQTypes';
+import { SelectedItem, Employee, employeeKey } from './RSQTypes';
 
 interface RSQCartSectionProps {
   selectedItems: SelectedItem[];
@@ -96,9 +96,9 @@ export const RSQCartSection: React.FC<RSQCartSectionProps> = ({
               <tr className="bg-gray-50/50 border-b border-gray-100">
                 <th className="px-8 py-6 text-[10px] font-bold text-gray-500 uppercase tracking-wider sticky left-0 bg-white z-10">Product Description</th>
                 {employees.map(emp => (
-                  <th key={emp.name} className="px-8 py-6 text-center text-[10px] font-bold text-gray-500 uppercase tracking-wider border-l border-gray-50 min-w-[150px]">
+                  <th key={employeeKey(emp)} className="px-8 py-6 text-center text-[10px] font-bold text-gray-500 uppercase tracking-wider border-l border-gray-50 min-w-[150px]">
                     <div className="flex flex-col items-center">
-                      <span className="text-gray-900 font-semibold">{emp.name}</span>
+                      <span className="text-gray-900 font-semibold">{emp.lastName}, {emp.firstName}</span>
                       <span className="opacity-70 font-medium">{emp.position}</span>
                     </div>
                   </th>
@@ -118,21 +118,24 @@ export const RSQCartSection: React.FC<RSQCartSectionProps> = ({
                       </div>
                     </div>
                   </td>
-                  {employees.map(emp => (
-                    <td key={emp.name} className="px-8 py-6 text-center border-l border-gray-50">
+                  {employees.map(emp => {
+                    const key = employeeKey(emp);
+                    return (
+                    <td key={key} className="px-8 py-6 text-center border-l border-gray-50">
                       <div className="flex items-center justify-center gap-3">
                         <input 
                           type="number" 
                           min="0"
-                          value={item.quantities[emp.name] || 0}
-                          onChange={(e) => updateCartItemQuantity(item.productId, emp.name, parseInt(e.target.value) || 0)}
+                          value={item.quantities[key] || 0}
+                          onChange={(e) => updateCartItemQuantity(item.productId, key, parseInt(e.target.value) || 0)}
                           className={`w-20 bg-gray-50/50 border rounded-xl text-center py-2 text-xs font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-primary/20 transition-all ${
-                            (item.quantities[emp.name] || 0) > 0 ? 'bg-white border-primary text-primary shadow-sm' : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                            (item.quantities[key] || 0) > 0 ? 'bg-white border-primary text-primary shadow-sm' : 'border-gray-200 text-gray-500 hover:border-gray-300'
                           }`}
                         />
                       </div>
                     </td>
-                  ))}
+                    );
+                  })}
                   <td className="px-8 py-6 text-right border-l border-gray-50">
                     <button 
                       onClick={() => removeCartItem(item.productId)}
@@ -148,9 +151,10 @@ export const RSQCartSection: React.FC<RSQCartSectionProps> = ({
               <tr className="bg-gray-50 border-t border-gray-100">
                 <td className="px-8 py-5 text-[10px] font-bold text-gray-600 uppercase tracking-wider sticky left-0 bg-gray-50">Total per Employee</td>
                 {employees.map(emp => {
-                  const total = selectedItems.reduce((sum, item) => sum + (item.quantities[emp.name] || 0), 0);
+                  const key = employeeKey(emp);
+                  const total = selectedItems.reduce((sum, item) => sum + (item.quantities[key] || 0), 0);
                   return (
-                    <td key={emp.name} className="px-8 py-5 text-center text-xs font-extrabold text-blue-600 border-l border-gray-100">
+                    <td key={key} className="px-8 py-5 text-center text-xs font-extrabold text-blue-600 border-l border-gray-100">
                       {total} Items
                     </td>
                   );

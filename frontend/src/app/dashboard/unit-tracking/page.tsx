@@ -256,11 +256,12 @@ function UnitTrackingContent() {
   };
 
   const handleExportPDF = () => {
-    const doc = new jsPDF('landscape', 'mm', 'a4');
+    const doc = new jsPDF('landscape', 'mm', 'letter');
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 15;
-    const usableWidth = pageWidth - margin * 2;
+    const ml = 15;
+    const mr = 28;
+    const usableWidth = pageWidth - ml - mr;
 
     // ── Title ──
     doc.setFont('helvetica', 'bold');
@@ -275,7 +276,7 @@ function UnitTrackingContent() {
 
     // ── Separator line ──
     doc.setDrawColor(200, 200, 200);
-    doc.line(margin, 36, pageWidth - margin, 36);
+    doc.line(ml, 36, pageWidth - mr, 36);
 
     // ── Metadata ──
     doc.setFont('helvetica', 'normal');
@@ -297,10 +298,10 @@ function UnitTrackingContent() {
 
     const metaStartY = 42;
     leftMeta.forEach((line, i) => {
-      doc.text(line, margin, metaStartY + i * 6);
+      doc.text(line, ml, metaStartY + i * 6);
     });
     rightMeta.forEach((line, i) => {
-      doc.text(line, pageWidth - margin, metaStartY + i * 6, { align: 'right' });
+      doc.text(line, pageWidth - mr, metaStartY + i * 6, { align: 'right' });
     });
 
     // ── Data Table ──
@@ -361,7 +362,7 @@ function UnitTrackingContent() {
           4: { cellWidth: 25, halign: 'right' },
           5: { cellWidth: 'auto', halign: 'left' },
         },
-        margin: { left: margin, right: margin },
+        margin: { left: ml, right: mr },
         pageBreak: 'auto',
       });
     }
@@ -378,7 +379,7 @@ function UnitTrackingContent() {
     } else {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
-      doc.text(`TOTAL ITEMS RECORDED: ${dataRows.length}`, margin, totalY);
+      doc.text(`TOTAL ITEMS RECORDED: ${dataRows.length}`, ml, totalY);
     }
 
     // ── Signatory Section ──
@@ -393,7 +394,7 @@ function UnitTrackingContent() {
       doc.setLineWidth(0.5);
 
       signFields.forEach((field, i) => {
-        const x = margin + i * signColWidth;
+        const x = ml + i * signColWidth;
         const label = field === 'preparedBy' ? 'Prepared by:'
           : field === 'checkedBy' ? 'Checked by:'
           : field === 'receivedBy' ? 'Received by:'
@@ -426,9 +427,9 @@ function UnitTrackingContent() {
     const timeStr = new Date().toLocaleTimeString('en-US', {
       hour: '2-digit', minute: '2-digit'
     });
-    doc.text(`${dateStr}, ${timeStr}`, margin, footerY);
+    doc.text(`${dateStr}, ${timeStr}`, ml, footerY);
     doc.text(`Uniform Transaction - ${transmittalHeader.transmittalNo}`, pageWidth / 2, footerY, { align: 'center' });
-    doc.text('1/1', pageWidth - margin, footerY, { align: 'right' });
+    doc.text('1/1', pageWidth - mr, footerY, { align: 'right' });
 
     // ── Print ──
     doc.autoPrint();

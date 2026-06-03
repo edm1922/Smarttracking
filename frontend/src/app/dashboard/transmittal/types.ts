@@ -53,7 +53,9 @@ export interface TransmittalItem {
 export interface PRItem {
   id: string;
   name: string;
+  description?: string;
   unit: string;
   quantity: number;
   estimatedCost: number;
+  currentStock?: number;
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { X, Tag, Eye, Trash2, ImageIcon, MapPin, Database, Info } from 'lucide-react';
+import { X, Tag, Eye, Trash2, ImageIcon, MapPin, Database, Info, ShoppingCart } from 'lucide-react';
 import { Product, Location } from '../types';
 
 interface EditProductModalProps {
@@ -18,6 +18,7 @@ interface EditProductModalProps {
   bypassStockEdit: boolean;
   setIsVerifyingPassword: (verifying: boolean) => void;
   handleDelete: () => void;
+  onRestock?: (product: Product) => void;
   isSaving: boolean;
   isUploading1: boolean;
   isUploading2: boolean;
@@ -47,6 +48,7 @@ export function EditProductModal({
   setIsVerifyingPassword,
   handleDelete,
   isSaving,
+  onRestock,
   isUploading1,
   isUploading2,
   handleImageUpload,
@@ -363,13 +365,23 @@ export function EditProductModal({
 
           {/* Action Buttons */}
           <div className="flex items-center justify-between pt-8 border-t border-gray-100 mt-auto">
-            <button 
-              type="button" 
-              onClick={handleDelete}
-              className="px-6 py-4 text-xs font-black text-red-500 uppercase tracking-widest hover:bg-red-50 rounded-2xl transition-all border border-transparent hover:border-red-100"
-            >
-              Delete Asset Record
-            </button>
+            <div className="flex gap-2">
+              <button 
+                type="button" 
+                onClick={handleDelete}
+                className="px-6 py-4 text-xs font-black text-red-500 uppercase tracking-widest hover:bg-red-50 rounded-2xl transition-all border border-transparent hover:border-red-100"
+              >
+                Delete Asset Record
+              </button>
+              <button 
+                type="button" 
+                onClick={() => onRestock?.(editingProduct)}
+                className="px-6 py-4 text-xs font-black text-blue-600 uppercase tracking-widest hover:bg-blue-50 rounded-2xl transition-all border border-transparent hover:border-blue-100 flex items-center gap-2"
+              >
+                <ShoppingCart className="h-4 w-4" />
+                Request Restock
+              </button>
+            </div>
             <div className="flex gap-4">
               <button type="button" onClick={onClose} className="px-8 py-4 text-xs font-black text-gray-400 uppercase tracking-widest hover:text-gray-600">Cancel</button>
               <button disabled={isSaving} type="submit" className="px-12 py-4 bg-primary text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50">

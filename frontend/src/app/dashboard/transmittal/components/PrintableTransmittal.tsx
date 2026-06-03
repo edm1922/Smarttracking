@@ -77,8 +77,7 @@ export const PrintableTransmittal: React.FC<PrintableTransmittalProps> = ({
               <>
                 <th className="py-2 px-3 text-left text-[8px] font-black uppercase tracking-widest w-8 border-r border-gray-900">No.</th>
                 <th className="py-2 px-3 text-left text-[8px] font-black uppercase tracking-widest border-r border-gray-900">Description</th>
-                <th className="py-2 px-3 text-left text-[8px] font-black uppercase tracking-widest w-20 border-r border-gray-900">Qty</th>
-                <th className="py-2 px-3 text-left text-[8px] font-black uppercase tracking-widest">Part No. / SKU</th>
+                <th className="py-2 px-3 text-left text-[8px] font-black uppercase tracking-widest w-20">Qty</th>
               </>
             )}
           </tr>
@@ -104,8 +103,7 @@ export const PrintableTransmittal: React.FC<PrintableTransmittalProps> = ({
                     {item.name}
                     {item.description ? ` (${item.description})` : ''}
                   </td>
-                  <td className="py-2 px-3 text-[10px] font-black border-r border-gray-900 text-center">{item.quantity} {(item.unit || 'PCS').toUpperCase()}</td>
-                  <td className="py-2 px-3 text-[10px] font-mono">{item.sku || '-'}</td>
+                  <td className="py-2 px-3 text-[10px] font-black text-center">{item.quantity} {(item.unit || 'PCS').toUpperCase()}</td>
                 </>
               )}
             </tr>

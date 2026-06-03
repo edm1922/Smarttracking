@@ -345,6 +345,61 @@ export class ReportsService {
         `;
         return topUsersRaw.map((u) => ({ name: u.name, count: u.count }));
 
+      case 'custom-item-report':
+        const productIdsArr = options.productIds
+          ? options.productIds.split(',').filter(Boolean)
+          : [];
+        const productWhere = productIdsArr.length > 0 ? { id: { in: productIdsArr } } : {};
+
+        const startDate = options.startDate ? new Date(options.startDate) : undefined;
+        const endDate = options.endDate ? (() => { const d = new Date(options.endDate); d.setDate(d.getDate() + 1); return d; })() : undefined;
+        const irDateFilter = startDate || endDate ? {
+          date: {
+            ...(startDate && { gte: startDate }),
+            ...(endDate && { lt: endDate }),
+          },
+        } : {};
+        const txDateFilter = startDate || endDate ? {
+          createdAt: {
+            ...(startDate && { gte: startDate }),
+            ...(endDate && { lt: endDate }),
+          },
+        } : {};
+
+        const products = await this.prisma.product.findMany({
+          where: productWhere,
+          include: {
+            stocks: { include: { location: true } },
+            InternalRequest: {
+              where: irDateFilter,
+              select: { id: true, status: true, quantity: true },
+            },
+            ProductTransaction: {
+              where: txDateFilter,
+              select: { id: true, type: true, remarks: true, quantity: true },
+            },
+          },
+          orderBy: { name: 'asc' },
+        });
+        return products.map((p) => {
+          const allIRs = (p as any).InternalRequest;
+          const fulfilledIRs = allIRs.filter((ir: any) => ir.status === 'FULFILLED');
+          const outTxs = (p as any).ProductTransaction.filter((t: any) => t.type === 'OUT');
+          const inTxs = (p as any).ProductTransaction.filter((t: any) => t.type === 'IN');
+          return {
+            sku: p.sku,
+            name: p.name,
+            description: p.description || '',
+            unit: p.unit,
+            threshold: p.threshold,
+            totalStock: p.stocks.reduce((sum: number, s: any) => sum + s.quantity, 0),
+            requestCount: allIRs.length,
+            issuedQty: fulfilledIRs.reduce((sum: number, ir: any) => sum + ir.quantity, 0),
+            mainOfficeCount: outTxs.filter((t: any) => t.remarks?.startsWith('Bulk Release:')).length,
+            stockInQty: inTxs.reduce((sum: number, t: any) => sum + t.quantity, 0),
+          };
+        });
+
       default:
         return [];
     }

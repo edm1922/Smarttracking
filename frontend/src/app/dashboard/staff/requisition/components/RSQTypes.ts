@@ -22,7 +22,8 @@ export interface Location {
 }
 
 export interface Employee {
-  name: string;
+  lastName: string;
+  firstName: string;
   position: string;
   department: string;
 }
@@ -38,7 +39,8 @@ export interface SelectedItem {
 }
 
 export interface DraftEntry {
-  name: string;
+  lastName: string;
+  firstName: string;
   position: string;
   department: string;
   items: DraftItem[];
@@ -52,3 +54,24 @@ export interface DraftItem {
   quantity: number;
   description: string | null;
 }
+
+export const formatEmpName = (lastName: string, firstName: string) =>
+  `${lastName.toUpperCase()}, ${firstName.toUpperCase()}`;
+
+export const displayEmpName = (lastName: string, firstName: string) =>
+  `${lastName.toUpperCase()}, ${firstName.toUpperCase()}`;
+
+export const parseEmpName = (name: string) => {
+  if (!name) return { lastName: '', firstName: '' };
+  const commaIdx = name.indexOf(',');
+  if (commaIdx >= 0) {
+    return { lastName: name.slice(0, commaIdx).trim().toUpperCase(), firstName: name.slice(commaIdx + 1).trim().toUpperCase() };
+  }
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return { lastName: parts.pop()!.toUpperCase(), firstName: parts.join(' ').toUpperCase() };
+  }
+  return { lastName: name.trim().toUpperCase(), firstName: '' };
+};
+
+export const employeeKey = (emp: Employee) => formatEmpName(emp.lastName, emp.firstName);

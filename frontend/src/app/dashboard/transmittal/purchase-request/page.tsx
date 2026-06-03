@@ -160,8 +160,8 @@ export default function PRTransmittalPage() {
     }
   };
 
-  const addPrRow = () => {
-    setPrItems([...prItems, { id: Math.random().toString(36).substr(2, 9), name: '', unit: 'PCS', quantity: 1, estimatedCost: 0 }]);
+  const addPrRow = (initialData?: Partial<PRItem>) => {
+    setPrItems([...prItems, { id: Math.random().toString(36).substr(2, 9), name: initialData?.name || '', description: initialData?.description || '', unit: initialData?.unit || 'PCS', quantity: initialData?.quantity ?? 1, estimatedCost: initialData?.estimatedCost ?? 0, currentStock: initialData?.currentStock ?? 0 }]);
   };
 
   const updatePrItem = (id: string, field: string, value: any) => {
@@ -195,7 +195,9 @@ export default function PRTransmittalPage() {
     setPrItems((pr.items || []).map((item: any) => ({
       ...item,
       id: item.id || Math.random().toString(36).substr(2, 9),
-      name: item.name || item.description || ''
+      name: item.name || item.description || '',
+      description: item.description || '',
+      currentStock: item.currentStock ?? 0
     })));
   };
 
@@ -203,7 +205,9 @@ export default function PRTransmittalPage() {
     const newItems = (pr.items || []).map((item: any) => ({
       ...item,
       id: Math.random().toString(36).substr(2, 9),
-      name: item.name || item.description || ''
+      name: item.name || item.description || '',
+      description: item.description || '',
+      currentStock: item.currentStock ?? 0
     }));
     setPrItems(prev => [...prev, ...newItems]);
   };

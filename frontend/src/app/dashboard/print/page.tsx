@@ -37,6 +37,7 @@ export default function PrintPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBatchId, setSelectedBatchId] = useState('all');
   const [usageFilter, setUsageFilter] = useState<'all' | 'new' | 'used'>('all');
+  const [qrSize, setQrSize] = useState(130);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -127,14 +128,32 @@ export default function PrintPage() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Link>
-          <button
-            onClick={handlePrint}
-            disabled={printQueue.length === 0}
-            className="inline-flex items-center rounded-2xl bg-primary px-8 py-2.5 text-sm font-bold text-white shadow-xl shadow-primary/30 hover:bg-primary-dark transition-all disabled:opacity-50 active:scale-95"
-          >
-            <PrinterIcon className="mr-2 h-4 w-4" />
-            Launch Print Wizard
-          </button>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-2 shadow-sm">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">QR Size</span>
+              <div className="flex items-center gap-1">
+                {[100, 130, 160, 200].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setQrSize(s)}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                      qrSize === s ? 'bg-primary text-white shadow-sm' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button
+              onClick={handlePrint}
+              disabled={printQueue.length === 0}
+              className="inline-flex items-center rounded-2xl bg-primary px-8 py-2.5 text-sm font-bold text-white shadow-xl shadow-primary/30 hover:bg-primary-dark transition-all disabled:opacity-50 active:scale-95"
+            >
+              <PrinterIcon className="mr-2 h-4 w-4" />
+              Launch Print Wizard
+            </button>
+          </div>
         </div>
       </div>
 
@@ -300,7 +319,7 @@ export default function PrintPage() {
                 )}
                 <QRCodeSVG 
                   value={`${typeof window !== 'undefined' ? window.location.origin : ''}/i/${item.slug}`}
-                  size={130}
+                  size={qrSize}
                   level="M"
                   includeMargin={false}
                 />
@@ -334,6 +353,10 @@ export default function PrintPage() {
       </div>
 
       <style jsx global>{`
+        @page {
+          size: portrait;
+          margin: 10mm 12mm;
+        }
         @media print {
           .no-print { display: none !important; }
           .pl-64 { padding-left: 0 !important; }
@@ -342,15 +365,15 @@ export default function PrintPage() {
           .bg-gray-50, body { background-color: white !important; }
           .rounded-[2rem], .shadow-sm, .border { border: none !important; box-shadow: none !important; border-radius: 0 !important; }
           .grid { 
-            gap: 0.5cm !important; 
-            grid-template-columns: repeat(4, 1fr) !important;
+            gap: 0.3cm !important; 
+            grid-template-columns: repeat(3, 1fr) !important;
             padding: 0 !important;
           }
           .p-12 { padding: 0 !important; }
           .flex-col { 
             border: 0.5pt solid #eee !important; 
-            padding: 10pt !important;
-            margin-bottom: 0.5cm !important;
+            padding: 6pt !important;
+            margin-bottom: 0.3cm !important;
           }
         }
       `}</style>

@@ -12,7 +12,7 @@ import { RSQSubmitModal } from './components/RSQSubmitModal';
 import { PrintableRequisition } from './components/PrintableRequisition';
 import { BlankRequisitionForm } from './components/BlankRequisitionForm';
 import { X, FolderOpen } from 'lucide-react';
-import { Product, Location, Employee, SelectedItem, DraftEntry } from './components/RSQTypes';
+import { Product, Location, Employee, SelectedItem, DraftEntry, parseEmpName, employeeKey, formatEmpName } from './components/RSQTypes';
 
 export default function StaffRequisitionPage() {
   return (
@@ -41,7 +41,8 @@ function RSQContent() {
   });
   
   // Multiple Employees state
-  const [employeeInput, setEmployeeInput] = useState('');
+  const [lastNameInput, setLastNameInput] = useState('');
+  const [firstNameInput, setFirstNameInput] = useState('');
   const [positionInput, setPositionInput] = useState('');
   const [departmentInput, setDepartmentInput] = useState('');
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -91,9 +92,17 @@ function RSQContent() {
       ]);
       
       const rawEmployees = empRes.data || [];
-      setExistingEmployees(rawEmployees.map((e: any) => 
-        typeof e === 'string' ? { name: e, position: 'Staff', department: '' } : { ...e, department: e.department || '' }
-      ));
+      const parsedEmpMap = new Map<string, any>();
+      rawEmployees.forEach((e: any) => {
+        const rawName = typeof e === 'string' ? e : (e.name || e.employeeName || '');
+        const parsed = parseEmpName(rawName);
+        const emp = { lastName: parsed.lastName, firstName: parsed.firstName, position: typeof e === 'string' ? 'Staff' : (e.position || e.employeeRole || 'Staff'), department: typeof e === 'string' ? '' : (e.department || e.departmentArea || '') };
+        const key = employeeKey(emp);
+        if (!parsedEmpMap.has(key)) {
+          parsedEmpMap.set(key, emp);
+        }
+      });
+      setExistingEmployees(Array.from(parsedEmpMap.values()));
       
       const locs = locsRes.data;
       setLocations(locs);
@@ -125,7 +134,12 @@ function RSQContent() {
       const savedEmployees = localStorage.getItem('requisition_employees');
       const savedItems = localStorage.getItem('requisition_items');
       const savedForm = localStorage.getItem('requisition_form');
-      if (savedEmployees) setEmployees(JSON.parse(savedEmployees));
+      if (savedEmployees) {
+        const parsed = JSON.parse(savedEmployees);
+        setEmployees(parsed.map((e: any) =>
+          e.lastName ? e : { ...parseEmpName(e.name), position: e.position || 'Staff', department: e.department || '' }
+        ));
+      }
       if (savedItems) setSelectedItems(JSON.parse(savedItems));
       if (savedForm) {
         const parsedForm = JSON.parse(savedForm);
@@ -186,7 +200,9 @@ function RSQContent() {
       const allDrafts = JSON.parse(localStorage.getItem('requisition_drafts') || '{}');
       const draft = allDrafts[name];
       if (!draft) return toast.error('Draft not found');
-      setEmployees(draft.employees || []);
+      setEmployees((draft.employees || []).map((e: any) =>
+        e.lastName ? e : { ...parseEmpName(e.name), position: e.position || 'Staff', department: e.department || '' }
+      ));
       setSelectedItems(draft.selectedItems || []);
       if (draft.form) setForm(prev => ({ ...prev, ...draft.form }));
       if (draft.activeEmployeeNames) setActiveEmployeeNames(draft.activeEmployeeNames);
@@ -212,39 +228,38 @@ function RSQContent() {
   }, [form.departmentArea, form.shift, form.supervisorName, form.remarks]);
 
   const addEmployee = () => {
-    const trimmedName = employeeInput.trim().toUpperCase();
-    if (!trimmedName) return;
+    const trimmedLast = lastNameInput.trim().toUpperCase();
+    const trimmedFirst = firstNameInput.trim().toUpperCase();
+    if (!trimmedLast && !trimmedFirst) return;
     const trimmedPos = positionInput.trim().toUpperCase() || 'STAFF';
     const trimmedDept = departmentInput.trim().toUpperCase() || '';
-    setDraftEntry({ name: trimmedName, position: trimmedPos, department: trimmedDept, items: [] });
-    setEmployeeInput('');
+    setDraftEntry({ lastName: trimmedLast || '—', firstName: trimmedFirst || '—', position: trimmedPos, department: trimmedDept, items: [] });
+    setLastNameInput('');
+    setFirstNameInput('');
     setPositionInput('');
     setDepartmentInput('');
     setShowEmployeeDropdown(false);
   };
 
   const selectExistingEmployee = (emp: Employee) => {
-    setEmployeeInput(emp.name.toUpperCase());
+    setLastNameInput(emp.lastName.toUpperCase());
+    setFirstNameInput(emp.firstName.toUpperCase());
     setPositionInput(emp.position.toUpperCase());
     setDepartmentInput((emp.department || '').toUpperCase());
     setShowEmployeeDropdown(false);
   };
 
-  const removeEmployee = (name: string) => {
-    setEmployees(employees.filter(e => e.name !== name));
+  const removeEmployee = (key: string) => {
+    setEmployees(employees.filter(e => employeeKey(e) !== key));
   };
 
-  const handleEditEmployee = (emp: Employee) => {
-    removeEmployee(emp.name);
-    setEmployeeInput(emp.name);
+  const editAndDraftEmployee = (emp: Employee) => {
+    removeEmployee(employeeKey(emp));
+    setLastNameInput(emp.lastName);
+    setFirstNameInput(emp.firstName);
     setPositionInput(emp.position);
     setDepartmentInput(emp.department);
-  };
-
-  const toggleEmployeeSelection = (name: string) => {
-    setActiveEmployeeNames(prev => 
-      prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
-    );
+    setDraftEntry({ lastName: emp.lastName, firstName: emp.firstName, position: emp.position, department: emp.department, items: [] });
   };
 
   const addProductToDraft = (product: Product) => {
@@ -282,23 +297,24 @@ function RSQContent() {
 
   const confirmDraftEntry = () => {
     if (!draftEntry) return;
-    if (!employees.some(e => e.name === draftEntry.name)) {
-      setEmployees([...employees, { name: draftEntry.name, position: draftEntry.position, department: draftEntry.department }]);
+    const empKey = employeeKey(draftEntry);
+    if (!employees.some(e => employeeKey(e) === empKey)) {
+      setEmployees([...employees, { lastName: draftEntry.lastName, firstName: draftEntry.firstName, position: draftEntry.position, department: draftEntry.department }]);
     }
     draftEntry.items.forEach(item => {
       const product = products.find(p => p.id === item.productId);
       if (product) {
-        addItemToCart(product, item.availableQty, [draftEntry.name], item.quantity);
+        addItemToCart(product, item.availableQty, [empKey], item.quantity);
       }
     });
     setDraftEntry(null);
     toast.success('Entry confirmed');
   };
 
-  const addItemToCart = (product: Product, availableQty: number, targetEmployeeNames?: string[], quantity: number = 1) => {
-    let targets = targetEmployeeNames;
+  const addItemToCart = (product: Product, availableQty: number, targetEmployeeKeys?: string[], quantity: number = 1) => {
+    let targets = targetEmployeeKeys;
     if (!targets || targets.length === 0) {
-      targets = activeEmployeeNames.length > 0 ? activeEmployeeNames : employees.map(e => e.name);
+      targets = activeEmployeeNames.length > 0 ? activeEmployeeNames : employees.map(e => employeeKey(e));
     }
     if (targets.length === 0) return toast.warning('Tag employees first');
 
@@ -308,15 +324,15 @@ function RSQContent() {
         return prev.map((item, idx) => {
           if (idx === existingIndex) {
             const newQuantities = { ...(item.quantities || {}) };
-            targets!.forEach(name => { newQuantities[name] = (newQuantities[name] || 0) + quantity; });
+            targets!.forEach(key => { newQuantities[key] = (newQuantities[key] || 0) + quantity; });
             return { ...item, quantities: newQuantities };
           }
           return item;
         });
       } else {
         const initialQuantities: Record<string, number> = {};
-        employees.forEach(emp => { initialQuantities[emp.name] = targets!.includes(emp.name) ? quantity : 0; });
-        targets!.forEach(name => { if (initialQuantities[name] === undefined) initialQuantities[name] = quantity; });
+        employees.forEach(emp => { const key = employeeKey(emp); initialQuantities[key] = targets!.includes(key) ? quantity : 0; });
+        targets!.forEach(key => { if (initialQuantities[key] === undefined) initialQuantities[key] = quantity; });
         return [...prev, {
           productId: product.id,
           productName: product.name,
@@ -363,12 +379,13 @@ function RSQContent() {
 
       const requestsData: any[] = [];
       employees.forEach(emp => {
+        const empKey = employeeKey(emp);
         selectedItems.forEach(item => {
-          const qty = item.quantities && item.quantities[emp.name] !== undefined ? item.quantities[emp.name] : 0;
+          const qty = item.quantities && item.quantities[empKey] !== undefined ? item.quantities[empKey] : 0;
           if (qty > 0) {
             requestsData.push({
               date: form.date,
-              employeeName: emp.name,
+              employeeName: formatEmpName(emp.lastName, emp.firstName),
               employeeRole: emp.position,
               supervisor: form.supervisorName,
               departmentArea: form.departmentArea,
@@ -431,14 +448,14 @@ function RSQContent() {
             <RSQFormSection 
               form={form} setForm={setForm} locations={locations}
               employees={employees} existingEmployees={existingEmployees}
-              employeeInput={employeeInput} setEmployeeInput={setEmployeeInput}
+              lastNameInput={lastNameInput} setLastNameInput={setLastNameInput}
+              firstNameInput={firstNameInput} setFirstNameInput={setFirstNameInput}
               positionInput={positionInput} setPositionInput={setPositionInput}
               departmentInput={departmentInput} setDepartmentInput={setDepartmentInput}
               showEmployeeDropdown={showEmployeeDropdown} setShowEmployeeDropdown={setShowEmployeeDropdown}
               highlightedIndex={highlightedIndex} setHighlightedIndex={setHighlightedIndex}
-              activeEmployeeNames={activeEmployeeNames} toggleEmployeeSelection={toggleEmployeeSelection}
               addEmployee={addEmployee} selectExistingEmployee={selectExistingEmployee}
-              removeEmployee={removeEmployee} handleEditEmployee={handleEditEmployee}
+              removeEmployee={removeEmployee} editAndDraftEmployee={editAndDraftEmployee}
               draftEntry={draftEntry} setDraftEntry={setDraftEntry}
               quickItemInput={quickItemInput} setQuickItemInput={setQuickItemInput}
               showItemDropdown={showItemDropdown} setShowItemDropdown={setShowItemDropdown}

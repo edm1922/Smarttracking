@@ -31,9 +31,11 @@ export class ReportsController {
   @Get('report-data')
   getReportData(
     @Query('type') type: string,
-    @Query('productId') productId?: string,
+    @Query('productIds') productIds?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
-    return this.service.getReportData(type, { productId });
+    return this.service.getReportData(type, { productIds, startDate, endDate });
   }
 
   // --- New Analytics Endpoints ---

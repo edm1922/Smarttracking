@@ -1,5 +1,5 @@
 import React from 'react';
-import { SelectedItem, Employee } from './RSQTypes';
+import { SelectedItem, Employee, employeeKey, formatEmpName } from './RSQTypes';
 
 interface PrintableRequisitionProps {
   form: any;
@@ -15,11 +15,12 @@ export const PrintableRequisition: React.FC<PrintableRequisitionProps> = ({
   // Flatten items per employee so we can print a clean signable table
   const flatRows: any[] = [];
   employees.forEach(emp => {
+    const key = employeeKey(emp);
     selectedItems.forEach(item => {
-      const qty = item.quantities && item.quantities[emp.name] !== undefined ? item.quantities[emp.name] : 0;
+      const qty = item.quantities && item.quantities[key] !== undefined ? item.quantities[key] : 0;
       if (qty > 0) {
         flatRows.push({
-          employeeName: emp.name,
+          employeeName: formatEmpName(emp.lastName, emp.firstName),
           employeeRole: emp.position,
           employeeDept: emp.department,
           productName: item.productName,

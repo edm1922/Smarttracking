@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Search, Plus, Filter, Download, Trash2, Package, Tag, Database, History, Info, ChevronRight, Eye, ImageIcon, X, CheckCircle, Clock, AlertTriangle, User, Bell } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
@@ -89,6 +90,8 @@ export default function ProductsPage() {
   const [bypassStockEdit, setBypassStockEdit] = useState(false);
   const [logSearchTerm, setLogSearchTerm] = useState('');
   const [isLogSearching, setIsLogSearching] = useState(false);
+
+  const router = useRouter();
 
   const standardUnits = ['PCS', 'METERS', 'ROLLS', 'KILOGRAMS', 'LITERS', 'SET', 'BOX'];
 
@@ -283,6 +286,19 @@ export default function ProductsPage() {
       ...prev,
       items: prev.items.map((i: any) => i.productId === productId ? { ...i, quantity: qty } : i)
     }));
+  };
+
+  const handleRestock = (product: Product) => {
+    const prItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: product.name,
+      unit: product.unit,
+      quantity: 1,
+      estimatedCost: product.price || 0,
+    };
+    localStorage.setItem('pending_pr_items', JSON.stringify([prItem]));
+    setIsEditModalOpen(false);
+    router.push('/dashboard/transmittal/purchase-request');
   };
 
   const handleDelete = async () => {
@@ -514,7 +530,8 @@ export default function ProductsPage() {
       <EditProductModal 
         isOpen={isEditModalOpen} onClose={() => { setIsEditModalOpen(false); setIsAddingCustomUnitEdit(false); }}
         onSubmit={handleEditSubmit} editingProduct={editingProduct!} setEditingProduct={setEditingProduct} isSaving={isSavingProduct}
-        handleDelete={() => setIsDeleteConfirmOpen(true)} activeEditTab={activeEditTab} setActiveEditTab={setActiveEditTab}
+        handleDelete={() => setIsDeleteConfirmOpen(true)} onRestock={handleRestock}
+        activeEditTab={activeEditTab} setActiveEditTab={setActiveEditTab}
         activeStockSubTab={activeStockSubTab} setActiveStockSubTab={setActiveStockSubTab}
         editableStock={editableStock} setEditableStock={setEditableStock}
         bypassStockEdit={bypassStockEdit} setIsVerifyingPassword={() => setIsVerifyingPassword(true)}

@@ -1,10 +1,11 @@
 import React from 'react';
-import { ClipboardList, Trash2 } from 'lucide-react';
+import { ClipboardList, Trash2, Search, Package } from 'lucide-react';
 import { PRItem } from '../types';
+import api from '@/lib/api';
 
 interface PRItemBuilderProps {
   prItems: PRItem[];
-  addPrRow: () => void;
+  addPrRow: (initialData?: Partial<PRItem>) => void;
   updatePrItem: (id: string, field: string, value: any) => void;
   removePrItem: (id: string) => void;
   setPrItems: (items: PRItem[]) => void;
@@ -21,19 +22,108 @@ export const PRItemBuilder: React.FC<PRItemBuilderProps> = ({
   savePR,
   editingPrId,
 }) => {
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [searchResults, setSearchResults] = React.useState<any[]>([]);
+  const [searchLoading, setSearchLoading] = React.useState(false);
+  const [showDropdown, setShowDropdown] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setShowDropdown(false);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const res = await api.get('/products', { params: { search: searchQuery, take: 8 } });
+        const items = res.data.data || res.data;
+        setSearchResults(items);
+        setShowDropdown(items.length > 0);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const getTotalStock = (p: any) =>
+    (p.stocks || []).reduce((sum: number, s: any) => sum + s.quantity, 0);
+
+  const selectProduct = (product: any) => {
+    const totalStock = getTotalStock(product);
+    addPrRow({
+      name: product.name,
+      description: product.description || '',
+      unit: product.unit,
+      estimatedCost: product.price || 0,
+      currentStock: totalStock,
+    });
+    setSearchQuery('');
+    setShowDropdown(false);
+  };
+
   return (
     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm h-full flex flex-col">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center">
           <ClipboardList className="mr-2 h-4 w-4" />
           Item Builder
         </h3>
         <button 
-          onClick={addPrRow} 
+          onClick={() => addPrRow()} 
           className="text-xs font-black text-blue-600 hover:text-blue-700 uppercase tracking-widest bg-blue-50 px-3 py-1.5 rounded-lg transition-all"
         >
           + Add Custom Row
         </button>
+      </div>
+
+      <div className="relative mb-4">
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            onFocus={() => { if (searchResults.length > 0) setShowDropdown(true); }}
+            onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+            className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:border-blue-500/30 focus:ring-2 focus:ring-blue-500/10 transition-all placeholder:text-gray-300"
+            placeholder="Search inventory items to add..."
+          />
+          {searchLoading && (
+            <div className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          )}
+        </div>
+
+        {showDropdown && (
+          <div className="absolute z-20 mt-1 w-full bg-white border border-gray-100 rounded-xl shadow-xl shadow-gray-200/50 max-h-60 overflow-y-auto custom-scrollbar">
+            {searchResults.map((product: any) => {
+              const totalStock = getTotalStock(product);
+              return (
+                <button
+                  key={product.id}
+                  type="button"
+                  onMouseDown={() => selectProduct(product)}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition-colors text-left border-b border-gray-50 last:border-b-0"
+                >
+                  <div className="h-8 w-8 bg-blue-50 rounded-lg flex items-center justify-center shrink-0">
+                    <Package className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold text-gray-900 truncate">{product.name}</div>
+                    <div className="text-[10px] text-gray-400 truncate">{product.description || product.sku}</div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-sm font-black text-gray-900">{totalStock}</div>
+                    <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">in stock</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-x-auto custom-scrollbar">
@@ -42,6 +132,7 @@ export const PRItemBuilder: React.FC<PRItemBuilderProps> = ({
             <tr className="text-gray-400 border-b border-gray-100">
               <th className="pb-3 font-black uppercase w-12 text-center">No.</th>
               <th className="pb-3 font-black uppercase">Description</th>
+              <th className="pb-3 font-black uppercase w-16 text-center">Stock</th>
               <th className="pb-3 font-black uppercase w-20 text-center">Unit</th>
               <th className="pb-3 font-black uppercase w-20 text-center">Qty</th>
               <th className="pb-3 font-black uppercase w-32 text-right">Est. Cost</th>
@@ -60,6 +151,16 @@ export const PRItemBuilder: React.FC<PRItemBuilderProps> = ({
                     className="w-full bg-transparent outline-none focus:bg-white focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500 p-2 rounded-lg transition-all font-bold text-gray-900" 
                     placeholder="Item name..."
                   />
+                  <input 
+                    type="text" 
+                    value={item.description || ''} 
+                    onChange={e => updatePrItem(item.id, 'description', e.target.value)} 
+                    className="w-full bg-transparent outline-none focus:bg-white focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500 px-2 pb-1 rounded-lg transition-all text-[10px] text-gray-400" 
+                    placeholder="Description..."
+                  />
+                </td>
+                <td className="py-3 text-center">
+                  <span className="text-sm font-black text-gray-700">{item.currentStock ?? 0}</span>
                 </td>
                 <td className="py-3">
                   <input 
@@ -100,12 +201,12 @@ export const PRItemBuilder: React.FC<PRItemBuilderProps> = ({
             ))}
             {prItems.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-20 text-center">
+                <td colSpan={7} className="py-20 text-center">
                   <div className="flex flex-col items-center justify-center space-y-3">
                     <div className="h-12 w-12 bg-gray-50 rounded-full flex items-center justify-center">
                       <ClipboardList className="h-6 w-6 text-gray-300" />
                     </div>
-                    <div className="text-sm text-gray-400 font-medium italic">No items added. Click "+ Add Custom Row" to start.</div>
+                    <div className="text-sm text-gray-400 font-medium italic">Search inventory above or click "+ Add Custom Row" to start.</div>
                   </div>
                 </td>
               </tr>

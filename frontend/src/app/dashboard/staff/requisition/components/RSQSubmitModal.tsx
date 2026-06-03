@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, CheckCircle, ImageIcon, Trash2, Send, AlertTriangle, Plus, Printer, User, MapPin, ShoppingBag } from 'lucide-react';
-import { SelectedItem, Employee } from './RSQTypes';
+import { SelectedItem, Employee, employeeKey } from './RSQTypes';
 
 interface RSQSubmitModalProps {
   isOpen: boolean;
@@ -106,22 +106,23 @@ export const RSQSubmitModal: React.FC<RSQSubmitModalProps> = ({
             </div>
             <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50 max-h-36 overflow-y-auto custom-scrollbar">
               {employees.map(emp => {
-                const empItems = selectedItems.filter(item => (item.quantities[emp.name] || 0) > 0);
+                const key = employeeKey(emp);
+                const empItems = selectedItems.filter(item => (item.quantities[key] || 0) > 0);
                 if (empItems.length === 0) return null;
                 return (
-                  <div key={emp.name} className="px-5 py-3 flex items-center justify-between">
+                  <div key={key} className="px-5 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="h-7 w-7 bg-primary/5 rounded-lg flex items-center justify-center shrink-0">
                         <User className="h-3.5 w-3.5 text-primary" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[10px] font-bold text-gray-900 uppercase truncate">{emp.name}</p>
+                        <p className="text-[10px] font-bold text-gray-900 uppercase truncate">{emp.lastName}, {emp.firstName}</p>
                         <p className="text-[8px] font-bold text-gray-400 uppercase truncate">{emp.position}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <span className="text-[9px] font-bold text-gray-500">{empItems.length} items</span>
-                      <span className="text-[10px] font-black text-primary">{empItems.reduce((s, i) => s + (i.quantities[emp.name] || 0), 0)} pcs</span>
+                      <span className="text-[10px] font-black text-primary">{empItems.reduce((s, i) => s + (i.quantities[key] || 0), 0)} pcs</span>
                     </div>
                   </div>
                 );
