@@ -65,20 +65,63 @@ export class InternalRequestsService {
     return { url };
   }
 
-  async findAll(params: { skip?: number; take?: number; search?: string; status?: string } = {}) {
-    const { skip = 0, take = 20, search, status } = params;
+  async findAll(params: { skip?: number; take?: number; itemSearch?: string; personSearch?: string; status?: string; fulfilledDateFrom?: string; fulfilledDateTo?: string } = {}) {
+    const { skip = 0, take = 20, itemSearch, personSearch, status, fulfilledDateFrom, fulfilledDateTo } = params;
 
     const where: any = {};
     if (status && status !== 'ALL') {
       where.status = status;
     }
+    if (fulfilledDateFrom || fulfilledDateTo) {
+      const dateFilter: any = {};
+      if (fulfilledDateFrom) {
+        const d = new Date(fulfilledDateFrom);
+        d.setHours(0, 0, 0, 0);
+        dateFilter.gte = d;
+      }
+      if (fulfilledDateTo) {
+        const d = new Date(fulfilledDateTo);
+        d.setHours(23, 59, 59, 999);
+        dateFilter.lte = d;
+      }
+      const txns = await this.prisma.productTransaction.findMany({
+        where: {
+          type: 'OUT',
+          createdAt: dateFilter,
+          remarks: { contains: 'Fulfilled Internal Request REQ-' },
+        },
+        select: { remarks: true },
+      });
+      const requestNos = txns
+        .map(t => t.remarks?.match(/REQ-\d{4}-\d+-[A-Z0-9]+/)?.[0])
+        .filter(Boolean) as string[];
+      if (requestNos.length > 0) {
+        where.requestNo = { in: requestNos };
+      } else {
+        where.id = '00000000-0000-0000-0000-000000000000';
+      }
+    }
     
-    if (search) {
-      where.OR = [
-        { requestNo: { contains: search, mode: 'insensitive' } },
-        { employeeName: { contains: search, mode: 'insensitive' } },
-        { product: { name: { contains: search, mode: 'insensitive' } } },
-      ];
+    const AND: any[] = [];
+    if (itemSearch) {
+      AND.push({
+        OR: [
+          { product: { name: { contains: itemSearch, mode: 'insensitive' } } },
+        ],
+      });
+    }
+    if (personSearch) {
+      AND.push({
+        OR: [
+          { requestNo: { contains: personSearch, mode: 'insensitive' } },
+          { employeeName: { contains: personSearch, mode: 'insensitive' } },
+          { supervisor: { contains: personSearch, mode: 'insensitive' } },
+          { departmentArea: { contains: personSearch, mode: 'insensitive' } },
+        ],
+      });
+    }
+    if (AND.length > 0) {
+      where.AND = AND;
     }
 
     const safeTake = Math.min(take ?? 20, 500);

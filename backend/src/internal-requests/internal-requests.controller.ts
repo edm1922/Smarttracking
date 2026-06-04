@@ -41,14 +41,20 @@ export class InternalRequestsController {
   findAll(
     @Query('skip') skip?: string,
     @Query('take') take?: string,
-    @Query('search') search?: string,
+    @Query('itemSearch') itemSearch?: string,
+    @Query('personSearch') personSearch?: string,
     @Query('status') status?: string,
+    @Query('fulfilledDateFrom') fulfilledDateFrom?: string,
+    @Query('fulfilledDateTo') fulfilledDateTo?: string,
   ) {
     return this.internalRequestsService.findAll({
       skip: skip ? parseInt(skip, 10) : 0,
       take: take ? parseInt(take, 10) : 20,
-      search,
+      itemSearch,
+      personSearch,
       status,
+      fulfilledDateFrom,
+      fulfilledDateTo,
     });
   }
 

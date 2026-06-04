@@ -69,8 +69,12 @@ export default function RequestsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [itemSearch, setItemSearch] = useState('');
+  const [personSearch, setPersonSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'PENDING' | 'APPROVED' | 'FULFILLED' | 'REJECTED' | 'ALL'>('PENDING');
+  const [allStatusFilter, setAllStatusFilter] = useState<'PENDING' | 'APPROVED' | 'FULFILLED' | 'REJECTED' | 'ALL'>('ALL');
+  const [fulfilledDateFrom, setFulfilledDateFrom] = useState('');
+  const [fulfilledDateTo, setFulfilledDateTo] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -100,8 +104,9 @@ export default function RequestsPage() {
 
   const [page, setPage] = useState(1);
   const [totalRequests, setTotalRequests] = useState(0);
-  const pageSize = 20;
-  const debouncedSearch = useDebounce(searchTerm, 300);
+  const pageSize = 100;
+  const debouncedItemSearch = useDebounce(itemSearch, 300);
+  const debouncedPersonSearch = useDebounce(personSearch, 300);
 
   const fetchInitialData = async () => {
     try {
@@ -121,7 +126,7 @@ export default function RequestsPage() {
     try {
       const skip = (page - 1) * pageSize;
       const res = await api.get('/internal-requests', {
-        params: { skip, take: pageSize, search: debouncedSearch, status: activeTab }
+        params: { skip, take: pageSize, itemSearch: debouncedItemSearch, personSearch: debouncedPersonSearch, status: activeTab === 'ALL' ? allStatusFilter : activeTab, fulfilledDateFrom: fulfilledDateFrom || undefined, fulfilledDateTo: fulfilledDateTo || undefined }
       });
       setRequests(res.data.data);
       setTotalRequests(res.data.total);
@@ -143,7 +148,7 @@ export default function RequestsPage() {
   useEffect(() => {
     fetchRequests();
     setSelectedIds([]);
-  }, [page, debouncedSearch, activeTab]);
+  }, [page, debouncedItemSearch, debouncedPersonSearch, activeTab, allStatusFilter, fulfilledDateFrom, fulfilledDateTo]);
 
   const addRowToDraft = () => {
     const product = products.find(p => p.id === form.productId);
@@ -204,7 +209,7 @@ export default function RequestsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, activeTab]);
+  }, [debouncedItemSearch, debouncedPersonSearch, activeTab, allStatusFilter, fulfilledDateFrom, fulfilledDateTo]);
 
 
   const handleUpdateStatus = async (id: string, status: string) => {
@@ -289,6 +294,13 @@ export default function RequestsPage() {
 
     if (dataToPrint.length === 0) return alert('No fulfilled requests to print');
 
+    const itemSummary = dataToPrint.reduce<Record<string, number>>((acc, r) => {
+      const name = r.product.name;
+      acc[name] = (acc[name] || 0) + r.quantity;
+      return acc;
+    }, {});
+    const totalItems = dataToPrint.reduce((s, r) => s + r.quantity, 0);
+
     const html = `
       <html>
         <head>
@@ -299,6 +311,8 @@ export default function RequestsPage() {
             th, td { border: 1px solid #ddd; padding: 12px; text-align: left; font-size: 12px; }
             th { background-color: #f8f9fa; font-weight: bold; }
             .header { text-align: center; margin-bottom: 30px; }
+            .summary { border-top: 1px solid #ddd; padding: 12px 0; margin-top: 16px; font-size: 11px; color: #555; line-height: 1.6; }
+            .summary-item strong { font-size: 13px; }
             .footer { margin-top: 50px; display: flex; justify-content: space-between; }
             .sign-box { border-top: 1px solid black; width: 200px; text-align: center; padding-top: 5px; font-size: 10px; }
           </style>
@@ -337,6 +351,10 @@ export default function RequestsPage() {
               `).join('')}
             </tbody>
           </table>
+          <div class="summary">
+            <strong>Summary:</strong> ${dataToPrint.length} request${dataToPrint.length !== 1 ? 's' : ''}, ${totalItems} total item${totalItems !== 1 ? 's' : ''} —
+            ${Object.entries(itemSummary).map(([name, qty]) => `${qty}x ${name}`).join(', ')}
+          </div>
           <div class="footer">
             <div class="sign-box">Prepared By</div>
             <div class="sign-box">Approved By (Supervisor)</div>
@@ -396,7 +414,7 @@ export default function RequestsPage() {
               {(['PENDING', 'APPROVED', 'FULFILLED', 'REJECTED', 'ALL'] as const).map((tab) => (
                 <button
                   key={tab}
-                  onClick={() => { setActiveTab(tab); setSelectedIds([]); }}
+                  onClick={() => { setActiveTab(tab); setAllStatusFilter('ALL'); setSelectedIds([]); }}
                   className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
                     activeTab === tab ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'
                   }`}
@@ -406,13 +424,58 @@ export default function RequestsPage() {
               ))}
             </div>
 
-            <div className="relative flex-1 max-w-md w-full">
+            {activeTab === 'ALL' && (
+              <select
+                value={allStatusFilter}
+                onChange={(e) => { setAllStatusFilter(e.target.value as any); setPage(1); }}
+                className="text-xs font-bold rounded-lg border border-gray-200 px-3 py-2 text-sm focus:ring-1 ring-primary outline-none bg-white"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="PENDING">Pending</option>
+                <option value="APPROVED">Approved</option>
+                <option value="FULFILLED">Fulfilled</option>
+                <option value="REJECTED">Rejected</option>
+              </select>
+            )}
+
+            {activeTab === 'ALL' && (
+              <div className="flex items-center gap-1">
+                <CheckCircle className="h-3.5 w-3.5 text-gray-400" />
+                <input
+                  type="date"
+                  value={fulfilledDateFrom}
+                  onChange={(e) => { setFulfilledDateFrom(e.target.value); setPage(1); }}
+                  title="Fulfilled date from"
+                  className="w-28 rounded-lg border border-gray-200 px-2 py-1.5 text-xs focus:ring-1 ring-primary outline-none"
+                />
+                <span className="text-[10px] text-gray-400">→</span>
+                <input
+                  type="date"
+                  value={fulfilledDateTo}
+                  onChange={(e) => { setFulfilledDateTo(e.target.value); setPage(1); }}
+                  title="Fulfilled date to"
+                  className="w-28 rounded-lg border border-gray-200 px-2 py-1.5 text-xs focus:ring-1 ring-primary outline-none"
+                />
+              </div>
+            )}
+
+            <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Filter requests..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search item..."
+                value={itemSearch}
+                onChange={(e) => { setItemSearch(e.target.value); setPage(1); }}
+                className="w-full rounded-lg border border-gray-200 pl-10 pr-4 py-2 text-sm focus:ring-1 ring-primary outline-none"
+              />
+            </div>
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search supervisor or department..."
+                value={personSearch}
+                onChange={(e) => { setPersonSearch(e.target.value); setPage(1); }}
                 className="w-full rounded-lg border border-gray-200 pl-10 pr-4 py-2 text-sm focus:ring-1 ring-primary outline-none"
               />
             </div>
