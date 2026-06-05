@@ -463,9 +463,9 @@ export default function RequestsPage() {
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search item..."
-                value={itemSearch}
-                onChange={(e) => { setItemSearch(e.target.value); setPage(1); }}
+                placeholder="Search employee, supervisor, or department..."
+                value={personSearch}
+                onChange={(e) => { setPersonSearch(e.target.value); setPage(1); }}
                 className="w-full rounded-lg border border-gray-200 pl-10 pr-4 py-2 text-sm focus:ring-1 ring-primary outline-none"
               />
             </div>
@@ -473,9 +473,9 @@ export default function RequestsPage() {
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search supervisor or department..."
-                value={personSearch}
-                onChange={(e) => { setPersonSearch(e.target.value); setPage(1); }}
+                placeholder="Search item..."
+                value={itemSearch}
+                onChange={(e) => { setItemSearch(e.target.value); setPage(1); }}
                 className="w-full rounded-lg border border-gray-200 pl-10 pr-4 py-2 text-sm focus:ring-1 ring-primary outline-none"
               />
             </div>

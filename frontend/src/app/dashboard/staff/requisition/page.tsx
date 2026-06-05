@@ -243,7 +243,9 @@ function RSQContent() {
 
   const selectExistingEmployee = (emp: Employee) => {
     setLastNameInput(emp.lastName.toUpperCase());
-    setFirstNameInput(emp.firstName.toUpperCase());
+    // Preserve user-typed first name if the selected employee has none
+    const typedFirst = firstNameInput.trim().toUpperCase();
+    setFirstNameInput(emp.firstName ? emp.firstName.toUpperCase() : typedFirst || '');
     setPositionInput(emp.position.toUpperCase());
     setDepartmentInput((emp.department || '').toUpperCase());
     setShowEmployeeDropdown(false);

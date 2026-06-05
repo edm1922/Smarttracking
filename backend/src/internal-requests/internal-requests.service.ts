@@ -153,34 +153,44 @@ export class InternalRequestsService {
       console.warn(`[InternalRequestsService] Slow findAll query: ${duration}ms`);
     }
 
-    // Compute sequential issuance number for each record
-    const employeeNames = [...new Set(requests.map(r => r.employeeName))];
+    // Compute sequential issuance number for each record, grouped by last name
+    const getLastName = (name: string): string => {
+      const commaIdx = name.indexOf(',');
+      return commaIdx >= 0 ? name.slice(0, commaIdx).trim().toUpperCase() : name.trim().toUpperCase();
+    };
+
+    const uniqueLastNames = [...new Set(requests.map(r => getLastName(r.employeeName)))];
     const issuanceOrderMap = new Map<string, Map<string, number>>();
 
-    if (employeeNames.length > 0) {
+    if (uniqueLastNames.length > 0) {
       const allFulfilled = await this.prisma.internalRequest.findMany({
         where: {
-          employeeName: { in: employeeNames },
           status: 'FULFILLED',
+          OR: uniqueLastNames.flatMap(lastName => [
+            { employeeName: { startsWith: lastName + ',' } },
+            { employeeName: lastName },
+          ]),
         },
         select: { id: true, employeeName: true, createdAt: true },
         orderBy: { createdAt: 'asc' },
       });
 
       allFulfilled.forEach((r) => {
-        if (!issuanceOrderMap.has(r.employeeName)) {
-          issuanceOrderMap.set(r.employeeName, new Map());
+        const key = getLastName(r.employeeName);
+        if (!issuanceOrderMap.has(key)) {
+          issuanceOrderMap.set(key, new Map());
         }
-        issuanceOrderMap.get(r.employeeName)!.set(r.id, issuanceOrderMap.get(r.employeeName)!.size + 1);
+        issuanceOrderMap.get(key)!.set(r.id, issuanceOrderMap.get(key)!.size + 1);
       });
     }
 
     const data = requests.map((req) => {
-      const seq = issuanceOrderMap.get(req.employeeName)?.get(req.id);
+      const key = getLastName(req.employeeName);
+      const seq = issuanceOrderMap.get(key)?.get(req.id);
       if (seq !== undefined) {
         return { ...req, previousIssuancesCount: seq - 1 };
       }
-      const totalFulfilled = issuanceOrderMap.get(req.employeeName)?.size ?? 0;
+      const totalFulfilled = issuanceOrderMap.get(key)?.size ?? 0;
       return { ...req, previousIssuancesCount: totalFulfilled };
     });
 

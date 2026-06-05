@@ -95,10 +95,14 @@ export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
   };
 
   const searchText = `${lastNameInput} ${firstNameInput}`.trim();
+  const searchLast = lastNameInput.trim().toLowerCase();
   const filteredExistingEmployees = existingEmployees.filter(
     (emp) => {
       const full = `${emp.lastName} ${emp.firstName}`;
-      return full.toLowerCase().includes(searchText.toLowerCase()) &&
+      const empLast = emp.lastName.toLowerCase();
+      const matchesFull = full.toLowerCase().includes(searchText.toLowerCase());
+      const matchesLast = searchLast.length > 0 && empLast === searchLast;
+      return (matchesFull || matchesLast) &&
                !employees.some(e => employeeKey(e) === employeeKey(emp));
     }
   );
