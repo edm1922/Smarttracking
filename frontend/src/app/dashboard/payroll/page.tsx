@@ -360,17 +360,44 @@ function PayrollContent() {
   const executeUpload = async () => {
     setUploading(true);
     setModalConfig((prev: any) => ({ ...prev, isOpen: false }));
-    // Close the import modal immediately so the user gets instant feedback
-    // that their click registered. The upload + first processing call run in
-    // the background and surface progress via toasts and the runs table.
     setIsImportModalOpen(false);
     const filesSnapshot = selectedFiles;
     setSelectedFiles([]);
+    const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+    if (!apiUrl) throw new Error('API URL is not configured');
+
     try {
       const file = filesSnapshot[0];
       if (!file) throw new Error('No file selected');
-      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
-      if (!apiUrl) throw new Error('API URL is not configured');
+
+      if (resumableBatchId) {
+        // Resume mode: batch already exists in DB with source PDF in Supabase.
+        // No re-upload needed — just trigger processing.
+        setUploading(false);
+        const processRes = await fetchWithTimeout(`${apiUrl}/payroll/process-uploaded`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resumeBatchId: resumableBatchId })
+        }, 600000);
+        setResumableBatchId(null);
+        if (!processRes.ok) throw new Error(`Failed to resume: ${processRes.status} ${processRes.statusText}`);
+        let processData: any = null;
+        try { processData = await processRes.json(); } catch { /* ignore */ }
+        if (processData?.cannotResume) {
+          toast.error('This batch cannot be resumed (source file missing or already completed). Please upload again.');
+          fetchRuns();
+          fetchProcessingStatus();
+          return;
+        }
+        fetchRuns();
+        fetchProcessingStatus();
+        if (processData && processData.batchId && processData.timedOut) {
+          toast.success(`Resumed: ${processData.processed}/${processData.totalPages} pages done. Continuing...`);
+          continueProcessingChain(processData.batchId);
+        } else if (processData && processData.batchId) {
+          toast.success(`Processing complete: ${processData.processed}/${processData.totalPages} pages.`);
+        }
+        return;
+      }
 
       // Step 1: Get signed upload URL
       const urlRes = await fetchWithTimeout(`${apiUrl}/payroll/get-upload-url`, {
@@ -387,14 +414,9 @@ function PayrollContent() {
         method: 'PUT', body: file, headers: { 'Content-Type': file.type }
       }, 300000);
       if (!uploadRes.ok) throw new Error(`Upload to cloud storage failed: ${uploadRes.status} ${uploadRes.statusText}`);
-      // Upload to cloud storage complete. Hide the uploading banner now — the
-      // processing banner (controlled by processingBatchIds polling) takes over.
       setUploading(false);
 
-      // Step 3: Kick off the first processing call. The backend processes as much
-      // as it can within its time budget and returns. If timedOut is true,
-      // we keep chaining requests until the whole PDF is done.
-      // Timeout matches the backend budget: 10min locally, 30s on Vercel.
+      // Step 3: Kick off the first processing call
       const processRes = await fetchWithTimeout(`${apiUrl}/payroll/process-uploaded`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filePath, client_name: clientLabel, period_start: periodStart, period_end: periodEnd, release_date: releaseDate })
@@ -404,12 +426,8 @@ function PayrollContent() {
       try { processData = await processRes.json(); } catch { /* ignore */ }
 
       fetchRuns();
-      // Kick the processing-status poll immediately so the spinner and
-      // processing banner show up right away, not 5 seconds later.
       fetchProcessingStatus();
 
-      // If the first call timed out partway through, chain follow-up calls in the
-      // background. Don't await — let the user keep using the UI.
       if (processData && processData.batchId && processData.timedOut) {
         toast.success(`Processing started: ${processData.processed}/${processData.totalPages} pages done. Continuing in background...`);
         continueProcessingChain(processData.batchId);
@@ -528,7 +546,8 @@ function PayrollContent() {
             setClientLabel(run.label || run.client_name || '');
             setPeriodStart(run.period_start ? new Date(run.period_start).toISOString().split('T')[0] : '');
             setPeriodEnd(run.period_end ? new Date(run.period_end).toISOString().split('T')[0] : '');
-            setResumableBatchId(run.id);
+            const isProcessing = run.remark?.includes('[BATCH_STATUS:PROCESSING]');
+            setResumableBatchId(isProcessing ? run.id : null);
             setIsImportModalOpen(true);
           }}
           onDelete={async (id) => {

@@ -26,6 +26,7 @@ export class PayrollService {
   // Update the [PROGRESS:N] token in the batch remark every N pages instead of
   // on every page (saves ~270 DB writes per 278-page batch).
   private readonly PROGRESS_UPDATE_EVERY = 10;
+  private readonly MAX_ERROR_RETRIES = 3;
   private supabaseAdmin;
 
   constructor(
@@ -84,13 +85,18 @@ export class PayrollService {
     if (clean.startsWith('CSC')) {
       const numbers = clean.substring(3);
       if (numbers.length > 4) {
-        // Format: CSC-XXXX-YYYY (e.g. CSC-1234-567)
         return `CSC-${numbers.substring(0, 4)}-${numbers.substring(4)}`;
       } else if (numbers.length > 0) {
-        // Format: CSC-XXXX (e.g. CSC-1001)
         return `CSC-${numbers}`;
       }
       return 'CSC';
+    }
+    if (clean.startsWith('TEMP')) {
+      const numbers = clean.substring(4);
+      if (numbers.length > 0) {
+        return `TEMP-${numbers}`;
+      }
+      return 'TEMP';
     }
     return clean;
   }
@@ -229,16 +235,28 @@ export class PayrollService {
           `Pre-fetched ${existingDocs.length} existing documents (${processedPageNumbers.size} unique pages) for batch ${batch.id}.`,
         );
 
-        // Also skip pages that errored in previous calls (persisted as [ERRORED_PAGES:...])
+        // Skip errored pages only if they exceeded MAX_ERROR_RETRIES
+        // Format: [ERRORED_PAGES:35@2,82@1] — page@retryCount
         const erroredMatch = batch.remark?.match(/\[ERRORED_PAGES:([^\]]+)\]/);
         if (erroredMatch) {
-          erroredMatch[1].split(',').forEach((p) => {
-            const num = parseInt(p.trim(), 10);
-            if (!isNaN(num)) processedPageNumbers.add(num);
+          const pagesToRetry: string[] = [];
+          erroredMatch[1].split(',').forEach((entry) => {
+            const parts = entry.trim().split('@');
+            const page = parseInt(parts[0], 10);
+            const retries = parts[1] ? parseInt(parts[1], 10) : 0;
+            if (!isNaN(page)) {
+              if (retries >= this.MAX_ERROR_RETRIES) {
+                processedPageNumbers.add(page);
+                pagesToRetry.push(entry.trim());
+              }
+            }
           });
-          this.logger.log(
-            `Skipping ${erroredMatch[1].split(',').length} errored pages from previous calls for batch ${batch.id}.`,
-          );
+          const skipped = erroredMatch[1].split(',').length - pagesToRetry.length;
+          if (skipped > 0) {
+            this.logger.log(
+              `Skipping ${skipped} permanently failed pages (exceeded ${this.MAX_ERROR_RETRIES} retries) for batch ${batch.id}. Will retry the rest.`,
+            );
+          }
         }
       }
 
@@ -260,11 +278,26 @@ export class PayrollService {
             currentRemark.match(/\[FILEPATH:[^\]]+\]/)?.[0] ||
             batch.remark?.match(/\[FILEPATH:[^\]]+\]/)?.[0] ||
             '';
-          const errorPages = results
+          const existingErrorMatch = currentRemark.match(/\[ERRORED_PAGES:([^\]]+)\]/);
+          const existingErrorMap = new Map<number, number>();
+          if (existingErrorMatch) {
+            existingErrorMatch[1].split(',').forEach((entry) => {
+              const parts = entry.trim().split('@');
+              const page = parseInt(parts[0], 10);
+              const retries = parts[1] ? parseInt(parts[1], 10) : 0;
+              if (!isNaN(page)) existingErrorMap.set(page, retries);
+            });
+          }
+          const currentErrorPages = results
             .filter((r) => r.status === 'error')
-            .map((r) => r.page)
-            .sort((a, b) => a - b);
-          const errorToken = errorPages.length > 0 ? ` [ERRORED_PAGES:${errorPages.join(',')}]` : '';
+            .map((r) => r.page);
+          currentErrorPages.forEach((p) => {
+            existingErrorMap.set(p, (existingErrorMap.get(p) || 0) + 1);
+          });
+          const mergedErrors = Array.from(existingErrorMap.entries())
+            .sort(([a], [b]) => a - b)
+            .map(([page, retries]) => `${page}@${retries}`);
+          const errorToken = mergedErrors.length > 0 ? ` [ERRORED_PAGES:${mergedErrors.join(',')}]` : '';
           const baseRemark = currentRemark
             .replace(/\[BATCH_STATUS:[A-Z]+\]\s*/g, '')
             .replace(/\[TOTAL_PAGES:\d+\]\s*/g, '')
@@ -1152,7 +1185,7 @@ export class PayrollService {
           }
 
           if (item.text) {
-            const match = item.text.match(/CSC-?[\d-]+/i);
+            const match = item.text.match(/(?:CSC|TEMP)-?[\d-]+/i);
             if (match) {
               ids.push(this.normalizeSysId(match[0]));
             }
