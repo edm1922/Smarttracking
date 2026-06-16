@@ -790,11 +790,21 @@ export default function DashboardPage() {
               <Eye className="h-3.5 w-3.5" />
               View Reports
             </button>
-            <button className="flex items-center space-x-2 bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm hover:border-primary/30 transition-all text-[10px] font-black text-gray-600 uppercase">
+            <button
+              onClick={() => {
+                const now = new Date();
+                setStartDate(new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]);
+                setEndDate(now.toISOString().split('T')[0]);
+              }}
+              className="flex items-center space-x-2 bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm hover:border-primary/30 transition-all text-[10px] font-black text-gray-600 uppercase"
+            >
               <Calendar className="h-3.5 w-3.5 text-gray-400" />
               <span>Current Month</span>
             </button>
-            <button className="flex items-center space-x-2 bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm hover:border-primary/30 transition-all text-[10px] font-black text-gray-600 uppercase">
+            <button
+              onClick={() => setSelectedLocation('all')}
+              className="flex items-center space-x-2 bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm hover:border-primary/30 transition-all text-[10px] font-black text-gray-600 uppercase"
+            >
               <Filter className="h-3.5 w-3.5 text-gray-400" />
               <span>All Depts</span>
             </button>
@@ -845,14 +855,15 @@ export default function DashboardPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={data.topDepartments}
+                    data={data.topDepartments.map((e: any) => ({ ...e, name: e.name || 'Satellite Office' }))}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
                     outerRadius={95}
                     innerRadius={40}
                     fill="#8884d8"
-                    dataKey="value"
+                    dataKey="requests"
+                    nameKey="name"
                   >
                     {data.topDepartments.map((entry: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

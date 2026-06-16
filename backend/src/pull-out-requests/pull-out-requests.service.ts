@@ -112,10 +112,14 @@ export class PullOutRequestsService {
 
     if (startDate || endDate) {
       where.createdAt = {};
-      if (startDate) where.createdAt.gte = new Date(startDate);
+      if (startDate) {
+        const start = new Date(startDate);
+        if (startDate.length <= 10) start.setHours(0, 0, 0, 0);
+        where.createdAt.gte = start;
+      }
       if (endDate) {
         const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
+        if (endDate.length <= 10) end.setHours(23, 59, 59, 999);
         where.createdAt.lte = end;
       }
     }

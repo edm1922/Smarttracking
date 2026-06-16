@@ -76,12 +76,12 @@ export class InternalRequestsService {
       const dateFilter: any = {};
       if (fulfilledDateFrom) {
         const d = new Date(fulfilledDateFrom);
-        d.setHours(0, 0, 0, 0);
+        if (fulfilledDateFrom.length <= 10) d.setHours(0, 0, 0, 0);
         dateFilter.gte = d;
       }
       if (fulfilledDateTo) {
         const d = new Date(fulfilledDateTo);
-        d.setHours(23, 59, 59, 999);
+        if (fulfilledDateTo.length <= 10) d.setHours(23, 59, 59, 999);
         dateFilter.lte = d;
       }
       const txns = await this.prisma.productTransaction.findMany({

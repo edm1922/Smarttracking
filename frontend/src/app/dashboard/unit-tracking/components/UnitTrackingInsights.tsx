@@ -107,9 +107,7 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {productSummary
-                .filter(item => item.inToday > 0 || item.outToday > 0)
-                .map((item, idx) => (
+              {productSummary.map((item, idx) => (
                 <tr 
                   key={item.name} 
                   className="hover:bg-gray-50/50 transition-all group cursor-pointer"
@@ -165,7 +163,7 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                   </td>
                 </tr>
               ))}
-              {productSummary.filter(item => exportType === 'stock-in' ? item.inToday > item.outToday : exportType === 'stock-out' ? item.outToday > item.inToday : item.inToday > 0 || item.outToday > 0).length === 0 && (
+              {productSummary.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-10 py-40 text-center">
                     <div className="max-w-xs mx-auto space-y-6 opacity-30">

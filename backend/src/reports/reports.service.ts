@@ -15,8 +15,16 @@ export class ReportsService {
     const dateFilter: Prisma.InternalRequestWhereInput = {};
     if (startDate || endDate) {
       dateFilter.date = {};
-      if (startDate) dateFilter.date.gte = new Date(startDate);
-      if (endDate) dateFilter.date.lte = new Date(endDate);
+      if (startDate) {
+        const s = new Date(startDate);
+        if (startDate.length <= 10) s.setHours(0, 0, 0, 0);
+        dateFilter.date.gte = s;
+      }
+      if (endDate) {
+        const e = new Date(endDate);
+        if (endDate.length <= 10) e.setHours(23, 59, 59, 999);
+        dateFilter.date.lte = e;
+      }
     }
 
     // 1. Summary Stats
@@ -59,10 +67,16 @@ export class ReportsService {
     // 3. Monthly Issuance Trends
     let trendStartDate = new Date();
     trendStartDate.setMonth(trendStartDate.getMonth() - 6);
-    if (startDate) trendStartDate = new Date(startDate);
+    if (startDate) {
+      trendStartDate = new Date(startDate);
+      if (startDate.length <= 10) trendStartDate.setHours(0, 0, 0, 0);
+    }
 
     let trendEndDate = new Date();
-    if (endDate) trendEndDate = new Date(endDate);
+    if (endDate) {
+      trendEndDate = new Date(endDate);
+      if (endDate.length <= 10) trendEndDate.setHours(23, 59, 59, 999);
+    }
 
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const monthlyDataMap: Record<string, number> = {};
@@ -153,7 +167,7 @@ export class ReportsService {
       where: summaryWhere,
       orderBy: { _count: { departmentArea: 'desc' } },
       take: 5
-    }).then(res => res.map(d => ({ name: d.departmentArea, value: d._count.departmentArea })));
+    }).then(res => res.map(d => ({ name: d.departmentArea, requests: d._count.departmentArea })));
 
     const topProductsRaw = await this.prisma.$queryRaw<any[]>`
       SELECT p.name, SUM(ir.quantity)::int as count
@@ -351,8 +365,8 @@ export class ReportsService {
           : [];
         const productWhere = productIdsArr.length > 0 ? { id: { in: productIdsArr } } : {};
 
-        const startDate = options.startDate ? new Date(options.startDate) : undefined;
-        const endDate = options.endDate ? (() => { const d = new Date(options.endDate); d.setDate(d.getDate() + 1); return d; })() : undefined;
+        const startDate = options.startDate ? (() => { const d = new Date(options.startDate); if (options.startDate.length <= 10) d.setHours(0, 0, 0, 0); return d; })() : undefined;
+        const endDate = options.endDate ? (() => { const d = new Date(options.endDate); if (options.endDate.length <= 10) d.setDate(d.getDate() + 1); else d.setDate(d.getDate() + 1); return d; })() : undefined;
         const irDateFilter = startDate || endDate ? {
           date: {
             ...(startDate && { gte: startDate }),

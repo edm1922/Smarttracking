@@ -43,7 +43,7 @@ function UnitTrackingContent() {
   const [logSearch, setLogSearch] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [stockHealthRange, setStockHealthRange] = useState({ 
-    start: new Date().toLocaleDateString('en-CA'),
+    start: new Date(Date.now() - 7 * 86400000).toLocaleDateString('en-CA'),
     end: new Date().toLocaleDateString('en-CA')
   });
   const [productFilters, setProductFilters] = useState<Record<string, Record<string, string>>>({});
@@ -100,9 +100,8 @@ function UnitTrackingContent() {
       });
     });
 
-    const start = new Date(stockHealthRange.start);
-    const end = new Date(stockHealthRange.end);
-    end.setHours(23, 59, 59, 999);
+    const start = new Date(stockHealthRange.start + 'T00:00:00');
+    const end = new Date(stockHealthRange.end + 'T23:59:59.999');
 
     requests.filter(r => {
       const d = new Date(r.createdAt);
@@ -148,8 +147,11 @@ function UnitTrackingContent() {
       });
       const liveQty = unitField && !isNaN(Number(unitField.value?.qty)) ? Number(unitField.value.qty) : undefined;
       
-      let qty = liveQty ?? Number(log.changes?.quantity);
-      if (isNaN(qty) || (liveQty === undefined && log.changes?.quantity === undefined)) {
+      let qty = Number(log.changes?.quantity);
+      if (isNaN(qty)) {
+        qty = liveQty ?? 0;
+      }
+      if (isNaN(qty) || qty === 0) {
          qty = (log.action === 'SUBMIT_CONTENT' || log.action === 'CREATE_ITEM' ? 1 : 0);
       }
 
@@ -198,7 +200,9 @@ function UnitTrackingContent() {
 
   const fetchStockInLogs = async () => {
     try {
-      const res = await api.get('/logs', { params: { action: 'STOCK_IN,SUBMIT_CONTENT,CREATE_ITEM', startDate: stockHealthRange.start, endDate: stockHealthRange.end, take: 10000 } });
+      const startUTC = new Date(stockHealthRange.start + 'T00:00:00').toISOString();
+      const endUTC = new Date(stockHealthRange.end + 'T23:59:59.999').toISOString();
+      const res = await api.get('/logs', { params: { action: 'STOCK_IN,SUBMIT_CONTENT,CREATE_ITEM', startDate: startUTC, endDate: endUTC, take: 10000 } });
       setStockInLogs(res.data.data || []);
     } catch (err) {
       console.error(err);
@@ -456,9 +460,9 @@ function UnitTrackingContent() {
 
   const displayRequests = useMemo(() => {
     let filtered = requests;
-    if (dateRange.start) filtered = filtered.filter(r => new Date(r.createdAt) >= new Date(dateRange.start));
+    if (dateRange.start) filtered = filtered.filter(r => new Date(r.createdAt) >= new Date(dateRange.start + 'T00:00:00'));
     if (dateRange.end) {
-      const end = new Date(dateRange.end); end.setHours(23, 59, 59, 999);
+      const end = new Date(dateRange.end + 'T23:59:59.999');
       filtered = filtered.filter(r => new Date(r.createdAt) <= end);
     }
     if (requisitionSubTab === 'pending') filtered = filtered.filter(r => r.status === 'PENDING' || r.status === 'SUBMITTED');
