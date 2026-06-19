@@ -121,7 +121,8 @@ function UnitTrackingContent() {
       const specString = req.item.fieldValues?.map((fv: any) => {
         const v = fv.value;
         const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-        return val ? String(val) : '';
+        const fieldName = fv.field?.name || fv.name || '';
+        return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
       }).filter(Boolean).sort().join(', ') || 'Standard';
       summary[pName].movementBreakdown[specString] = (summary[pName].movementBreakdown[specString] || 0) + req.qty;
     });
@@ -160,7 +161,8 @@ function UnitTrackingContent() {
         const specString = log.item?.fieldValues?.map((fv: any) => {
           const v = fv.value;
           const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-          return val ? String(val) : '';
+          const fieldName = fv.field?.name || '';
+          return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
         }).filter(Boolean).sort().join(', ') || 'Standard';
         summary[pName].inBreakdown[specString] = (summary[pName].inBreakdown[specString] || 0) + qty;
       }
