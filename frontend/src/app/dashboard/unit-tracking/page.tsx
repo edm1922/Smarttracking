@@ -166,11 +166,7 @@ function UnitTrackingContent() {
       }
     });
 
-    const result = Object.values(summary);
-    if (result.length > 0) {
-      console.log('productSummary:', JSON.stringify(result.map((r: any) => ({ name: r.name, inToday: r.inToday, outToday: r.outToday, totalInStock: r.totalInStock }))));
-    }
-    return result;
+    return Object.values(summary);
   }, [inventory, requests, stockInLogs, stockHealthRange]);
 
   // API Fetches
@@ -207,8 +203,6 @@ function UnitTrackingContent() {
       const startUTC = new Date(stockHealthRange.start + 'T00:00:00').toISOString();
       const endUTC = new Date(stockHealthRange.end + 'T23:59:59.999').toISOString();
       const res = await api.get('/logs', { params: { action: 'STOCK_IN,SUBMIT_CONTENT,CREATE_ITEM', startDate: startUTC, endDate: endUTC, take: 10000 } });
-      console.log('fetchStockInLogs response:', res.data.data?.length, 'logs');
-      console.log('fetchStockInLogs sample:', JSON.stringify(res.data.data?.slice(0, 3), null, 2));
       setStockInLogs(res.data.data || []);
     } catch (err) {
       console.error(err);

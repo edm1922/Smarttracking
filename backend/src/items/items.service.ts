@@ -267,7 +267,7 @@ export class ItemsService {
         const newQty = newUnitField ? Number(newUnitField.value.qty) || 0 : 0;
         const qtyDiff = newQty - oldQty;
 
-        if (qtyDiff !== 0 && item.name) {
+        if (qtyDiff !== 0) {
           const type = qtyDiff > 0 ? 'IN' : 'OUT';
           const absDiff = Math.abs(qtyDiff);
 
