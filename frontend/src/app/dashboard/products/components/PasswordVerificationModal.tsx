@@ -47,7 +47,9 @@ export function PasswordVerificationModal({
                 onChange={(e) => setPasswordInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && onVerify()}
                 autoFocus
+                autoComplete="off"
                 className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded-2xl text-center font-semibold tracking-[0.5em] outline-none focus:bg-white focus:border-red-500 transition-all text-xl"
+                aria-label="Super admin password"
               />
             </div>
             <button 

@@ -42,7 +42,6 @@ export default function ProductsPage() {
   
   // Form State
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [releasingProduct, setReleasingProduct] = useState<Product | null>(null);
   const [viewingLogProduct, setViewingLogProduct] = useState<Product | null>(null);
   const [systemLogs, setSystemLogs] = useState<any[]>([]);
   const [newProduct, setNewProduct] = useState({
@@ -90,6 +89,11 @@ export default function ProductsPage() {
   const [bypassStockEdit, setBypassStockEdit] = useState(false);
   const [logSearchTerm, setLogSearchTerm] = useState('');
   const [isLogSearching, setIsLogSearching] = useState(false);
+  const [isBulkDelete, setIsBulkDelete] = useState(false);
+
+  // Onboarding state
+  const [hasEverHadProducts, setHasEverHadProducts] = useState(false);
+  const [hasSeenRelease, setHasSeenRelease] = useState(false);
 
   const router = useRouter();
 
@@ -108,9 +112,13 @@ export default function ProductsPage() {
         api.get('/products', { params: { skip: (page - 1) * pageSize, take: pageSize, search: searchTerm } }),
         api.get('/locations')
       ]);
-      setProducts(prodRes.data.data || prodRes.data);
-      setTotalProducts(prodRes.data.total || (prodRes.data.length || 0));
+      const data = prodRes.data.data || prodRes.data;
+      setProducts(data);
+      setTotalProducts(prodRes.data.total || (data.length || 0));
       setLocations(locRes.data);
+      if (data.length > 0 && !hasEverHadProducts) {
+        setHasEverHadProducts(true);
+      }
     } catch (err) {
       setError('Unable to load products.');
       toast.error('Unable to load products.');
@@ -118,6 +126,8 @@ export default function ProductsPage() {
       setLoading(false);
     }
   };
+
+  const isFirstVisit = !loading && !searchTerm && products.length === 0 && !hasEverHadProducts;
 
   useEffect(() => {
     if (isLogModalOpen) {
@@ -145,13 +155,23 @@ export default function ProductsPage() {
   // Handlers
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newProduct.name.trim()) {
+      toast.error('Item name is required.');
+      return;
+    }
     setIsSavingProduct(true);
     try {
-      await api.post('/products', newProduct);
-      toast.success('New product added successfully.');
+      await api.post('/products', { ...newProduct, name: newProduct.name.trim(), description: newProduct.description.trim() });
+      const isFirst = isFirstVisit;
       setIsAddModalOpen(false);
       setNewProduct({ name: '', sku: '', description: '', unit: 'PCS', price: 0, threshold: 0, showInInventory: true, initialStock: 0, initialLocationId: '' });
+      setHasEverHadProducts(true);
       fetchData();
+      if (isFirst) {
+        toast.success('Product created. Use Stock IN to record initial quantity.', { duration: 6000 });
+      } else {
+        toast.success('New product added successfully.');
+      }
     } catch (err) {
       toast.error('Failed to add product. Please check the form and try again.');
     } finally {
@@ -162,9 +182,13 @@ export default function ProductsPage() {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
+    if (!editingProduct.name.trim()) {
+      toast.error('Item name cannot be empty.');
+      return;
+    }
     setIsSavingProduct(true);
     try {
-      const payload = { ...editingProduct, totalStock: bypassStockEdit ? editableStock : undefined };
+      const payload = { ...editingProduct, name: editingProduct.name.trim(), description: (editingProduct.description || '').trim(), totalStock: bypassStockEdit ? editableStock : undefined };
       await api.patch(`/products/${editingProduct.id}`, payload);
       toast.success('Product updated successfully.');
       setIsEditModalOpen(false);
@@ -302,6 +326,24 @@ export default function ProductsPage() {
   };
 
   const handleDelete = async () => {
+    if (isBulkDelete) {
+      if (selectedIds.length === 0) return;
+      let deleted = 0;
+      for (const id of selectedIds) {
+        try {
+          await api.delete(`/products/${id}`);
+          deleted++;
+        } catch {
+          // continue deleting rest
+        }
+      }
+      toast.success(`Deleted ${deleted} of ${selectedIds.length} products.`);
+      setSelectedIds([]);
+      setIsDeleteConfirmOpen(false);
+      setIsBulkDelete(false);
+      fetchData();
+      return;
+    }
     if (!editingProduct) return;
     try {
       await api.delete(`/products/${editingProduct.id}`);
@@ -315,9 +357,14 @@ export default function ProductsPage() {
   };
 
   const handleVerifyPassword = async () => {
+    const trimmed = adminPassInput.trim();
+    if (!trimmed) {
+      toast.error('Please enter your password.');
+      return;
+    }
     setIsVerifying(true);
     try {
-      const res = await api.post('/auth/verify-super-admin', { password: adminPassInput });
+      const res = await api.post('/auth/verify-super-admin', { password: trimmed });
       if (res.data.valid) {
         setBypassStockEdit(true);
         setIsVerifyingPassword(false);
@@ -372,13 +419,14 @@ export default function ProductsPage() {
     setIsNotifying(true);
     try {
       const typeLabel = editingLog.type === 'IN' ? 'Stock In' : 'Stock Out';
+      const productName = editingLog.product?.name || editingLog.productName || 'Unknown Item';
       await api.post('/stock-notifications', {
         productTransactionId: editingLog.id,
         productId: editingLog.productId || editingLog.product?.id,
-        productName: editingLog.product?.name || editingLog.productName || 'Unknown Item',
+        productName,
         type: editingLog.type === 'IN' ? 'STOCK_IN' : 'STOCK_OUT',
         quantity: editingLog.quantity,
-        message: `${typeLabel}: ${editingLog.quantity} ${editingLog.product?.unit || 'pcs'} of ${editingLog.product?.name || 'Unknown'}`,
+        message: `${typeLabel}: ${editingLog.quantity} ${editingLog.product?.unit || 'pcs'} of ${productName}`,
         durationHours: notifyDuration,
       });
       toast.success('Staff notified successfully');
@@ -453,7 +501,8 @@ export default function ProductsPage() {
       <ProductHeader 
         onOpenProductModal={() => setIsAddModalOpen(true)} 
         onOpenLogModal={() => setIsLogModalOpen(true)}
-        onOpenReleaseModal={() => setIsReleaseModalOpen(true)}
+        onOpenReleaseModal={() => { setHasSeenRelease(true); setIsReleaseModalOpen(true); }}
+        showReleaseHint={!hasSeenRelease && !loading && products.length > 0}
       />
 
       <div className="space-y-6">
@@ -475,7 +524,7 @@ export default function ProductsPage() {
             onClear={() => setSelectedIds([])} 
                     onTransmittal={() => toast.info('Transmittal workflow started.')}
                     onPR={() => toast.info('Purchase request created.')}
-            onDelete={() => setIsDeleteConfirmOpen(true)}
+            onDelete={() => { setIsBulkDelete(true); setIsDeleteConfirmOpen(true); }}
           />
         </div>
 
@@ -483,9 +532,11 @@ export default function ProductsPage() {
           products={products}
           loading={loading}
           error={error}
+          onRetry={fetchData}
           selectedIds={selectedIds}
           toggleSelect={toggleSelect}
           toggleSelectAll={toggleSelectAll}
+          isFirstVisit={isFirstVisit}
           handleRowDoubleClick={(p: Product) => {
             setEditingProduct(p);
             setEditableStock(p.stocks.reduce((acc: number, s: any) => acc + s.quantity, 0));
@@ -528,9 +579,10 @@ export default function ProductsPage() {
         locations={locations}
       />
 
+      {editingProduct && (
       <EditProductModal 
         isOpen={isEditModalOpen} onClose={() => { setIsEditModalOpen(false); setIsAddingCustomUnitEdit(false); }}
-        onSubmit={handleEditSubmit} editingProduct={editingProduct!} setEditingProduct={setEditingProduct} isSaving={isSavingProduct}
+        onSubmit={handleEditSubmit} editingProduct={editingProduct} setEditingProduct={setEditingProduct} isSaving={isSavingProduct}
         handleDelete={() => setIsDeleteConfirmOpen(true)} onRestock={handleRestock}
         activeEditTab={activeEditTab} setActiveEditTab={setActiveEditTab}
         activeStockSubTab={activeStockSubTab} setActiveStockSubTab={setActiveStockSubTab}
@@ -542,6 +594,7 @@ export default function ProductsPage() {
         standardUnits={standardUnits} isAddingCustomUnitEdit={isAddingCustomUnitEdit} setIsAddingCustomUnitEdit={setIsAddingCustomUnitEdit}
         locations={locations}
       />
+      )}
 
       <StockModal 
         isOpen={isStockModalOpen}
@@ -579,10 +632,10 @@ export default function ProductsPage() {
       />
 
       <ConfirmModal 
-        isOpen={isDeleteConfirmOpen} title="Delete Product?"
-        message={`Delete ${editingProduct?.name}? This will also remove all associated stock logs. This action cannot be undone.`}
-        confirmText="Delete Product" isDestructive={true}
-        onConfirm={handleDelete} onCancel={() => setIsDeleteConfirmOpen(false)}
+        isOpen={isDeleteConfirmOpen} title={isBulkDelete ? 'Delete Selected Products?' : 'Delete Product?'}
+        message={isBulkDelete ? `Delete ${selectedIds.length} selected products? This will also remove all associated stock logs. This action cannot be undone.` : `Delete ${editingProduct?.name}? This will also remove all associated stock logs. This action cannot be undone.`}
+        confirmText={isBulkDelete ? `Delete ${selectedIds.length} Products` : 'Delete Product'} isDestructive={true}
+        onConfirm={handleDelete} onCancel={() => { setIsDeleteConfirmOpen(false); setIsBulkDelete(false); }}
       />
 
       {/* Edit Log Modal */}
@@ -669,9 +722,22 @@ export default function ProductsPage() {
 
       {/* Global Image Preview */}
       {isPreviewOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95 p-4 animate-in fade-in duration-300" onClick={() => setIsPreviewOpen(false)}>
-          <button className="absolute top-10 right-10 text-white/40 hover:text-white transition-colors"><X className="h-10 w-10" /></button>
-          <img src={previewImageUrl} alt="Full Preview" className="max-w-full max-h-full object-contain shadow-2xl animate-in zoom-in-95 duration-500" />
+        <div 
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95 p-4 animate-in fade-in duration-300" 
+          onClick={() => setIsPreviewOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Product image preview"
+          onKeyDown={(e) => { if (e.key === 'Escape') setIsPreviewOpen(false); }}
+        >
+          <button 
+            className="absolute top-10 right-10 text-white/40 hover:text-white transition-colors" 
+            onClick={() => setIsPreviewOpen(false)}
+            aria-label="Close image preview"
+          >
+            <X className="h-10 w-10" />
+          </button>
+          <img src={previewImageUrl} alt="Full product image preview" className="max-w-full max-h-full object-contain shadow-2xl animate-in zoom-in-95 duration-500" />
         </div>
       )}
 
@@ -680,6 +746,9 @@ export default function ProductsPage() {
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #D1D5DB; }
+        @media (prefers-reduced-motion: reduce) {
+          .animate-in, .animate-pulse, .fade-in, .zoom-in-95, .slide-in-from-bottom-4, .slide-in-from-left-4, .slide-in-from-right-4, .duration-300, .duration-500, .duration-1000, [class*="animate-"], [class*="transition-"] { animation: none !important; transition: none !important; }
+        }
       `}</style>
     </div>
   );

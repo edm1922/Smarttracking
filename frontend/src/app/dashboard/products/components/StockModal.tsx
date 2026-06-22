@@ -88,7 +88,7 @@ export function StockModal({
               aria-label="Transaction remarks"
             />
           </div>
-          <div className="bg-blue-50 p-4 rounded-lg flex items-start">
+          <div className="bg-blue-50 p-4 rounded-lg flex items-start" role="status" aria-live="polite">
             <Info className="h-5 w-5 text-blue-500 mr-3 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-blue-700">
               {form.type === 'IN' 
@@ -99,7 +99,7 @@ export function StockModal({
           <div className="flex justify-end space-x-3 pt-4">
             <button type="button" onClick={onClose} className="px-6 py-2 text-sm font-bold text-gray-500 hover:text-gray-900">Cancel</button>
             <button 
-              disabled={isProcessing}
+              disabled={isProcessing || !form.quantity || form.quantity < 1}
               type="submit" 
               className={`px-8 py-2 text-sm font-bold text-white rounded-lg shadow-md transition-all active:scale-95 disabled:opacity-50 ${form.type === 'IN' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
             >

@@ -247,10 +247,48 @@ export class PullOutRequestsService {
   async approve(id: string) {
     const request = await this.prisma.pullOutRequest.findUnique({
       where: { id },
+      include: {
+        item: {
+          include: { fieldValues: true }
+        }
+      }
     });
 
     if (!request) throw new NotFoundException('Request not found');
     if (request.status !== 'PENDING' && request.status !== 'SUBMITTED') throw new BadRequestException('Request is already processed');
+
+    // Deduct qty from the item's unit-tracking field value
+    const unitField = request.item.fieldValues.find(fv => {
+      const val = fv.value as any;
+      return val && typeof val === 'object' && val.useUnitQty === true;
+    });
+
+    if (unitField) {
+      const currentQty = Number((unitField.value as any).qty) || 0;
+      if (currentQty < request.qty) {
+        throw new BadRequestException(
+          `Insufficient stock: only ${currentQty} available, ${request.qty} requested`
+        );
+      }
+
+      const newQty = currentQty - request.qty;
+      await this.prisma.itemFieldValue.update({
+        where: { id: unitField.id },
+        data: {
+          value: { ...(unitField.value as any), qty: newQty }
+        }
+      });
+
+      // Log the stock deduction
+      await this.prisma.activityLog.create({
+        data: {
+          userId: request.userId,
+          itemId: request.itemId,
+          action: 'STOCK_OUT',
+          changes: { quantity: request.qty, unit: request.unit },
+        },
+      });
+    }
 
     const result = await this.prisma.pullOutRequest.update({
       where: { id },

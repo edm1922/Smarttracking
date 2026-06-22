@@ -184,21 +184,31 @@ export function ReleaseModal({
                 
                 {/* Search Results Dropdown */}
                 {releaseSearchResults.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-3 bg-white rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-gray-100 z-10 overflow-hidden animate-in slide-in-from-top-2 duration-200">
+                  <div 
+                    className="absolute left-0 right-0 top-full mt-3 bg-white rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-gray-100 z-10 overflow-hidden animate-in slide-in-from-top-2 duration-200"
+                    role="listbox"
+                    aria-label="Search results"
+                    aria-live="polite"
+                    aria-atomic="false"
+                  >
                     <div className="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
-                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Found {releaseSearchResults.length} Matching Items</span>
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider" aria-live="polite">{releaseSearchResults.length} Matching Item{releaseSearchResults.length !== 1 ? 's' : ''}</span>
                       <button onClick={() => setReleaseSearchInput('')} className="text-xs font-semibold text-primary hover:underline">Clear Search</button>
                     </div>
                     <div className="max-h-[300px] overflow-y-auto">
-                      {releaseSearchResults.map(product => {
+                      {releaseSearchResults.map((product, idx) => {
                         const isAdded = form.items.find(i => i.productId === product.id);
                         const available = product.stocks.find(s => s.locationId === form.sourceLocationId)?.quantity || 0;
                         
                         return (
                           <div 
                             key={product.id} 
-                            onClick={() => !isAdded && available > 0 && addReleaseItem(product)}
-                            className={`flex items-center justify-between p-5 hover:bg-primary/5 transition-all cursor-pointer border-b border-gray-50 last:border-0 ${isAdded ? 'opacity-50 grayscale pointer-events-none' : ''}`}
+                            role="option"
+                            aria-selected={!!isAdded}
+                            tabIndex={isAdded || available <= 0 ? -1 : 0}
+                            onClick={() => { if (!isAdded && available > 0) addReleaseItem(product); }}
+                            onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !isAdded && available > 0) { e.preventDefault(); addReleaseItem(product); } }}
+                            className={`flex items-center justify-between p-5 hover:bg-primary/5 transition-all cursor-pointer border-b border-gray-50 last:border-0 focus:outline-none focus:ring-2 focus:ring-primary/30 ${isAdded ? 'opacity-50 grayscale pointer-events-none' : ''}`}
                           >
                             <div className="flex items-center space-x-4">
                               <div className="h-12 w-12 bg-gray-100 rounded-xl flex items-center justify-center">
