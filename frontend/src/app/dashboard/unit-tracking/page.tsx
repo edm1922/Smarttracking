@@ -208,7 +208,7 @@ function UnitTrackingContent() {
     try {
       const startUTC = new Date(stockHealthRange.start + 'T00:00:00').toISOString();
       const endUTC = new Date(stockHealthRange.end + 'T23:59:59.999').toISOString();
-      const res = await api.get('/logs', { params: { action: 'STOCK_IN,SUBMIT_CONTENT,CREATE_ITEM', startDate: startUTC, endDate: endUTC, take: 10000 } });
+      const res = await api.get('/logs', { params: { action: 'CREATE_ITEM', startDate: startUTC, endDate: endUTC, take: 10000 } });
       setStockInLogs(res.data.data || []);
     } catch (err) {
       console.error(err);
