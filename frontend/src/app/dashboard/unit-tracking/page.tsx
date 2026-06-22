@@ -151,12 +151,13 @@ function UnitTrackingContent() {
       });
       const liveQty = unitField && !isNaN(Number(unitField.value?.qty)) ? Number(unitField.value.qty) : undefined;
       
-      let qty = Number(log.changes?.quantity);
-      if (isNaN(qty)) {
-        qty = liveQty ?? 0;
-      }
-      if (isNaN(qty) || qty === 0) {
-         qty = (log.action === 'SUBMIT_CONTENT' || log.action === 'CREATE_ITEM' ? 1 : 0);
+      let qty: number;
+      if (log.action === 'CREATE_ITEM') {
+        qty = liveQty ?? 1;
+      } else {
+        qty = Number(log.changes?.quantity);
+        if (isNaN(qty)) qty = liveQty ?? 0;
+        if (isNaN(qty) || qty === 0) qty = 0;
       }
 
       if (qty > 0) {
@@ -517,9 +518,14 @@ function UnitTrackingContent() {
         return val && typeof val === 'object' && val.useUnitQty;
       });
       const liveQty = unitField && !isNaN(Number(unitField.value?.qty)) ? Number(unitField.value.qty) : undefined;
-      let qty = Number(log.changes?.quantity);
-      if (isNaN(qty)) qty = liveQty ?? 0;
-      if (isNaN(qty) || qty === 0) qty = (log.action === 'SUBMIT_CONTENT' || log.action === 'CREATE_ITEM' ? 1 : 0);
+      let qty: number;
+      if (log.action === 'CREATE_ITEM') {
+        qty = liveQty ?? 1;
+      } else {
+        qty = Number(log.changes?.quantity);
+        if (isNaN(qty)) qty = liveQty ?? 0;
+        if (isNaN(qty) || qty === 0) qty = 0;
+      }
       if (qty > 0) {
         inToday += qty;
         const specString = log.item?.fieldValues?.map((fv: any) => {
