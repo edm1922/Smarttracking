@@ -51,6 +51,7 @@ export default function StoragePage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [batchToDelete, setBatchToDelete] = useState<Batch | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [itemSearch, setItemSearch] = useState('');
 
   const fetchData = async () => {
     try {
@@ -234,6 +235,18 @@ export default function StoragePage() {
     );
   }
 
+  const filteredItems = items.filter(item => {
+    if (!itemSearch) return true;
+    const q = itemSearch.toLowerCase();
+    if (item.slug.toLowerCase().includes(q)) return true;
+    if ((item.name || '').toLowerCase().includes(q)) return true;
+    return item.fieldValues?.some(fv => {
+      const val = fv.value;
+      const displayVal = val && typeof val === 'object' ? (val.main ?? JSON.stringify(val)) : String(val ?? '');
+      return displayVal.toLowerCase().includes(q);
+    });
+  });
+
   if (viewMode === 'details' && selectedBatch) {
     const batchFields = getRelevantFields();
     
@@ -273,6 +286,22 @@ export default function StoragePage() {
           </div>
         </div>
 
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Filter by QR slug, name, or spec value..."
+            value={itemSearch}
+            onChange={e => setItemSearch(e.target.value)}
+            className="w-full rounded-2xl border border-gray-200 bg-white py-3.5 pl-11 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-gray-400"
+          />
+          {itemSearch && (
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">
+              {filteredItems.length} of {items.length}
+            </span>
+          )}
+        </div>
+
         <div className="bg-white rounded-[2rem] border border-gray-200 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -294,8 +323,10 @@ export default function StoragePage() {
                   <TableSkeleton columns={batchFields.length + 4} rows={5} />
                 ) : items.length === 0 ? (
                   <tr><td colSpan={batchFields.length + 4} className="px-6 py-12 text-center text-sm text-gray-400 italic">No submissions found for this batch yet.</td></tr>
+                ) : filteredItems.length === 0 ? (
+                  <tr><td colSpan={batchFields.length + 4} className="px-6 py-12 text-center text-sm text-gray-400 italic">No submissions match "{itemSearch}"</td></tr>
                 ) : (
-                  items.map(item => (
+                  filteredItems.map(item => (
                     <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center">
