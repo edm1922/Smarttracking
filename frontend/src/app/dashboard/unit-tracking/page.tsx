@@ -127,7 +127,7 @@ function UnitTrackingContent() {
         return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
       }).filter(Boolean).sort().join(', ') || 'Standard';
       if (!summary[pName].movementBreakdown[specString]) summary[pName].movementBreakdown[specString] = [];
-      summary[pName].movementBreakdown[specString].push({ qty: req.qty, date: req.createdAt });
+      summary[pName].movementBreakdown[specString].push({ qty: req.qty, date: req.createdAt, slug: req.item?.slug });
     });
 
     stockInLogs.forEach(log => {
@@ -168,7 +168,7 @@ function UnitTrackingContent() {
           return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
         }).filter(Boolean).sort().join(', ') || 'Standard';
         if (!summary[pName].inBreakdown[specString]) summary[pName].inBreakdown[specString] = [];
-        summary[pName].inBreakdown[specString].push({ qty, date: log.createdAt });
+        summary[pName].inBreakdown[specString].push({ qty, date: log.createdAt, slug: log.item?.slug });
       }
     });
 

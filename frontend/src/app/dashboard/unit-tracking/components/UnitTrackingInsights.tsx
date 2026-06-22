@@ -227,7 +227,7 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                 </div>
                 {Object.keys(selectedMovementItem.inBreakdown || {}).length > 0 ? (
                   <div className="grid grid-cols-1 gap-3">
-                    {Object.entries(selectedMovementItem.inBreakdown as Record<string, { qty: number; date: string }[]>).map(([spec, entries]) => (
+                    {Object.entries(selectedMovementItem.inBreakdown as Record<string, { qty: number; date: string; slug?: string }[]>).map(([spec, entries]) => (
                       entries.map((entry, idx) => (
                         <div key={`${spec}-${idx}`} className="bg-gray-50 border border-gray-100 rounded-2xl p-4 flex items-center justify-between group hover:border-gray-200 transition-all">
                           <div className="flex flex-col gap-2">
@@ -239,6 +239,11 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                             <span className="text-[9px] font-bold text-gray-400">
                               {new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                             </span>
+                            {entry.slug && (
+                              <span className="text-[8px] font-mono text-gray-400 bg-white border border-gray-200 px-1.5 py-0.5 rounded self-start">
+                                {entry.slug}
+                              </span>
+                            )}
                           </div>
                           <span className="text-lg font-black text-[#50C878]">+{entry.qty}</span>
                         </div>
@@ -262,7 +267,7 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                 </div>
                 {Object.keys(selectedMovementItem.movementBreakdown || {}).length > 0 ? (
                   <div className="grid grid-cols-1 gap-3">
-                    {Object.entries(selectedMovementItem.movementBreakdown as Record<string, { qty: number; date: string }[]>).map(([spec, entries]) => (
+                    {Object.entries(selectedMovementItem.movementBreakdown as Record<string, { qty: number; date: string; slug?: string }[]>).map(([spec, entries]) => (
                       entries.map((entry, idx) => (
                         <div key={`${spec}-${idx}`} className="bg-gray-50 border border-gray-100 rounded-2xl p-4 flex items-center justify-between group hover:border-gray-200 transition-all">
                           <div className="flex flex-col gap-2">
@@ -274,6 +279,11 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                             <span className="text-[9px] font-bold text-gray-400">
                               {new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                             </span>
+                            {entry.slug && (
+                              <span className="text-[8px] font-mono text-gray-400 bg-white border border-gray-200 px-1.5 py-0.5 rounded self-start">
+                                {entry.slug}
+                              </span>
+                            )}
                           </div>
                           <span className="text-lg font-black text-red-500">-{entry.qty}</span>
                         </div>
