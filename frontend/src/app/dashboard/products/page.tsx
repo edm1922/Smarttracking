@@ -112,8 +112,8 @@ export default function ProductsPage() {
       setTotalProducts(prodRes.data.total || (prodRes.data.length || 0));
       setLocations(locRes.data);
     } catch (err) {
-      setError('Strategic synchronization failed.');
-      toast.error('Strategic synchronization failed.');
+      setError('Unable to load products.');
+      toast.error('Unable to load products.');
     } finally {
       setLoading(false);
     }
@@ -148,12 +148,12 @@ export default function ProductsPage() {
     setIsSavingProduct(true);
     try {
       await api.post('/products', newProduct);
-      toast.success('New asset classified and stored.');
+      toast.success('New product added successfully.');
       setIsAddModalOpen(false);
       setNewProduct({ name: '', sku: '', description: '', unit: 'PCS', price: 0, threshold: 0, showInInventory: true, initialStock: 0, initialLocationId: '' });
       fetchData();
     } catch (err) {
-      toast.error('Classification error detected.');
+      toast.error('Failed to add product. Please check the form and try again.');
     } finally {
       setIsSavingProduct(false);
     }
@@ -166,12 +166,12 @@ export default function ProductsPage() {
     try {
       const payload = { ...editingProduct, totalStock: bypassStockEdit ? editableStock : undefined };
       await api.patch(`/products/${editingProduct.id}`, payload);
-      toast.success('Asset parameters updated.');
+      toast.success('Product updated successfully.');
       setIsEditModalOpen(false);
       setBypassStockEdit(false);
       fetchData();
     } catch (err) {
-      toast.error('Parameter update failed.');
+      toast.error('Failed to update product. Please try again.');
     } finally {
       setIsSavingProduct(false);
     }
@@ -186,12 +186,12 @@ export default function ProductsPage() {
     setIsReleasing(true);
     try {
       await api.post(`/products/bulk-release`, releaseBulkForm);
-      toast.success('Asset release successful.');
+      toast.success('Items released successfully.');
       setIsReleaseModalOpen(false);
       setReleaseBulkForm({ sourceLocationId: '', requestedBy: '', whereTo: '', remarks: '', items: [] });
       fetchData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Release protocol failure.');
+      toast.error(err.response?.data?.message || 'Release failed. Please try again.');
     } finally {
       setIsReleasing(false);
     }
@@ -223,7 +223,7 @@ export default function ProductsPage() {
       });
       fetchData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Stock transaction failed.');
+      toast.error(err.response?.data?.message || 'Stock transaction failed. Please check your entries and try again.');
     } finally {
       setIsProcessingStock(false);
     }
@@ -305,12 +305,12 @@ export default function ProductsPage() {
     if (!editingProduct) return;
     try {
       await api.delete(`/products/${editingProduct.id}`);
-      toast.success('Asset record purged from archives.');
+      toast.success('Product deleted permanently.');
       setIsEditModalOpen(false);
       setIsDeleteConfirmOpen(false);
       fetchData();
     } catch (err) {
-      toast.error('Purge operation aborted.');
+      toast.error('Failed to delete product.');
     }
   };
 
@@ -322,12 +322,12 @@ export default function ProductsPage() {
         setBypassStockEdit(true);
         setIsVerifyingPassword(false);
         setAdminPassInput('');
-        toast.success('Access Granted. Administrative bypass enabled.');
+        toast.success('Access granted. Stock edit bypass is now active.');
       } else {
-        toast.error('Unauthorized access attempt.');
+        toast.error('Incorrect password. Please try again.');
       }
     } catch (err) {
-      toast.error('Security handshake failed.');
+      toast.error('Verification failed. Please try again.');
     } finally {
       setIsVerifying(false);
     }
@@ -342,9 +342,9 @@ export default function ProductsPage() {
       const res = await api.post(`/products/${productId}/image`, formData);
       setEditingProduct(res.data);
       setProducts(prev => prev.map(p => p.id === productId ? res.data : p));
-      toast.success('Visual asset documented.');
+      toast.success('Image uploaded successfully.');
     } catch (err) {
-      toast.error('Media ingestion failure.');
+      toast.error('Image upload failed. Please try again.');
     } finally {
       slot === 1 ? setIsUploading1(false) : setIsUploading2(false);
     }
@@ -355,9 +355,9 @@ export default function ProductsPage() {
       const res = await api.delete(`/products/${productId}/image/${slot}`);
       setEditingProduct(res.data);
       setProducts(prev => prev.map(p => p.id === productId ? res.data : p));
-      toast.info('Visual record removed.');
+      toast.info('Image removed.');
     } catch (err) {
-      toast.error('Media removal failed.');
+      toast.error('Failed to remove image. Please try again.');
     }
   };
 
@@ -424,7 +424,7 @@ export default function ProductsPage() {
     setIsDeletingLog(true);
     try {
       await api.delete(`/products/logs/${editingLog.id}`);
-      toast.success('Log entry purged');
+      toast.success('Log entry deleted');
       setIsEditLogModalOpen(false);
       if (viewingLogProduct) {
         const res = await api.get(`/products/${viewingLogProduct.id}`);
@@ -462,18 +462,19 @@ export default function ProductsPage() {
             <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-primary transition-colors" />
             <input
               type="text"
-              placeholder="Query asset database by name or SKU..."
+              placeholder="Search by name or SKU..."
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
               className="w-full pl-14 pr-6 py-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 shadow-xl shadow-gray-200/50 outline-none focus:border-primary transition-all placeholder:text-gray-300"
+              aria-label="Search products by name or SKU"
             />
           </div>
           
           <BulkActionsBar 
             selectedCount={selectedIds.length} 
             onClear={() => setSelectedIds([])} 
-            onTransmittal={() => toast.info('Transmittal workflow initiated.')}
-            onPR={() => toast.info('PR workflow initiated.')}
+                    onTransmittal={() => toast.info('Transmittal workflow started.')}
+                    onPR={() => toast.info('Purchase request created.')}
             onDelete={() => setIsDeleteConfirmOpen(true)}
           />
         </div>
@@ -578,15 +579,21 @@ export default function ProductsPage() {
       />
 
       <ConfirmModal 
-        isOpen={isDeleteConfirmOpen} title="Permanently Purge Asset?"
-        message={`This will irrevocably delete ${editingProduct?.name} and all associated distribution logs. This action is terminal and cannot be reversed.`}
-        confirmText="Confirm Termination" isDestructive={true}
+        isOpen={isDeleteConfirmOpen} title="Delete Product?"
+        message={`Delete ${editingProduct?.name}? This will also remove all associated stock logs. This action cannot be undone.`}
+        confirmText="Delete Product" isDestructive={true}
         onConfirm={handleDelete} onCancel={() => setIsDeleteConfirmOpen(false)}
       />
 
       {/* Edit Log Modal */}
       {isEditLogModalOpen && editingLog && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+        <div 
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Edit Transaction Log Entry"
+          onKeyDown={(e) => { if (e.key === 'Escape') setIsEditLogModalOpen(false); }}
+        >
           <div className="w-full max-w-md bg-white rounded-[2.5rem] p-10 shadow-2xl space-y-8 animate-in zoom-in-95 duration-300 border border-gray-100">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
@@ -594,11 +601,11 @@ export default function ProductsPage() {
                   <History className="h-6 w-6" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-gray-900 tracking-tight leading-none mb-1">Correct Entry</h3>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Transaction Audit Modification</p>
+                  <h3 className="text-xl font-bold text-gray-900 tracking-tight leading-none mb-1">Correct Entry</h3>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Edit Transaction Log</p>
                 </div>
               </div>
-              <button onClick={() => setIsEditLogModalOpen(false)} className="p-2 text-gray-400 hover:text-gray-900 transition-colors">
+              <button onClick={() => setIsEditLogModalOpen(false)} className="p-2 text-gray-400 hover:text-gray-700 transition-colors">
                 <X className="h-6 w-6" />
               </button>
             </div>
@@ -606,33 +613,33 @@ export default function ProductsPage() {
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Quantity</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider ml-1">Quantity</label>
                   <input type="number" value={editingLog.quantity} onChange={(e) => setEditingLog({...editingLog, quantity: parseInt(e.target.value) || 0})} className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:bg-white focus:border-primary outline-none transition-all" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Date</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider ml-1">Date</label>
                   <input type="date" value={editingLog.date} onChange={(e) => setEditingLog({...editingLog, date: e.target.value})} className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:bg-white focus:border-primary outline-none transition-all" />
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Reason for Correction</label>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider ml-1">Reason for Correction</label>
                 <textarea value={editingLog.remarks || ''} onChange={(e) => setEditingLog({...editingLog, remarks: e.target.value})} className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:bg-white focus:border-primary outline-none transition-all min-h-[100px] resize-none" placeholder="Explain the correction..." />
               </div>
             </div>
 
             <div className="space-y-4">
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-5 space-y-4">
+              <div className="bg-primary/5 border border-primary/10 rounded-2xl p-5 space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 bg-blue-100 rounded-xl flex items-center justify-center">
-                    <Bell className="h-4 w-4 text-blue-600" />
+                  <div className="h-8 w-8 bg-primary/10 rounded-xl flex items-center justify-center">
+                    <Bell className="h-4 w-4 text-primary" />
                   </div>
-                  <h4 className="text-[10px] font-black text-gray-800 uppercase tracking-wider">Notify Staff</h4>
+                  <h4 className="text-[10px] font-bold text-gray-800 uppercase tracking-wider">Notify Staff</h4>
                 </div>
                 <div className="flex items-center gap-3">
                   <select
                     value={notifyDuration}
                     onChange={e => setNotifyDuration(parseInt(e.target.value))}
-                    className="flex-1 px-4 py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100 transition-all cursor-pointer"
+                    className="flex-1 px-4 py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all cursor-pointer"
                   >
                     <option value={24}>24 Hours</option>
                     <option value={48}>48 Hours</option>
@@ -643,7 +650,7 @@ export default function ProductsPage() {
                   <button
                     onClick={handleNotifyStaff}
                     disabled={isNotifying}
-                    className="px-5 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl text-[10px] font-extrabold uppercase tracking-widest shadow-lg shadow-blue-600/20 hover:shadow-xl hover:shadow-blue-600/30 hover:-translate-y-0.5 active:translate-y-px transition-all duration-300 disabled:opacity-50 disabled:hover:translate-y-0 disabled:shadow-none flex items-center gap-2 shrink-0"
+                    className="px-5 py-3 bg-primary text-white rounded-xl text-xs font-semibold uppercase tracking-wider shadow-md hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2 shrink-0"
                   >
                     <Bell className="h-4 w-4" />
                     {isNotifying ? 'Sending...' : 'Notify'}
@@ -651,9 +658,9 @@ export default function ProductsPage() {
                 </div>
               </div>
 
-              <button onClick={handleUpdateLog} className="w-full py-5 bg-primary text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all">Update Log Entry</button>
-              <button disabled={isDeletingLog} onClick={handleDeleteLog} className="w-full py-4 text-red-500 font-black text-[10px] uppercase tracking-widest hover:bg-red-50 rounded-2xl transition-all flex items-center justify-center gap-2">
-                <Trash2 className="h-4 w-4" /> {isDeletingLog ? 'Purging...' : 'Purge Entry from Archives'}
+              <button onClick={handleUpdateLog} className="w-full py-5 bg-primary text-white rounded-2xl text-xs font-semibold uppercase tracking-wider shadow-md hover:shadow-lg transition-all">Update Log Entry</button>
+              <button disabled={isDeletingLog} onClick={handleDeleteLog} className="w-full py-4 text-red-500 font-semibold text-xs uppercase tracking-wider hover:bg-red-50 rounded-2xl transition-all flex items-center justify-center gap-2">
+                <Trash2 className="h-4 w-4" /> {isDeletingLog ? 'Deleting...' : 'Delete This Entry'}
               </button>
             </div>
           </div>

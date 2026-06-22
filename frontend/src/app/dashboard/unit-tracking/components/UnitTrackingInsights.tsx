@@ -19,6 +19,7 @@ interface UnitTrackingInsightsProps {
   exportType: 'all' | 'stock-in' | 'stock-out';
   setExportType: (val: 'all' | 'stock-in' | 'stock-out') => void;
   onConfirmExport: () => void;
+  onPrintItem: (item: any) => void;
 }
 
 export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
@@ -35,6 +36,7 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
   exportType,
   setExportType,
   onConfirmExport,
+  onPrintItem,
 }) => {
   const [selectedMovementItem, setSelectedMovementItem] = useState<any | null>(null);
 
@@ -157,6 +159,8 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                     <button 
                       onClick={() => setSelectedMovementItem(item)}
                       className="h-10 w-10 bg-gray-50 text-gray-300 rounded-xl flex items-center justify-center hover:bg-primary hover:text-white transition-all shadow-sm"
+                      title="View movement breakdown"
+                      aria-label={`View movement details for ${item.name}`}
                     >
                       <TrendingUp className="h-5 w-5" />
                     </button>
@@ -194,12 +198,22 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Movement Breakdown Details</p>
                 </div>
               </div>
-              <button 
-                onClick={() => setSelectedMovementItem(null)}
-                className="h-10 w-10 bg-white border border-gray-200 text-gray-400 rounded-xl flex items-center justify-center hover:bg-gray-100 hover:text-gray-900 transition-all shadow-sm"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => { onPrintItem(selectedMovementItem); }}
+                  className="h-10 w-10 bg-white border border-gray-200 text-gray-400 rounded-xl flex items-center justify-center hover:bg-gray-900 hover:text-white hover:border-gray-900 transition-all shadow-sm"
+                  title="Print movement grouped by spec"
+                  aria-label="Print movement report grouped by specification"
+                >
+                  <Printer className="h-5 w-5" />
+                </button>
+                <button 
+                  onClick={() => setSelectedMovementItem(null)}
+                  className="h-10 w-10 bg-white border border-gray-200 text-gray-400 rounded-xl flex items-center justify-center hover:bg-gray-100 hover:text-gray-900 transition-all shadow-sm"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
             
             <div className="p-10 overflow-y-auto flex-1 bg-white custom-scrollbar space-y-8">

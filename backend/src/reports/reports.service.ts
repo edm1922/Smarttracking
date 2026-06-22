@@ -610,21 +610,57 @@ export class ReportsService {
   }
 
   async getLowStockAlertReport() {
-    const stock = await this.prisma.productStock.findMany({
+    const productsWithStock = await this.prisma.product.findMany({
       select: {
-        productId: true,
-        quantity: true,
-        product: {
-          select: {
-            name: true,
-            threshold: true,
-          },
+        id: true,
+        name: true,
+        description: true,
+        threshold: true,
+        stocks: {
+          select: { quantity: true },
         },
       },
     });
 
-    return stock
-      .filter((item) => item.quantity < (item.product?.threshold || 0))
+    const lowStockItems = productsWithStock
+      .map((p) => ({
+        productId: p.id,
+        totalQuantity: p.stocks.reduce((sum, s) => sum + s.quantity, 0),
+        product: { name: p.name, description: p.description, threshold: p.threshold },
+      }))
+      .filter((item) => item.totalQuantity < (item.product.threshold || 0));
+
+    if (lowStockItems.length === 0) return [];
+
+    const requestCounts = await this.prisma.internalRequest.groupBy({
+      by: ['productId'],
+      where: {
+        productId: { in: lowStockItems.map((i) => i.productId) },
+      },
+      _count: { id: true },
+      _sum: { quantity: true },
+    });
+
+    const requestCountMap = new Map(
+      requestCounts.map((r) => [
+        r.productId,
+        {
+          requestCount: r._count.id,
+          totalRequestedQty: r._sum.quantity ?? 0,
+        },
+      ])
+    );
+
+    return lowStockItems
+      .map((item) => ({
+        productId: item.productId,
+        quantity: item.totalQuantity,
+        product: item.product,
+        requestCount: requestCountMap.get(item.productId)?.requestCount ?? 0,
+        totalRequestedQty:
+          requestCountMap.get(item.productId)?.totalRequestedQty ?? 0,
+      }))
+      .sort((a, b) => b.requestCount - a.requestCount)
       .slice(0, 50);
   }
 

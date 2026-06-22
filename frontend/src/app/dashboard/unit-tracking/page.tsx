@@ -8,6 +8,8 @@ import { PageHeaderSkeleton } from '@/components/ui/LoadingSkeletons';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import jsPDF from 'jspdf';
 import { applyPlugin } from 'jspdf-autotable';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 applyPlugin(jsPDF);
 import { X, FileText, ImageIcon, CheckCircle, Clock, User, Box, ClipboardList } from 'lucide-react';
 
@@ -445,6 +447,378 @@ function UnitTrackingContent() {
     setIsBuildingTransmittal(false);
   };
 
+  const handlePrintItem = async (item: any) => {
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet('Uniform Stocks Report', {
+      views: [{ showGridLines: false }]
+    });
+
+    const thinBorder = { style: 'thin' as const, color: { argb: 'FF94A3B8' } };
+    const allBorders = {
+      top: thinBorder, left: thinBorder, bottom: thinBorder, right: thinBorder,
+    };
+
+    // Landscape page setup, 10 columns matching the reference layout
+    ws.pageSetup = {
+      orientation: 'landscape',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: {
+        left: 0.2, right: 0.2, top: 0.2, bottom: 0.2, header: 0, footer: 0,
+      },
+    };
+    ws.columns = [
+      { key: 'a', width: 6 },
+      { key: 'b', width: 12 },
+      { key: 'c', width: 32 },
+      { key: 'd', width: 10 },
+      { key: 'e', width: 12 },
+      { key: 'f', width: 10 },
+      { key: 'g', width: 12 },
+      { key: 'h', width: 10 },
+      { key: 'i', width: 12 },
+      { key: 'j', width: 10 },
+    ];
+
+    const fmtStart = new Date(stockHealthRange.start).toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' });
+    const fmtEnd = new Date(stockHealthRange.end).toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' });
+    const runtimeStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+      + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    const opening = item.totalInStock + item.outToday - item.inToday;
+
+    // ── Company Header ──
+    ws.mergeCells('A1:J1');
+    const h1 = ws.getCell('A1');
+    h1.value = 'CENTRO SERVICES COOPERATIVE';
+    h1.font = { name: 'Segoe UI', size: 14, bold: true, color: { argb: 'FF0F172A' } };
+    h1.alignment = { horizontal: 'left', vertical: 'middle' };
+    ws.getRow(1).height = 28;
+
+    ws.mergeCells('A2:J2');
+    const h2 = ws.getCell('A2');
+    h2.value = 'Purok Camachille, Brgy. Tambler, General Santos City';
+    h2.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF64748B' } };
+    h2.alignment = { horizontal: 'left', vertical: 'middle' };
+    ws.getRow(2).height = 18;
+
+    ws.mergeCells('A3:J3');
+    const h3 = ws.getCell('A3');
+    h3.value = 'centrocooperative21@gmail.com | (083) 554 5552';
+    h3.font = { name: 'Segoe UI', size: 9, color: { argb: 'FF94A3B8' } };
+    h3.alignment = { horizontal: 'left', vertical: 'middle' };
+    ws.getRow(3).height = 18;
+
+    // ── Spacer ──
+    ws.getRow(4).height = 8;
+
+    // ── Title ──
+    ws.mergeCells('A5:J5');
+    const title = ws.getCell('A5');
+    title.value = 'UNIFORM STOCKS REPORT';
+    title.font = { name: 'Segoe UI', size: 16, bold: true, color: { argb: 'FF0F172A' } };
+    title.alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getRow(5).height = 32;
+
+    // ── Spacer ──
+    ws.getRow(6).height = 8;
+
+    // ── Period Covered ──
+    ws.mergeCells('C7:J7');
+    const periodLabel = ws.getCell('A7');
+    periodLabel.value = 'Period Covered:';
+    periodLabel.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF475569' } };
+    periodLabel.alignment = { horizontal: 'left', vertical: 'middle' };
+    const periodVal = ws.getCell('C7');
+    periodVal.value = `${fmtStart} - ${fmtEnd}`;
+    periodVal.font = { name: 'Segoe UI', size: 10, color: { argb: 'FF0F172A' } };
+    ws.getRow(7).height = 20;
+
+    // ── Runtime ──
+    ws.mergeCells('C8:J8');
+    const runtimeLabel = ws.getCell('A8');
+    runtimeLabel.value = 'Runtime:';
+    runtimeLabel.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF475569' } };
+    runtimeLabel.alignment = { horizontal: 'left', vertical: 'middle' };
+    const runtimeVal = ws.getCell('C8');
+    runtimeVal.value = runtimeStr;
+    runtimeVal.font = { name: 'Segoe UI', size: 10, color: { argb: 'FF0F172A' } };
+    ws.getRow(8).height = 20;
+
+    // ── Spacer ──
+    ws.getRow(9).height = 8;
+    ws.getRow(11).height = 6;
+    ws.getRow(13).height = 6;
+
+    // ── Item Name ──
+    ws.mergeCells('A10:J10');
+    const itemRow = ws.getCell('A10');
+    itemRow.value = `ITEM: ${item.name?.toUpperCase() || 'N/A'}`;
+    itemRow.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF0F172A' } };
+    ws.getRow(10).height = 22;
+
+    // ── Collect spec data ──
+    const allSpecKeys = new Set([
+      ...Object.keys(item.inBreakdown || {}),
+      ...Object.keys(item.movementBreakdown || {}),
+    ]);
+
+    const specData = Array.from(allSpecKeys).map(spec => {
+      const inEntries = (item.inBreakdown?.[spec] || []) as { qty: number; date: string }[];
+      const outEntries = (item.movementBreakdown?.[spec] || []) as { qty: number; date: string }[];
+      const inTotal = inEntries.reduce((s, e) => s + e.qty, 0);
+      const outTotal = outEntries.reduce((s, e) => s + e.qty, 0);
+      return { spec, inTotal, outTotal, net: inTotal - outTotal, specOpening: 0 };
+    });
+
+    // Calculate each spec's opening balance proportionally
+    let totalMovement = specData.reduce((s, d) => s + Math.abs(d.net), 0);
+    if (totalMovement === 0) totalMovement = 1;
+    let remainingOpening = opening;
+    specData.forEach((d, i) => {
+      if (i === specData.length - 1) {
+        d.specOpening = remainingOpening;
+      } else {
+        const proportion = Math.abs(d.net) / totalMovement;
+        d.specOpening = Math.round(opening * proportion);
+        remainingOpening -= d.specOpening;
+      }
+    });
+
+    let cr = 12;
+    const dataStartRow = cr;
+
+    if (specData.length > 0) {
+      // ── Table Header (matches reference file structure) ──
+      const hRow = cr;
+      // A: NO. (merged hRow to hRow+2)
+      ws.mergeCells(`A${hRow}:A${hRow + 2}`);
+      const hA = ws.getCell(`A${hRow}`);
+      hA.value = 'NO.';
+      hA.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF334155' } };
+      hA.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      hA.alignment = { horizontal: 'center', vertical: 'middle' };
+      hA.border = allBorders;
+      ws.getCell(`A${hRow + 1}`).border = allBorders;
+      ws.getCell(`A${hRow + 2}`).border = allBorders;
+
+      // B: empty (merged hRow to hRow+2)
+      ws.mergeCells(`B${hRow}:B${hRow + 2}`);
+      const hB = ws.getCell(`B${hRow}`);
+      hB.value = '';
+      hB.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      hB.border = allBorders;
+      ws.getCell(`B${hRow + 1}`).border = allBorders;
+      ws.getCell(`B${hRow + 2}`).border = allBorders;
+
+      // C: SPECIFICATION (merged hRow to hRow+2)
+      ws.mergeCells(`C${hRow}:C${hRow + 2}`);
+      const hC = ws.getCell(`C${hRow}`);
+      hC.value = 'SPECIFICATION';
+      hC.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF334155' } };
+      hC.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      hC.alignment = { horizontal: 'center', vertical: 'middle' };
+      hC.border = allBorders;
+      ws.getCell(`C${hRow + 1}`).border = allBorders;
+      ws.getCell(`C${hRow + 2}`).border = allBorders;
+
+      // D: (empty — no price, merged hRow to hRow+2)
+      ws.mergeCells(`D${hRow}:D${hRow + 2}`);
+      const hD = ws.getCell(`D${hRow}`);
+      hD.value = '';
+      hD.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      hD.border = allBorders;
+      ws.getCell(`D${hRow + 1}`).border = allBorders;
+      ws.getCell(`D${hRow + 2}`).border = allBorders;
+
+      // E-F: STOCK IN (merged hRow to hRow+1)
+      ws.mergeCells(`E${hRow}:F${hRow + 1}`);
+      const hEF = ws.getCell(`E${hRow}`);
+      hEF.value = 'STOCK IN';
+      hEF.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF334155' } };
+      hEF.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      hEF.alignment = { horizontal: 'center', vertical: 'middle' };
+      hEF.border = allBorders;
+      ws.getCell(`F${hRow}`).border = allBorders;
+      ws.getCell(`E${hRow + 1}`).border = allBorders;
+      ws.getCell(`F${hRow + 1}`).border = allBorders;
+
+      // G-H: STOCK OUT (merged hRow to hRow+1)
+      ws.mergeCells(`G${hRow}:H${hRow + 1}`);
+      const hGH = ws.getCell(`G${hRow}`);
+      hGH.value = 'STOCK OUT';
+      hGH.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF334155' } };
+      hGH.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      hGH.alignment = { horizontal: 'center', vertical: 'middle' };
+      hGH.border = allBorders;
+      ws.getCell(`H${hRow}`).border = allBorders;
+      ws.getCell(`G${hRow + 1}`).border = allBorders;
+      ws.getCell(`H${hRow + 1}`).border = allBorders;
+
+      // I-J: ENDING (merged hRow to hRow+1)
+      ws.mergeCells(`I${hRow}:J${hRow + 1}`);
+      const hIJ = ws.getCell(`I${hRow}`);
+      hIJ.value = 'ENDING';
+      hIJ.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF334155' } };
+      hIJ.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      hIJ.alignment = { horizontal: 'center', vertical: 'middle' };
+      hIJ.border = allBorders;
+      ws.getCell(`J${hRow}`).border = allBorders;
+      ws.getCell(`I${hRow + 1}`).border = allBorders;
+      ws.getCell(`J${hRow + 1}`).border = allBorders;
+
+      // Row hRow+2: sub-headers
+      ws.getCell(`E${hRow + 2}`).value = 'QTY';
+      ws.getCell(`E${hRow + 2}`).font = { name: 'Segoe UI', size: 8, bold: true, color: { argb: 'FF64748B' } };
+      ws.getCell(`E${hRow + 2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      ws.getCell(`E${hRow + 2}`).alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getCell(`E${hRow + 2}`).border = allBorders;
+
+      ws.getCell(`F${hRow + 2}`).value = '';
+      ws.getCell(`F${hRow + 2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      ws.getCell(`F${hRow + 2}`).border = allBorders;
+
+      ws.getCell(`G${hRow + 2}`).value = 'QTY';
+      ws.getCell(`G${hRow + 2}`).font = { name: 'Segoe UI', size: 8, bold: true, color: { argb: 'FF64748B' } };
+      ws.getCell(`G${hRow + 2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      ws.getCell(`G${hRow + 2}`).alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getCell(`G${hRow + 2}`).border = allBorders;
+
+      ws.getCell(`H${hRow + 2}`).value = '';
+      ws.getCell(`H${hRow + 2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      ws.getCell(`H${hRow + 2}`).border = allBorders;
+
+      ws.getCell(`I${hRow + 2}`).value = 'QTY';
+      ws.getCell(`I${hRow + 2}`).font = { name: 'Segoe UI', size: 8, bold: true, color: { argb: 'FF64748B' } };
+      ws.getCell(`I${hRow + 2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      ws.getCell(`I${hRow + 2}`).alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getCell(`I${hRow + 2}`).border = allBorders;
+
+      ws.getCell(`J${hRow + 2}`).value = '';
+      ws.getCell(`J${hRow + 2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      ws.getCell(`J${hRow + 2}`).border = allBorders;
+
+      ws.getRow(hRow).height = 20;
+      ws.getRow(hRow + 1).height = 4;
+      ws.getRow(hRow + 2).height = 20;
+
+      cr = hRow + 3;
+
+      // ── Data Rows ──
+      specData.forEach((d, i) => {
+        const ending = d.specOpening + d.net;
+        const r = cr;
+
+        ws.getCell(`A${r}`).value = i + 1;
+        ws.getCell(`A${r}`).font = { name: 'Segoe UI', size: 9, color: { argb: 'FF475569' } };
+        ws.getCell(`A${r}`).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(`A${r}`).border = allBorders;
+
+        ws.getCell(`B${r}`).value = '';
+        ws.getCell(`B${r}`).border = allBorders;
+
+        ws.getCell(`C${r}`).value = d.spec;
+        ws.getCell(`C${r}`).font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF0F172A' } };
+        ws.getCell(`C${r}`).alignment = { vertical: 'middle' };
+        ws.getCell(`C${r}`).border = allBorders;
+
+        ws.getCell(`D${r}`).value = '';
+        ws.getCell(`D${r}`).border = allBorders;
+
+        ws.getCell(`E${r}`).value = d.inTotal || '';
+        ws.getCell(`E${r}`).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: d.inTotal > 0 ? 'FF059669' : 'FF94A3B8' } };
+        ws.getCell(`E${r}`).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(`E${r}`).border = allBorders;
+
+        ws.getCell(`F${r}`).value = '';
+        ws.getCell(`F${r}`).border = allBorders;
+
+        ws.getCell(`G${r}`).value = d.outTotal || '';
+        ws.getCell(`G${r}`).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: d.outTotal > 0 ? 'FFDC2626' : 'FF94A3B8' } };
+        ws.getCell(`G${r}`).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(`G${r}`).border = allBorders;
+
+        ws.getCell(`H${r}`).value = '';
+        ws.getCell(`H${r}`).border = allBorders;
+
+        ws.getCell(`I${r}`).value = ending;
+        ws.getCell(`I${r}`).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: ending >= 0 ? 'FF0F172A' : 'FFDC2626' } };
+        ws.getCell(`I${r}`).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(`I${r}`).border = allBorders;
+
+        ws.getCell(`J${r}`).value = '';
+        ws.getCell(`J${r}`).border = allBorders;
+
+        ws.getRow(r).height = 22;
+        cr++;
+      });
+    }
+
+    // ── Totals Row ──
+    const totalIn = specData.reduce((s, d) => s + d.inTotal, 0);
+    const totalOut = specData.reduce((s, d) => s + d.outTotal, 0);
+    const totalEnd = opening + totalIn - totalOut;
+
+    ws.mergeCells(`A${cr}:C${cr}`);
+    const totLabel = ws.getCell(`A${cr}`);
+    totLabel.value = 'TOTAL';
+    totLabel.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF1E293B' } };
+    totLabel.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+    totLabel.alignment = { horizontal: 'right', vertical: 'middle' };
+    totLabel.border = allBorders;
+
+    ws.getCell(`D${cr}`).border = allBorders;
+    ws.getCell(`D${cr}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+
+    ws.getCell(`E${cr}`).value = totalIn;
+    ws.getCell(`E${cr}`).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF059669' } };
+    ws.getCell(`E${cr}`).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(`E${cr}`).border = allBorders;
+    ws.getCell(`E${cr}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+
+    ws.getCell(`F${cr}`).border = allBorders;
+    ws.getCell(`F${cr}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+
+    ws.getCell(`G${cr}`).value = totalOut;
+    ws.getCell(`G${cr}`).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FFDC2626' } };
+    ws.getCell(`G${cr}`).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(`G${cr}`).border = allBorders;
+    ws.getCell(`G${cr}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+
+    ws.getCell(`H${cr}`).border = allBorders;
+    ws.getCell(`H${cr}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+
+    ws.getCell(`I${cr}`).value = totalEnd;
+    ws.getCell(`I${cr}`).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF0F172A' } };
+    ws.getCell(`I${cr}`).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(`I${cr}`).border = allBorders;
+    ws.getCell(`I${cr}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+
+    ws.getCell(`J${cr}`).border = allBorders;
+    ws.getCell(`J${cr}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+    ws.getRow(cr).height = 24;
+
+    cr += 2;
+
+    // ── Footer ──
+    ws.mergeCells(`A${cr}:J${cr}`);
+    const footer = ws.getCell(`A${cr}`);
+    footer.value = `Smart Tracking System • Printed: ${new Date().toLocaleString()}`;
+    footer.font = { name: 'Segoe UI', size: 8, italic: true, color: { argb: 'FF94A3B8' } };
+    footer.alignment = { horizontal: 'right', vertical: 'middle' };
+    ws.getRow(cr).height = 20;
+
+    // ── Export ──
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const ts = `${pad(now.getMonth() + 1)}${pad(now.getDate())}${now.getFullYear()}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    saveAs(blob, `Uniform Stocks Report (${fmtStart} - ${fmtEnd}) ${ts}.xlsx`);
+  };
+
   const toggleFilter = (productName: string, specKey: string, specValue: string) => {
     setProductFilters(prev => {
       if (productName === '') return {}; // Clear all
@@ -568,6 +942,7 @@ function UnitTrackingContent() {
           exportType={exportType}
           setExportType={setExportType}
           onConfirmExport={handleExportPDF}
+          onPrintItem={handlePrintItem}
         />
       )}
 

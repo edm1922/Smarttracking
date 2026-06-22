@@ -10,6 +10,14 @@ export default function AdminNotifications() {
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const SEEN_KEY = 'admin_notif_last_seen';
+
+  const latestDate = pendingRequests.length > 0
+    ? Math.max(...pendingRequests.map(r => r._date))
+    : 0;
+
+  const lastSeen = parseInt(typeof window !== 'undefined' ? localStorage.getItem(SEEN_KEY) || '0' : '0', 10);
+  const hasUnseen = pendingRequests.length > 0 && latestDate > lastSeen;
 
   const fetchPending = async () => {
     try {
@@ -66,24 +74,29 @@ export default function AdminNotifications() {
   return (
     <div className="relative" ref={dropdownRef}>
       <button 
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          if (!isOpen && pendingRequests.length > 0) {
+            localStorage.setItem(SEEN_KEY, String(Math.max(...pendingRequests.map(r => r._date))));
+          }
+          setIsOpen(!isOpen);
+        }}
         className="relative p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
       >
         <Bell className="h-5 w-5" />
-        {hasNotifications && (
+        {hasUnseen && (
           <span className="absolute top-1 right-1 flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+            <span className="animate-ping motion-reduce:animate-none absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-400"></span>
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-2 w-[350px] bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-[100] transform origin-top-left">
+          <div className="absolute top-full left-0 mt-2 w-[350px] bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden z-[100] transform origin-top-left">
           <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-            <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">Pending Requests</h3>
+            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-tight">Pending Requests</h3>
             {hasNotifications && (
-              <span className="px-2 py-0.5 bg-red-100 text-red-600 rounded-lg text-[10px] font-black">{pendingRequests.length} New</span>
+              <span className="px-2 py-0.5 bg-rose-50 text-rose-500 rounded-lg text-[10px] font-bold">{pendingRequests.length} New</span>
             )}
           </div>
           
@@ -103,21 +116,21 @@ export default function AdminNotifications() {
                       }
                     }}
                   >
-                    <div className={`mt-1 p-2 rounded-full h-fit flex-shrink-0 ${req._type === 'pull-out' ? 'bg-indigo-50 text-indigo-500' : 'bg-emerald-50 text-emerald-500'}`}>
+                    <div className="mt-1 p-2 rounded-full h-fit flex-shrink-0 bg-primary/10 text-primary">
                       {req._type === 'pull-out' ? <Package className="h-4 w-4" /> : <Box className="h-4 w-4" />}
                     </div>
                     <div>
                       <p className="text-xs font-bold text-gray-900 mb-1">
                         {req._type === 'pull-out' ? req.user?.username : req.employeeName} requested <span className="text-primary">{req._type === 'pull-out' ? `${req.qty} ${req.unit}` : `${req.quantity} pcs`}</span>
                       </p>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest truncate max-w-[220px]">
+                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider truncate max-w-[220px]">
                         {req._type === 'pull-out' ? req.item?.name : req.product?.name}
                       </p>
                       <div className="flex items-center gap-2 mt-2">
-                        <p className="text-[9px] font-bold text-gray-400">
+                        <p className="text-[9px] font-bold text-gray-500">
                           {new Date(req._date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                         </p>
-                        <span className="text-[8px] font-black px-1.5 py-0.5 rounded-sm bg-gray-100 text-gray-500 uppercase tracking-tighter">
+                        <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-gray-100 text-gray-500 uppercase tracking-tighter">
                           {req._type === 'pull-out' ? 'Unit' : 'Material'}
                         </span>
                       </div>
@@ -130,7 +143,7 @@ export default function AdminNotifications() {
                 <div className="mx-auto h-12 w-12 bg-gray-50 rounded-full flex items-center justify-center mb-3">
                   <Bell className="h-5 w-5 text-gray-300" />
                 </div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">You're all caught up</p>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">You're all caught up</p>
               </div>
             )}
           </div>
