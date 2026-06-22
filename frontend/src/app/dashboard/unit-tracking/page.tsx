@@ -470,8 +470,19 @@ function UnitTrackingContent() {
     const end = new Date(stockHealthRange.end + 'T23:59:59.999');
 
     let totalInStock = 0;
+    const specCurrentStock: Record<string, number> = {};
     freshInventory.forEach((p: any) => {
-      if (p.name === pName) totalInStock += p.totalQty;
+      if (p.name !== pName) return;
+      totalInStock += p.totalQty;
+      p.items?.forEach((item: any) => {
+        const specString = item.fieldValues?.map((fv: any) => {
+          const v = fv.value;
+          const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+          const fieldName = fv.field?.name || fv.name || '';
+          return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
+        }).filter(Boolean).sort().join(', ') || 'Standard';
+        specCurrentStock[specString] = (specCurrentStock[specString] || 0) + (item.qty || 0);
+      });
     });
 
     let outToday = 0;
@@ -650,18 +661,9 @@ function UnitTrackingContent() {
       return { spec, inTotal, outTotal, net: inTotal - outTotal, specOpening: 0 };
     });
 
-    // Calculate each spec's opening balance proportionally
-    let totalMovement = specData.reduce((s, d) => s + Math.abs(d.net), 0);
-    if (totalMovement === 0) totalMovement = 1;
-    let remainingOpening = opening;
-    specData.forEach((d, i) => {
-      if (i === specData.length - 1) {
-        d.specOpening = remainingOpening;
-      } else {
-        const proportion = Math.abs(d.net) / totalMovement;
-        d.specOpening = Math.round(opening * proportion);
-        remainingOpening -= d.specOpening;
-      }
+    // Calculate each spec's opening from current stock minus period movement
+    specData.forEach(d => {
+      d.specOpening = (specCurrentStock[d.spec] || 0) - d.inTotal + d.outTotal;
     });
 
     let cr = 12;
