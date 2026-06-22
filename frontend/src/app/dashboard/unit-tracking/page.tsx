@@ -331,7 +331,7 @@ function UnitTrackingContent() {
               ...Object.entries(item.inBreakdown || {}).map(([s, q]) => `IN ${s}: +${q}`),
             ];
         const breakdownStr = breakdownParts.join('; ') || '\u2014';
-        const opening = item.totalInStock + item.outToday - item.inToday;
+    const opening = item.totalInStock + item.outToday - item.inToday;
         const movement = item.inToday - item.outToday;
         const movementStr = movement > 0 ? `+${movement}` : String(movement);
         return [
@@ -448,6 +448,82 @@ function UnitTrackingContent() {
   };
 
   const handlePrintItem = async (item: any) => {
+    // Fetch fresh data for the report (bypass stale state)
+    const [inventoryRes, requestsRes, stockInLogsRes] = await Promise.all([
+      api.get('/items/unit-inventory', { params: { skip: 0, take: 9999 } }),
+      api.get('/pull-out-requests', { params: { skip: 0, take: 9999 } }),
+      api.get('/logs', {
+        params: {
+          action: 'STOCK_IN,CREATE_ITEM',
+          startDate: new Date(stockHealthRange.start + 'T00:00:00').toISOString(),
+          endDate: new Date(stockHealthRange.end + 'T23:59:59.999').toISOString(),
+          take: 10000,
+        },
+      }),
+    ]);
+
+    const freshInventory = inventoryRes.data.data || [];
+    const freshRequests = (requestsRes.data.data || []).filter((r: any) => r.status === 'APPROVED');
+    const freshStockInLogs = stockInLogsRes.data.data || [];
+    const pName = item.name;
+    const start = new Date(stockHealthRange.start + 'T00:00:00');
+    const end = new Date(stockHealthRange.end + 'T23:59:59.999');
+
+    let totalInStock = 0;
+    freshInventory.forEach((p: any) => {
+      if (p.name === pName) totalInStock += p.totalQty;
+    });
+
+    let outToday = 0;
+    const movementBreakdown: Record<string, { qty: number; date: string }[]> = {};
+    freshRequests.forEach((req: any) => {
+      const reqPName = req.item.product?.name || req.item.name;
+      if (reqPName !== pName) return;
+      const isUnitTracked = req.item.fieldValues?.some((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty);
+      if (!isUnitTracked) return;
+      outToday += req.qty;
+      const specString = req.item.fieldValues?.map((fv: any) => {
+        const v = fv.value;
+        const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+        const fieldName = fv.field?.name || fv.name || '';
+        return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
+      }).filter(Boolean).sort().join(', ') || 'Standard';
+      if (!movementBreakdown[specString]) movementBreakdown[specString] = [];
+      movementBreakdown[specString].push({ qty: req.qty, date: req.createdAt });
+    });
+
+    let inToday = 0;
+    const inBreakdown: Record<string, { qty: number; date: string }[]> = {};
+    freshStockInLogs.forEach((log: any) => {
+      const logPName = log.product?.name || log.item?.name;
+      if (logPName !== pName) return;
+      if (log.item) {
+        const isUnitTracked = log.item.fieldValues?.some((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty);
+        if (!isUnitTracked) return;
+      }
+      const unitField = log.item?.fieldValues?.find((fv: any) => {
+        const val = fv.value;
+        return val && typeof val === 'object' && val.useUnitQty;
+      });
+      const liveQty = unitField && !isNaN(Number(unitField.value?.qty)) ? Number(unitField.value.qty) : undefined;
+      let qty = Number(log.changes?.quantity);
+      if (isNaN(qty)) qty = liveQty ?? 0;
+      if (isNaN(qty) || qty === 0) qty = (log.action === 'SUBMIT_CONTENT' || log.action === 'CREATE_ITEM' ? 1 : 0);
+      if (qty > 0) {
+        inToday += qty;
+        const specString = log.item?.fieldValues?.map((fv: any) => {
+          const v = fv.value;
+          const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+          const fieldName = fv.field?.name || '';
+          return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
+        }).filter(Boolean).sort().join(', ') || 'Standard';
+        if (!inBreakdown[specString]) inBreakdown[specString] = [];
+        inBreakdown[specString].push({ qty, date: log.createdAt });
+      }
+    });
+
+    const freshItem = { name: pName, totalInStock, outToday, inToday, movementBreakdown, inBreakdown };
+
     const workbook = new ExcelJS.Workbook();
     const ws = workbook.addWorksheet('Uniform Stocks Report', {
       views: [{ showGridLines: false }]
@@ -486,7 +562,7 @@ function UnitTrackingContent() {
     const runtimeStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
       + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-    const opening = item.totalInStock + item.outToday - item.inToday;
+    const opening = freshItem.totalInStock + freshItem.outToday - freshItem.inToday;
 
     // ── Company Header ──
     ws.mergeCells('A1:J1');
@@ -554,19 +630,19 @@ function UnitTrackingContent() {
     // ── Item Name ──
     ws.mergeCells('A10:J10');
     const itemRow = ws.getCell('A10');
-    itemRow.value = `ITEM: ${item.name?.toUpperCase() || 'N/A'}`;
+    itemRow.value = `ITEM: ${freshItem.name?.toUpperCase() || 'N/A'}`;
     itemRow.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF0F172A' } };
     ws.getRow(10).height = 22;
 
     // ── Collect spec data ──
     const allSpecKeys = new Set([
-      ...Object.keys(item.inBreakdown || {}),
-      ...Object.keys(item.movementBreakdown || {}),
+      ...Object.keys(freshItem.inBreakdown || {}),
+      ...Object.keys(freshItem.movementBreakdown || {}),
     ]);
 
     const specData = Array.from(allSpecKeys).map(spec => {
-      const inEntries = (item.inBreakdown?.[spec] || []) as { qty: number; date: string }[];
-      const outEntries = (item.movementBreakdown?.[spec] || []) as { qty: number; date: string }[];
+      const inEntries = (freshItem.inBreakdown?.[spec] || []) as { qty: number; date: string }[];
+      const outEntries = (freshItem.movementBreakdown?.[spec] || []) as { qty: number; date: string }[];
       const inTotal = inEntries.reduce((s, e) => s + e.qty, 0);
       const outTotal = outEntries.reduce((s, e) => s + e.qty, 0);
       return { spec, inTotal, outTotal, net: inTotal - outTotal, specOpening: 0 };
