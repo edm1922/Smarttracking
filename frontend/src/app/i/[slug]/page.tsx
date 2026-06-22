@@ -291,11 +291,12 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
         unit: unitTracking.unit,
         remarks: pullOutRemarks,
         supervisor: pullOutSupervisor,
+        status: 'SUBMITTED',
       };
 
       await api.post('/pull-out-requests', payload);
       
-      alert(`Pull-out request for ${slug} has been submitted. Please go to the Unit Requisition Portal to review and finalize.`);
+      alert(`Pull-out request for ${slug} has been submitted for approval.`);
       
       // Reset state
       setPullOutRemarks('');
