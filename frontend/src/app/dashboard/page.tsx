@@ -608,7 +608,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const role = localStorage.getItem('role');
-    if (role === 'inventory' || role !== 'admin') {
+    if (role === 'inventory') {
       router.push('/dashboard/staff/requisition');
     }
   }, [router]);
