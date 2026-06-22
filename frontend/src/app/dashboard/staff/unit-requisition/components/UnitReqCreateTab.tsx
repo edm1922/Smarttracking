@@ -9,6 +9,7 @@ interface UnitReqCreateTabProps {
   setForm: (form: any) => void;
   cart: any[];
   myRequests: any[];
+  pendingRequests: any[];
   handleDeleteRequest: (id: string) => void;
   removeFromCart: (id: string) => void;
   updateCartItem: (id: string, updates: any) => void;
@@ -32,6 +33,7 @@ export const UnitReqCreateTab: React.FC<UnitReqCreateTabProps> = ({
   setForm,
   cart,
   myRequests,
+  pendingRequests,
   handleDeleteRequest,
   removeFromCart,
   updateCartItem,
@@ -49,7 +51,7 @@ export const UnitReqCreateTab: React.FC<UnitReqCreateTabProps> = ({
   setCart,
   addPendingScanToCart,
 }) => {
-  const pendingFromScans = myRequests.filter(r => r.status === 'PENDING' && !cart.some(c => c.id === r.id));
+  const pendingFromScans = pendingRequests.filter(r => !cart.some(c => c.id === r.id));
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">

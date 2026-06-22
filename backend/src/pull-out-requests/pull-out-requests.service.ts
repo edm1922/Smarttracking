@@ -180,10 +180,11 @@ export class PullOutRequestsService {
     return { data, total };
   }
 
-  async findAll(params: { skip?: number; take?: number; search?: string } = {}) {
-    const { skip = 0, take = 20, search } = params;
+  async findAll(params: { skip?: number; take?: number; search?: string; status?: string } = {}) {
+    const { skip = 0, take = 20, search, status } = params;
 
     const where: any = {};
+    if (status) where.status = status;
     if (search) {
       where.OR = [
         { remarks: { contains: search, mode: 'insensitive' } },
