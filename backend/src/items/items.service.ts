@@ -538,16 +538,42 @@ export class ItemsService {
       include: { fieldValues: true },
     });
 
-    // Log the submission
-    const unitValue = fieldValues?.find((fv: any) => fv.value?.useUnitQty)?.value;
-    const logQuantity = unitValue?.qty || 1;
-    const logUnit = unitValue?.unit || 'Units';
-
     // Use a real user ID for the log (required by foreign key constraint)
     let systemUser = await this.prisma.user.findFirst({ where: { role: 'admin' } });
     if (!systemUser) {
       systemUser = await this.prisma.user.findFirst(); // Fallback to any valid user
     }
+
+    // Auto-detect stock movement from unit-tracking field qty changes
+    try {
+      const oldUnitField = item.fieldValues?.find((fv: any) => fv.value && typeof fv.value === 'object' && (fv.value as any).useUnitQty);
+      const newFieldValuesPayload = data.fieldValues || [];
+      const newUnitField = newFieldValuesPayload.find((fv: any) => fv.value?.useUnitQty);
+
+      if (newUnitField || oldUnitField) {
+        const oldQty = oldUnitField ? Number((oldUnitField.value as any).qty) || 0 : 0;
+        const newQty = newUnitField ? Number(newUnitField.value.qty) || 0 : 0;
+        const qtyDiff = newQty - oldQty;
+
+        if (qtyDiff !== 0) {
+          const type = qtyDiff > 0 ? 'IN' : 'OUT';
+          const absDiff = Math.abs(qtyDiff);
+          await this.logsService.create({
+            userId: systemUser?.id || '7b026b2a-d53a-486d-9a15-3cc0229e43cf',
+            itemId: item.id,
+            action: `STOCK_${type}`,
+            changes: { quantity: absDiff },
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Auto stock detection failed:', err.message);
+    }
+
+    // Log the submission
+    const unitValue = fieldValues?.find((fv: any) => fv.value?.useUnitQty)?.value;
+    const logQuantity = unitValue?.qty || 1;
+    const logUnit = unitValue?.unit || 'Units';
     
     await this.logsService.create({
       userId: systemUser?.id || '7b026b2a-d53a-486d-9a15-3cc0229e43cf', 
