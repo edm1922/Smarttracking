@@ -153,7 +153,8 @@ function UnitTrackingContent() {
       
       let qty: number;
       if (log.action === 'CREATE_ITEM') {
-        qty = liveQty ?? 1;
+        qty = Number(log.changes?.quantity);
+        if (isNaN(qty)) qty = liveQty ?? 1;
       } else {
         qty = Number(log.changes?.quantity);
         if (isNaN(qty)) qty = liveQty ?? 0;
@@ -520,7 +521,8 @@ function UnitTrackingContent() {
       const liveQty = unitField && !isNaN(Number(unitField.value?.qty)) ? Number(unitField.value.qty) : undefined;
       let qty: number;
       if (log.action === 'CREATE_ITEM') {
-        qty = liveQty ?? 1;
+        qty = Number(log.changes?.quantity);
+        if (isNaN(qty)) qty = liveQty ?? 1;
       } else {
         qty = Number(log.changes?.quantity);
         if (isNaN(qty)) qty = liveQty ?? 0;
