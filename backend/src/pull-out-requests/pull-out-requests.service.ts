@@ -426,4 +426,79 @@ export class PullOutRequestsService {
     }
     return results;
   }
+
+  /**
+   * One-time reconciliation: deducts stock for all APPROVED pull-out requests
+   * that were approved before the approve() method deducted stock.
+   * Idempotent — skips items whose field value qty is already 0 or unchanged.
+   */
+  async reconcileStock() {
+    const approvedRequests = await this.prisma.pullOutRequest.findMany({
+      where: { status: 'APPROVED' },
+      select: { id: true, qty: true, itemId: true },
+    });
+
+    // Group approved qtys by itemId
+    const itemDeductions = new Map<string, { totalQty: number; requestIds: string[] }>();
+    for (const req of approvedRequests) {
+      if (!itemDeductions.has(req.itemId)) {
+        itemDeductions.set(req.itemId, { totalQty: 0, requestIds: [] });
+      }
+      const entry = itemDeductions.get(req.itemId)!;
+      entry.totalQty += req.qty;
+      entry.requestIds.push(req.id);
+    }
+
+    const results = [];
+    for (const [itemId, { totalQty, requestIds }] of itemDeductions) {
+      const item = await this.prisma.item.findUnique({
+        where: { id: itemId },
+        select: { fieldValues: true },
+      });
+
+      if (!item) {
+        results.push({ itemId, status: 'skipped', reason: 'Item not found' });
+        continue;
+      }
+
+      const unitField = item.fieldValues.find((fv) => {
+        const val = fv.value as any;
+        return val && typeof val === 'object' && val.useUnitQty === true;
+      });
+
+      if (!unitField) {
+        results.push({ itemId, status: 'skipped', reason: 'No unit-tracking field' });
+        continue;
+      }
+
+      const currentQty = Number((unitField.value as any).qty) || 0;
+      const newQty = Math.max(0, currentQty - totalQty);
+
+      if (newQty === currentQty) {
+        results.push({ itemId, status: 'skipped', reason: 'Already deducted or qty already 0' });
+        continue;
+      }
+
+      await this.prisma.itemFieldValue.update({
+        where: { id: unitField.id },
+        data: {
+          value: { ...(unitField.value as any), qty: newQty },
+        },
+      });
+
+      results.push({
+        itemId,
+        status: 'deducted',
+        previousQty: currentQty,
+        newQty,
+        totalApprovedQty: totalQty,
+      });
+    }
+
+    return {
+      totalApprovedRequests: approvedRequests.length,
+      totalItemsAffected: itemDeductions.size,
+      results,
+    };
+  }
 }

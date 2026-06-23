@@ -83,6 +83,11 @@ export class PullOutRequestsController {
     return this.pullOutRequestsService.bulkReject(data.ids, req.user.sub);
   }
 
+  @Post('reconcile-stock')
+  async reconcileStock() {
+    return this.pullOutRequestsService.reconcileStock();
+  }
+
   @Patch(':id/approve')
   async approve(@Param('id') id: string) {
     return this.pullOutRequestsService.approve(id);
