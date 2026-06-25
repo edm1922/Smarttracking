@@ -37,6 +37,8 @@ export async function exportRSQToExcel(rsq: any) {
   if (!rsq) return;
 
   const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Smart Tracking System';
+  workbook.created = new Date();
   const tailorNickname = getTailorNickname(rsq.tailor?.name);
   const formattedDate = rsq.orderDate ? new Date(rsq.orderDate).toLocaleDateString() : new Date().toLocaleDateString();
 
@@ -58,12 +60,9 @@ export async function exportRSQToExcel(rsq: any) {
     views: [{ showGridLines: false }]
   });
 
-  // Page Setup: portrait mode with absolute scaling disabled
+  // Page Setup: portrait mode
   ws.pageSetup = {
-    paperSize: 6 as any, // Statement / Half Letter
     orientation: 'portrait',
-    fitToPage: false, // Prevent Excel from shrinking/scaling down content
-    scale: 100, // Forces absolute 100% layout scaling
     margins: {
       left: 0.15,
       right: 0.15,
@@ -144,12 +143,8 @@ export async function exportRSQToExcel(rsq: any) {
     // RQ No. RSQ-00564
     merge('F', 3, 'G', 3);
     const cellF3 = cell('F', 3);
-    cellF3.value = {
-      richText: [
-        { text: 'RQ No.:    ', font: { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF0F172A' } } },
-        { text: rsq.rsqNo, font: { name: 'Segoe UI', size: 13, bold: true, color: { argb: 'FFDC2626' } } }
-      ]
-    };
+    cellF3.value = `RQ No.:  ${rsq.rsqNo}`;
+    cellF3.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FFDC2626' } };
     cellF3.alignment = { horizontal: 'right', vertical: 'middle' };
     ws.getRow(r(3)).height = 26;
 
@@ -340,16 +335,15 @@ export async function exportTransactionToExcel(transaction: any) {
   if (!transaction) return;
 
   const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Smart Tracking System';
+  workbook.created = new Date();
   const ws = workbook.addWorksheet('Transmittal Report', {
     views: [{ showGridLines: false }]
   });
 
-  // Set Statement 8.5" x 5.5" landscape paper size
+  // Page Setup
   ws.pageSetup = {
-    paperSize: 6 as any, // Statement / Half Letter
     orientation: 'portrait',
-    fitToPage: false, // Prevent Excel from shrinking/scaling down content
-    scale: 100, // Forces absolute 100% layout scaling
     margins: {
       left: 0.15,
       right: 0.15,
