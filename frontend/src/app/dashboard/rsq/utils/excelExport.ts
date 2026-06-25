@@ -1,5 +1,15 @@
 import ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
 
 // Helper to normalize tailor nickname
 const getTailorNickname = (_tailorName: string) => {
@@ -320,7 +330,7 @@ export async function exportRSQToExcel(rsq: any) {
   const buffer = await workbook.xlsx.writeBuffer();
   const fileType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   const blob = new Blob([buffer], { type: fileType });
-  saveAs(blob, `RSQ_SLIPS_${rsq.rsqNo}.xlsx`);
+  downloadBlob(blob, `RSQ_SLIPS_${rsq.rsqNo}.xlsx`);
 }
 
 /**
@@ -549,5 +559,5 @@ export async function exportTransactionToExcel(transaction: any) {
   const buffer = await workbook.xlsx.writeBuffer();
   const fileType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   const blob = new Blob([buffer], { type: fileType });
-  saveAs(blob, `MTR_${transaction.transactionNo}.xlsx`);
+  downloadBlob(blob, `MTR_${transaction.transactionNo}.xlsx`);
 }
