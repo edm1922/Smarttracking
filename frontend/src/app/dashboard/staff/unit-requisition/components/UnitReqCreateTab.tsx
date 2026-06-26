@@ -1,6 +1,6 @@
 import { 
   Plus, Search, Box, Trash2, QrCode, ClipboardList, Send, 
-  History, ImageIcon, Clock, User, ChevronRight 
+  History, ImageIcon, Clock, User, ChevronRight, X
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -344,7 +344,12 @@ export const UnitReqCreateTab: React.FC<UnitReqCreateTabProps> = ({
                               .map((item: any) => (
                                 <button
                                   key={item.slug}
+                                  disabled={item.qty === 0}
                                   onClick={() => {
+                                    if (item.qty === 0) {
+                                      toast.error(`${item.slug} is out of stock.`);
+                                      return;
+                                    }
                                     const currentSpecStr = item.fieldValues
                                       .filter((fv: any) => fv.value)
                                       .map((fv: any) => {
@@ -367,14 +372,21 @@ export const UnitReqCreateTab: React.FC<UnitReqCreateTabProps> = ({
                                     }]);
                                     toast.success(`${product.name} added to list`);
                                   }}
-                                  className="group flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl hover:border-primary hover:bg-white hover:shadow-md transition-all text-left"
+                                  className={`group flex items-center justify-between p-4 border rounded-2xl transition-all text-left ${item.qty === 0 ? 'bg-red-50 border-red-100 opacity-60 cursor-not-allowed' : 'bg-white border-gray-100 hover:border-primary hover:bg-white hover:shadow-md'}`}
                                 >
                                   <div>
-                                    <p className="text-xs font-mono font-black text-gray-900 group-hover:text-primary transition-colors">{item.slug}</p>
-                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter mt-1">Batch: {item.batch || 'N/A'}</p>
+                                    <p className={`text-xs font-mono font-black transition-colors ${item.qty === 0 ? 'text-red-400' : 'text-gray-900 group-hover:text-primary'}`}>{item.slug}</p>
+                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter mt-1">
+                                      Batch: {item.batch || 'N/A'} &middot; Stock: {item.qty} {product.unit}
+                                      {item.qty === 0 && <span className="ml-1.5 text-red-500">OUT OF STOCK</span>}
+                                    </p>
                                   </div>
-                                  <div className="h-8 w-8 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-primary transition-colors">
-                                    <Plus className="h-4 w-4 text-gray-300 group-hover:text-white" />
+                                  <div className={`h-8 w-8 rounded-xl flex items-center justify-center transition-colors ${item.qty === 0 ? 'bg-red-100' : 'bg-gray-50 group-hover:bg-primary'}`}>
+                                    {item.qty === 0 ? (
+                                      <X className="h-4 w-4 text-red-300" />
+                                    ) : (
+                                      <Plus className="h-4 w-4 text-gray-300 group-hover:text-white" />
+                                    )}
                                   </div>
                                 </button>
                               ))}
