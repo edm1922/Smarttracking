@@ -1,5 +1,5 @@
-import React from 'react';
-import { Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, Trash2 } from 'lucide-react';
 
 interface PRHistoryLogProps {
   prHistory: any[];
@@ -14,18 +14,41 @@ export const PRHistoryLog: React.FC<PRHistoryLogProps> = ({
   appendPrItems,
   deletePr,
 }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filtered = searchQuery.trim()
+    ? prHistory.filter(pr =>
+        pr.prNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (pr.items || []).some((item: any) =>
+          (item.name || '').toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      )
+    : prHistory;
+
   return (
     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">
           PR History Log
         </h3>
         <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100">
-          {prHistory.length} records
+          {filtered.length} / {prHistory.length} records
         </span>
       </div>
+
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search by PR No. or item name..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          className="w-full rounded-lg border border-gray-200 pl-10 pr-4 py-2 text-sm outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary"
+        />
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-        {prHistory.map(pr => (
+        {filtered.length > 0 ? filtered.map(pr => (
           <div
             key={pr.id}
             className="flex flex-col p-5 rounded-2xl border border-gray-100 bg-gray-50/50 hover:border-blue-200 hover:bg-blue-50/30 transition-all text-left group shadow-sm"
@@ -77,10 +100,9 @@ export const PRHistoryLog: React.FC<PRHistoryLogProps> = ({
               </button>
             </div>
           </div>
-        ))}
-        {prHistory.length === 0 && (
+        )) : (
           <div className="col-span-full py-12 text-center text-gray-400 italic text-sm">
-            No history found. Save a PR to see it here.
+            {searchQuery ? 'No records match your search.' : 'No history found. Save a PR to see it here.'}
           </div>
         )}
       </div>

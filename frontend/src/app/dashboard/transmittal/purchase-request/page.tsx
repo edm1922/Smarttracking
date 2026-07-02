@@ -12,7 +12,6 @@ import { PrintablePR } from '../components/PrintablePR';
 
 export default function PRTransmittalPage() {
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
   const [isPrinting, setIsPrinting] = useState(false);
   const [prHistory, setPrHistory] = useState<any[]>([]);
   const [prItems, setPrItems] = useState<PRItem[]>([]);
