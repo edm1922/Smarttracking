@@ -628,7 +628,7 @@ export class ReportsService {
         totalQuantity: p.stocks.reduce((sum, s) => sum + s.quantity, 0),
         product: { name: p.name, description: p.description, threshold: p.threshold },
       }))
-      .filter((item) => item.totalQuantity < (item.product.threshold || 0));
+      .filter((item) => item.totalQuantity <= item.product.threshold);
 
     if (lowStockItems.length === 0) return [];
 

@@ -132,7 +132,7 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                   <td className="px-10 py-8 text-right">
                     <div className="inline-flex flex-col items-end">
                       <span className={`text-lg font-black ${item.inToday > 0 ? 'text-[#50C878]' : 'text-gray-300'}`}>
-                        {item.inToday > 0 ? `+${item.inToday}` : '0'}
+                        {item.inToday > 0 ? `+${item.inToday}` : ''}
                       </span>
                       {Object.keys(item.inBreakdown).length > 0 && (
                         <span className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter mt-1 italic">Distributed Input</span>
@@ -142,7 +142,7 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                   <td className="px-10 py-8 text-right">
                     <div className="inline-flex flex-col items-end">
                       <span className={`text-lg font-black ${item.outToday > 0 ? 'text-red-500' : 'text-gray-300'}`}>
-                        {item.outToday > 0 ? `-${item.outToday}` : '0'}
+                        {item.outToday > 0 ? `-${item.outToday}` : ''}
                       </span>
                       {Object.keys(item.movementBreakdown).length > 0 && (
                         <span className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter mt-1 italic">Allocated Output</span>
