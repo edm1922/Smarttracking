@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Plus, Filter, Download, Trash2, Package, Tag, Database, History, Info, ChevronRight, Eye, ImageIcon, X, CheckCircle, Clock, AlertTriangle, User, Bell } from 'lucide-react';
 import { toast } from 'sonner';
@@ -96,6 +96,7 @@ export default function ProductsPage() {
   const [hasSeenRelease, setHasSeenRelease] = useState(false);
 
   const router = useRouter();
+  const processedSelectedRef = useRef(false);
 
   const standardUnits = ['PCS', 'METERS', 'ROLLS', 'KILOGRAMS', 'LITERS', 'SET', 'BOX'];
 
@@ -103,6 +104,35 @@ export default function ProductsPage() {
   useEffect(() => {
     fetchData();
   }, [page, searchTerm]);
+
+  // Auto-open product modal from ?selected=ID query param
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const selectedId = params.get('selected');
+    if (!selectedId || processedSelectedRef.current) return;
+    processedSelectedRef.current = true;
+    window.history.replaceState({}, '', '/dashboard/products');
+
+    const existing = products.find((p) => p.id === selectedId);
+    if (existing) {
+      setEditingProduct(existing);
+      setEditableStock(
+        existing.stocks.reduce((acc: number, s: any) => acc + s.quantity, 0),
+      );
+      setIsEditModalOpen(true);
+      setActiveEditTab('general');
+    } else {
+      api.get(`/products/${selectedId}`).then((res) => {
+        const product = res.data;
+        setEditingProduct(product);
+        setEditableStock(
+          product.stocks?.reduce((acc: number, s: any) => acc + s.quantity, 0) ?? 0,
+        );
+        setIsEditModalOpen(true);
+        setActiveEditTab('general');
+      });
+    }
+  }, [products]);
 
   const fetchData = async () => {
     setLoading(true);

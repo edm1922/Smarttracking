@@ -409,7 +409,7 @@ export class ReportsService {
             totalStock: p.stocks.reduce((sum: number, s: any) => sum + s.quantity, 0),
             requestCount: allIRs.length,
             issuedQty: fulfilledIRs.reduce((sum: number, ir: any) => sum + ir.quantity, 0),
-            mainOfficeCount: outTxs.filter((t: any) => t.remarks?.startsWith('Bulk Release:')).length,
+            mainOfficeCount: outTxs.filter((t: any) => t.remarks?.startsWith('Bulk Release:')).reduce((sum: number, t: any) => sum + t.quantity, 0),
             stockInQty: inTxs.reduce((sum: number, t: any) => sum + t.quantity, 0),
           };
         });
@@ -641,6 +641,19 @@ export class ReportsService {
       _sum: { quantity: true },
     });
 
+    const stockOutCounts = await this.prisma.productTransaction.groupBy({
+      by: ['productId'],
+      where: {
+        productId: { in: lowStockItems.map((i) => i.productId) },
+        type: 'OUT',
+      },
+      _count: { id: true },
+    });
+
+    const stockOutCountMap = new Map(
+      stockOutCounts.map((s) => [s.productId, s._count.id])
+    );
+
     const requestCountMap = new Map(
       requestCounts.map((r) => [
         r.productId,
@@ -656,7 +669,8 @@ export class ReportsService {
         productId: item.productId,
         quantity: item.totalQuantity,
         product: item.product,
-        requestCount: requestCountMap.get(item.productId)?.requestCount ?? 0,
+        requestCount: (requestCountMap.get(item.productId)?.requestCount ?? 0) +
+                      (stockOutCountMap.get(item.productId) ?? 0),
         totalRequestedQty:
           requestCountMap.get(item.productId)?.totalRequestedQty ?? 0,
       }))

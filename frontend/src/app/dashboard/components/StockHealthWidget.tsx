@@ -48,12 +48,11 @@ export const StockHealthWidget: React.FC<StockHealthWidgetProps> = ({
     fetchLowStock();
   }, []);
 
-  const filteredItems = filterMode === 'demand'
-    ? lowStockItems.filter((i) => i.requestCount > 0)
-    : lowStockItems;
+  const demandItems = lowStockItems.filter((i) => i.requestCount > 0);
+  const displayItems = filterMode === 'demand' ? demandItems.slice(0, 5) : lowStockItems;
 
   const lowCount = lowStockItems.length;
-  const demandLowCount = lowStockItems.filter((i) => i.requestCount > 0).length;
+  const demandLowCount = Math.min(demandItems.length, 5);
 
   return (
     <section className="space-y-6">
@@ -171,7 +170,7 @@ export const StockHealthWidget: React.FC<StockHealthWidgetProps> = ({
                 </button>
               </div>
             </div>
-          ) : filteredItems.length === 0 ? (
+          ) : displayItems.length === 0 ? (
             <div className="py-16 text-center">
               <div className="h-14 w-14 mx-auto mb-4 bg-green-50 rounded-2xl flex items-center justify-center">
                 <CheckCircle className="h-7 w-7 text-green-500" />
@@ -198,7 +197,7 @@ export const StockHealthWidget: React.FC<StockHealthWidgetProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filteredItems.map((item, idx) => {
+                {displayItems.map((item, idx) => {
                   const isOutOfStock = item.quantity === 0;
                   const deficit = (item.product?.threshold || 0) - item.quantity;
                   const hasDemand = item.requestCount > 0;
@@ -242,12 +241,12 @@ export const StockHealthWidget: React.FC<StockHealthWidgetProps> = ({
                         </span>
                       </td>
                       <td className="py-4 px-8 text-right">
-                        <Link
-                          href={`/dashboard/products`}
-                          className="inline-flex items-center gap-1 text-[10px] font-bold text-primary/80 hover:text-primary transition-colors"
-                        >
-                          VIEW <ChevronRight className="h-3 w-3" />
-                        </Link>
+                          <Link
+                            href={`/dashboard/products?selected=${item.productId}`}
+                            className="inline-flex items-center gap-1 text-[10px] font-bold text-primary/80 hover:text-primary transition-colors"
+                          >
+                            VIEW <ChevronRight className="h-3 w-3" />
+                          </Link>
                       </td>
                     </tr>
                   );

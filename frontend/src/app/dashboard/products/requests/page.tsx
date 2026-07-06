@@ -71,7 +71,7 @@ export default function RequestsPage() {
   const [loading, setLoading] = useState(true);
   const [itemSearch, setItemSearch] = useState('');
   const [personSearch, setPersonSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'PENDING' | 'APPROVED' | 'FULFILLED' | 'REJECTED' | 'ALL'>('PENDING');
+  const [activeTab, setActiveTab] = useState<'PENDING' | 'APPROVED' | 'FULFILLED' | 'REJECTED' | 'ALL' | 'REQ_LOOKUP'>('PENDING');
   const [allStatusFilter, setAllStatusFilter] = useState<'PENDING' | 'APPROVED' | 'FULFILLED' | 'REJECTED' | 'ALL'>('ALL');
   const [fulfilledDateFrom, setFulfilledDateFrom] = useState('');
   const [fulfilledDateTo, setFulfilledDateTo] = useState('');
@@ -80,6 +80,9 @@ export default function RequestsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [selectedEmployeeRequests, setSelectedEmployeeRequests] = useState<Request[] | null>(null);
   const [employeeHistoryLoading, setEmployeeHistoryLoading] = useState(false);
+  const [reqLookupInput, setReqLookupInput] = useState('');
+  const [reqLookupResults, setReqLookupResults] = useState<Request[]>([]);
+  const [reqLookupLoading, setReqLookupLoading] = useState(false);
 
   // Form state
   const [form, setForm] = useState({
@@ -375,7 +378,7 @@ export default function RequestsPage() {
     setEmployeeHistoryLoading(true);
     try {
       const res = await api.get('/internal-requests', {
-        params: { search: employeeName, take: 500 }
+        params: { personSearch: employeeName, take: 500 }
       });
       const allRequests: Request[] = res.data.data || [];
       setSelectedEmployeeRequests(allRequests.filter(r => r.employeeName === employeeName));
@@ -384,6 +387,79 @@ export default function RequestsPage() {
     } finally {
       setEmployeeHistoryLoading(false);
     }
+  };
+
+  const handleReqLookup = async () => {
+    const q = reqLookupInput.trim();
+    if (!q) return;
+    setReqLookupLoading(true);
+    try {
+      const res = await api.get('/internal-requests', {
+        params: { personSearch: q, take: 50 }
+      });
+      setReqLookupResults(res.data.data || []);
+    } catch {
+      alert('Failed to lookup request');
+    } finally {
+      setReqLookupLoading(false);
+    }
+  };
+
+  const handlePrintReqLookup = () => {
+    if (reqLookupResults.length === 0) return alert('No results to print');
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const html = `
+      <html>
+        <head>
+          <title>Request Lookup - ${reqLookupInput}</title>
+          <style>
+            body { font-family: sans-serif; padding: 40px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 12px; }
+            th { background-color: #f8f9fa; font-weight: bold; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .header h1 { font-size: 18px; margin: 0; }
+            .header p { font-size: 11px; color: #666; margin: 4px 0 0; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Request Lookup Result</h1>
+            <p>Searched: ${reqLookupInput} &mdash; ${new Date().toLocaleString()}</p>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Request No.</th>
+                <th>Employee Name</th>
+                <th>Department</th>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Status</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${reqLookupResults.map(r => `
+                <tr>
+                  <td>${r.requestNo}</td>
+                  <td>${r.employeeName}</td>
+                  <td>${r.departmentArea}</td>
+                  <td>${r.product.name}</td>
+                  <td>${r.quantity}</td>
+                  <td>${r.status}</td>
+                  <td>${new Date(r.date).toLocaleDateString()}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <script>window.print();</script>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   const filteredRequests = requests;
@@ -433,7 +509,7 @@ export default function RequestsPage() {
         <div className="lg:col-span-12 space-y-6">
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
             <div className="flex space-x-1 rounded-lg bg-gray-100 p-1 w-fit">
-              {(['PENDING', 'APPROVED', 'FULFILLED', 'REJECTED', 'ALL'] as const).map((tab) => (
+              {(['PENDING', 'APPROVED', 'FULFILLED', 'REJECTED', 'ALL', 'REQ_LOOKUP'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => { setActiveTab(tab); setAllStatusFilter('ALL'); setSelectedIds([]); }}
@@ -441,7 +517,7 @@ export default function RequestsPage() {
                     activeTab === tab ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  {tab === 'FULFILLED' ? 'Issuance Log' : tab}
+                  {tab === 'FULFILLED' ? 'Issuance Log' : tab === 'REQ_LOOKUP' ? 'Find Request' : tab}
                 </button>
               ))}
             </div>
@@ -481,26 +557,6 @@ export default function RequestsPage() {
               </div>
             )}
 
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search employee, supervisor, or department..."
-                value={personSearch}
-                onChange={(e) => { setPersonSearch(e.target.value); setPage(1); }}
-                className="w-full rounded-lg border border-gray-200 pl-10 pr-4 py-2 text-sm focus:ring-1 ring-primary outline-none"
-              />
-            </div>
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search item..."
-                value={itemSearch}
-                onChange={(e) => { setItemSearch(e.target.value); setPage(1); }}
-                className="w-full rounded-lg border border-gray-200 pl-10 pr-4 py-2 text-sm focus:ring-1 ring-primary outline-none"
-              />
-            </div>
           </div>
 
           {selectedIds.length > 0 && (
@@ -530,8 +586,106 @@ export default function RequestsPage() {
           )}
 
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            {activeTab === 'FULFILLED' ? (
+            {activeTab === 'REQ_LOOKUP' ? (
+              /* ── Find Request ── */
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Enter request number (e.g. REQ-2026-854705-E2)..."
+                      value={reqLookupInput}
+                      onChange={(e) => setReqLookupInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleReqLookup(); }}
+                      className="w-full rounded-lg border border-gray-200 pl-10 pr-4 py-2 text-sm focus:ring-1 ring-primary outline-none"
+                    />
+                  </div>
+                  <button
+                    onClick={handleReqLookup}
+                    disabled={reqLookupLoading || !reqLookupInput.trim()}
+                    className="px-5 py-2 bg-primary text-white rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-primary-dark disabled:opacity-50 transition-colors shadow-sm"
+                  >
+                    {reqLookupLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}
+                  </button>
+                  {reqLookupResults.length > 0 && (
+                    <button
+                      onClick={handlePrintReqLookup}
+                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-gray-200 transition-colors flex items-center gap-1.5"
+                    >
+                      <Printer className="h-3.5 w-3.5" /> Print
+                    </button>
+                  )}
+                </div>
+
+                {reqLookupResults.length > 0 ? (
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Request No.</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Employee Name</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Department</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Item</th>
+                        <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Qty</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {reqLookupResults.map((r) => (
+                        <tr key={r.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="px-6 py-4">
+                            <span className="text-xs font-bold text-gray-900">{r.requestNo}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-sm font-semibold text-gray-900">{r.employeeName}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-xs font-bold text-gray-500 uppercase">{r.departmentArea}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-xs font-bold text-gray-900">{r.product.name}</div>
+                            {r.product.description && (
+                              <div className="text-[10px] text-gray-500 italic leading-tight">{r.product.description}</div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="text-sm font-semibold text-primary">{r.quantity}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold border uppercase ${getStatusColor(r.status)}`}>
+                              {r.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-xs font-bold text-gray-700">{new Date(r.date).toLocaleDateString()}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="py-16 text-center">
+                    <Search className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                    <p className="text-sm font-bold text-gray-700 mb-1">Look Up a Request</p>
+                    <p className="text-xs text-gray-500 italic">Enter a request number above to find matching records.</p>
+                  </div>
+                )}
+              </div>
+            ) : activeTab === 'FULFILLED' ? (
               /* ── Issuance Log: Employee List ── */
+              <><div className="px-6 py-3 border-b border-gray-100 flex items-center gap-3">
+                <div className="relative flex-1 max-w-xs">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by name..."
+                    value={personSearch}
+                    onChange={(e) => { setPersonSearch(e.target.value); setPage(1); }}
+                    className="w-full rounded-lg border border-gray-200 pl-10 pr-4 py-2 text-sm focus:ring-1 ring-primary outline-none"
+                  />
+                </div>
+              </div>
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -592,10 +746,32 @@ export default function RequestsPage() {
                         });
                     })()
                   )}
-                </tbody>
-              </table>
-            ) : (
+              </tbody>
+            </table>
+            </>) : (
               /* ── Standard Request List ── */
+              <><div className="px-6 py-3 border-b border-gray-100 flex items-center gap-4">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search employee, supervisor, or department..."
+                    value={personSearch}
+                    onChange={(e) => { setPersonSearch(e.target.value); setPage(1); }}
+                    className="w-full rounded-lg border border-gray-200 pl-10 pr-4 py-2 text-sm focus:ring-1 ring-primary outline-none"
+                  />
+                </div>
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search item..."
+                    value={itemSearch}
+                    onChange={(e) => { setItemSearch(e.target.value); setPage(1); }}
+                    className="w-full rounded-lg border border-gray-200 pl-10 pr-4 py-2 text-sm focus:ring-1 ring-primary outline-none"
+                  />
+                </div>
+              </div>
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -710,9 +886,9 @@ export default function RequestsPage() {
                       </tr>
                     ))
                   )}
-                </tbody>
-              </table>
-            )}
+              </tbody>
+            </table>
+            </>)}
           </div>
 
           <div className="flex items-center justify-between mt-4">
@@ -770,6 +946,17 @@ export default function RequestsPage() {
                       <span className="text-xs font-semibold text-gray-900">{selectedRequest.shift}</span>
                     </div>
                   </div>
+                  <button
+                    onClick={() => {
+                      const name = selectedRequest.employeeName;
+                      setSelectedRequest(null);
+                      fetchEmployeeHistory(name);
+                    }}
+                    className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-primary bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors border border-primary/10"
+                  >
+                    <History className="h-3.5 w-3.5" />
+                    View Issuance Log
+                  </button>
                 </div>
 
                 <div>
@@ -918,7 +1105,9 @@ export default function RequestsPage() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-xs font-bold text-gray-900">{r.product.name}</div>
-                          <div className="text-[10px] text-gray-400 font-mono">{r.product.sku}</div>
+                          {r.product.description && (
+                            <div className="text-[10px] text-gray-500 italic leading-tight">{r.product.description}</div>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-center">
                           <span className="text-sm font-semibold text-primary">{r.quantity}</span>
