@@ -256,59 +256,41 @@ export class ItemsService {
       });
     }
 
-    // Automated Stock Log Integration for Unit Tracking
-    if (data.logAction && (data.logAction.startsWith('PULL_OUT_') || data.logAction.startsWith('STOCK_IN_'))) {
-      try {
-        // 1. Check if item has unit tracking (check payload first, then existing)
-        const fieldValuesPayload = data.fieldValues || [];
-        const unitData = fieldValuesPayload.find((fv: any) => fv.value?.useUnitQty)?.value || 
-                         item.fieldValues.find((fv: any) => (fv.value as any)?.useUnitQty)?.value as any;
+    // Auto-detect stock movement from unit-tracking field qty changes
+    try {
+      const oldUnitField = item.fieldValues?.find((fv: any) => fv.value && typeof fv.value === 'object' && (fv.value as any).useUnitQty);
+      const newFieldValuesPayload = data.fieldValues || [];
+      const newUnitField = newFieldValuesPayload.find((fv: any) => fv.value?.useUnitQty);
 
-        if (unitData?.useUnitQty) {
-          // 2. Extract qty from logAction (e.g., PULL_OUT_5_PAIR)
-          const isOut = data.logAction.startsWith('PULL_OUT_');
-          const type = isOut ? 'OUT' : 'IN';
-          const prefix = isOut ? 'PULL_OUT_' : 'STOCK_IN_';
-          
-          const match = data.logAction.match(new RegExp(`${prefix}(\\d+)_`));
-          if (match) {
-            const qty = parseInt(match[1]);
-            const productName = item.name;
+      if (newUnitField || oldUnitField) {
+        const oldQty = oldUnitField ? Number((oldUnitField.value as any).qty) || 0 : 0;
+        const newQty = newUnitField ? Number(newUnitField.value.qty) || 0 : 0;
+        const qtyDiff = newQty - oldQty;
 
-            if (productName) {
-              // 3. Find matching product
-              const product = await this.prisma.product.findFirst({
-                where: { name: { equals: productName, mode: 'insensitive' } }
-              });
-
-              if (product) {
-                // 4. Log to stock (Dynamic Location: Try WAREHOUSE, fallback to first available)
-                let defaultLoc = await this.prisma.location.findFirst({
-                  where: { name: { contains: 'WAREHOUSE', mode: 'insensitive' } }
-                });
-                if (!defaultLoc) {
-                  defaultLoc = await this.prisma.location.findFirst();
-                }
-                const targetLocationId = defaultLoc?.id || '906271f9-c80c-449c-81f5-60156c83e1d1';
-
-                await this.productsService.processStock(
-                  product.id,
-                  targetLocationId,
-                  userId,
-                  type,
-                  qty,
-                  `QR ${isOut ? 'Pull Out' : 'Stock In'}: ${item.slug} | User: ${userId}`
-                ).catch(err => {
-                  console.error('Stock processing failed:', err.message);
-                  // We don't rethrow here to prevent 500, but the audit log will still exist
-                });
-              }
-            }
-          }
+        if (!oldUnitField && newUnitField && newQty > 0) {
+          await this.prisma.activityLog.updateMany({
+            where: { itemId: item.id, action: 'CREATE_ITEM' },
+            data: { changes: { name: item.name, quantity: newQty } },
+          });
+          await this.logsService.create({
+            userId,
+            itemId: item.id,
+            action: 'STOCK_IN',
+            changes: { quantity: newQty },
+          });
+        } else if (qtyDiff !== 0) {
+          const type = qtyDiff > 0 ? 'IN' : 'OUT';
+          const absDiff = Math.abs(qtyDiff);
+          await this.logsService.create({
+            userId,
+            itemId: item.id,
+            action: `STOCK_${type}`,
+            changes: { quantity: absDiff },
+          });
         }
-      } catch (err) {
-        console.error('Automated stock log failed:', err.message);
       }
+    } catch (err) {
+      console.error('Auto stock detection failed:', err.message);
     }
 
     // Auto-detect stock movement from unit-tracking field qty changes
@@ -602,11 +584,6 @@ export class ItemsService {
       },
       include: { fieldValues: true },
     });
-
-    // Log the submission
-    const unitValue = fieldValues?.find((fv: any) => fv.value?.useUnitQty)?.value;
-    const logQuantity = unitValue?.qty || 1;
-    const logUnit = unitValue?.unit || 'Units';
 
     // Use a real user ID for the log (required by foreign key constraint)
     let systemUser = await this.prisma.user.findFirst({ where: { role: 'admin' } });

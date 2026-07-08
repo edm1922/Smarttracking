@@ -8,6 +8,8 @@ import { PageHeaderSkeleton } from '@/components/ui/LoadingSkeletons';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import jsPDF from 'jspdf';
 import { applyPlugin } from 'jspdf-autotable';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 applyPlugin(jsPDF);
 import { X, FileText, ImageIcon, CheckCircle, Clock, User, Box, ClipboardList } from 'lucide-react';
 
@@ -43,7 +45,7 @@ function UnitTrackingContent() {
   const [logSearch, setLogSearch] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [stockHealthRange, setStockHealthRange] = useState({ 
-    start: new Date().toLocaleDateString('en-CA'),
+    start: new Date(Date.now() - 7 * 86400000).toLocaleDateString('en-CA'),
     end: new Date().toLocaleDateString('en-CA')
   });
   const [productFilters, setProductFilters] = useState<Record<string, Record<string, string>>>({});
@@ -100,9 +102,8 @@ function UnitTrackingContent() {
       });
     });
 
-    const start = new Date(stockHealthRange.start);
-    const end = new Date(stockHealthRange.end);
-    end.setHours(23, 59, 59, 999);
+    const start = new Date(stockHealthRange.start + 'T00:00:00');
+    const end = new Date(stockHealthRange.end + 'T23:59:59.999');
 
     requests.filter(r => {
       const d = new Date(r.createdAt);
@@ -122,9 +123,11 @@ function UnitTrackingContent() {
       const specString = req.item.fieldValues?.map((fv: any) => {
         const v = fv.value;
         const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-        return val ? String(val) : '';
+        const fieldName = fv.field?.name || fv.name || '';
+        return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
       }).filter(Boolean).sort().join(', ') || 'Standard';
-      summary[pName].movementBreakdown[specString] = (summary[pName].movementBreakdown[specString] || 0) + req.qty;
+      if (!summary[pName].movementBreakdown[specString]) summary[pName].movementBreakdown[specString] = [];
+      summary[pName].movementBreakdown[specString].push({ qty: req.qty, date: req.createdAt, slug: req.item?.slug });
     });
 
     stockInLogs.forEach(log => {
@@ -158,9 +161,14 @@ function UnitTrackingContent() {
       });
       const liveQty = unitField && !isNaN(Number(unitField.value?.qty)) ? Number(unitField.value.qty) : undefined;
       
-      let qty = liveQty ?? Number(log.changes?.quantity);
-      if (isNaN(qty) || (liveQty === undefined && log.changes?.quantity === undefined)) {
-         qty = (log.action === 'SUBMIT_CONTENT' || log.action === 'CREATE_ITEM' ? 1 : 0);
+      let qty: number;
+      if (log.action === 'CREATE_ITEM') {
+        qty = Number(log.changes?.quantity);
+        if (isNaN(qty)) qty = liveQty ?? 1;
+      } else {
+        qty = Number(log.changes?.quantity);
+        if (isNaN(qty)) qty = liveQty ?? 0;
+        if (isNaN(qty) || qty === 0) qty = 0;
       }
 
       if (qty > 0) {
@@ -168,9 +176,11 @@ function UnitTrackingContent() {
         const specString = log.item?.fieldValues?.map((fv: any) => {
           const v = fv.value;
           const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-          return val ? String(val) : '';
+          const fieldName = fv.field?.name || '';
+          return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
         }).filter(Boolean).sort().join(', ') || 'Standard';
-        summary[pName].inBreakdown[specString] = (summary[pName].inBreakdown[specString] || 0) + qty;
+        if (!summary[pName].inBreakdown[specString]) summary[pName].inBreakdown[specString] = [];
+        summary[pName].inBreakdown[specString].push({ qty, date: log.createdAt, slug: log.item?.slug });
       }
     });
 
@@ -333,7 +343,7 @@ function UnitTrackingContent() {
               ...Object.entries(item.inBreakdown || {}).map(([s, q]) => `IN ${s}: +${q}`),
             ];
         const breakdownStr = breakdownParts.join('; ') || '\u2014';
-        const opening = item.totalInStock + item.outToday - item.inToday;
+    const opening = item.totalInStock + item.outToday - item.inToday;
         const movement = item.inToday - item.outToday;
         const movementStr = movement > 0 ? `+${movement}` : String(movement);
         return [
@@ -449,6 +459,503 @@ function UnitTrackingContent() {
     setIsBuildingTransmittal(false);
   };
 
+  const handlePrintItem = async (item: any) => {
+    // Fetch fresh data for the report (bypass stale state)
+    const [inventoryRes, requestsRes, stockInLogsRes] = await Promise.all([
+      api.get('/items/unit-inventory', { params: { skip: 0, take: 9999 } }),
+      api.get('/pull-out-requests', { params: { skip: 0, take: 9999 } }),
+      api.get('/logs', {
+        params: {
+          action: 'STOCK_IN,CREATE_ITEM',
+          startDate: new Date(stockHealthRange.start + 'T00:00:00').toISOString(),
+          endDate: new Date(stockHealthRange.end + 'T23:59:59.999').toISOString(),
+          take: 10000,
+        },
+      }),
+    ]);
+
+    const freshInventory = inventoryRes.data.data || [];
+    const freshRequests = (requestsRes.data.data || []).filter((r: any) => r.status === 'APPROVED');
+    const freshStockInLogs = stockInLogsRes.data.data || [];
+    const pName = item.name;
+    const start = new Date(stockHealthRange.start + 'T00:00:00');
+    const end = new Date(stockHealthRange.end + 'T23:59:59.999');
+
+    let totalInStock = 0;
+    const specCurrentStock: Record<string, number> = {};
+    freshInventory.forEach((p: any) => {
+      if (p.name !== pName) return;
+      totalInStock += p.totalQty;
+      p.items?.forEach((item: any) => {
+        const specString = item.fieldValues?.map((fv: any) => {
+          const v = fv.value;
+          const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+          const fieldName = fv.field?.name || fv.name || '';
+          return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
+        }).filter(Boolean).sort().join(', ') || 'Standard';
+        specCurrentStock[specString] = (specCurrentStock[specString] || 0) + (item.qty || 0);
+      });
+    });
+
+    let outToday = 0;
+    const movementBreakdown: Record<string, { qty: number; date: string }[]> = {};
+    freshRequests.forEach((req: any) => {
+      const reqPName = req.item.product?.name || req.item.name;
+      if (reqPName !== pName) return;
+      const isUnitTracked = req.item.fieldValues?.some((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty);
+      if (!isUnitTracked) return;
+      outToday += req.qty;
+      const specString = req.item.fieldValues?.map((fv: any) => {
+        const v = fv.value;
+        const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+        const fieldName = fv.field?.name || fv.name || '';
+        return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
+      }).filter(Boolean).sort().join(', ') || 'Standard';
+      if (!movementBreakdown[specString]) movementBreakdown[specString] = [];
+      movementBreakdown[specString].push({ qty: req.qty, date: req.createdAt });
+    });
+
+    let inToday = 0;
+    const inBreakdown: Record<string, { qty: number; date: string }[]> = {};
+    freshStockInLogs.forEach((log: any) => {
+      const logPName = log.product?.name || log.item?.name;
+      if (logPName !== pName) return;
+      if (log.item) {
+        const isUnitTracked = log.item.fieldValues?.some((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty);
+        if (!isUnitTracked) return;
+      }
+      const unitField = log.item?.fieldValues?.find((fv: any) => {
+        const val = fv.value;
+        return val && typeof val === 'object' && val.useUnitQty;
+      });
+      const liveQty = unitField && !isNaN(Number(unitField.value?.qty)) ? Number(unitField.value.qty) : undefined;
+      let qty: number;
+      if (log.action === 'CREATE_ITEM') {
+        qty = Number(log.changes?.quantity);
+        if (isNaN(qty)) qty = liveQty ?? 1;
+      } else {
+        qty = Number(log.changes?.quantity);
+        if (isNaN(qty)) qty = liveQty ?? 0;
+        if (isNaN(qty) || qty === 0) qty = 0;
+      }
+      if (qty > 0) {
+        inToday += qty;
+        const specString = log.item?.fieldValues?.map((fv: any) => {
+          const v = fv.value;
+          const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+          const fieldName = fv.field?.name || '';
+          return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
+        }).filter(Boolean).sort().join(', ') || 'Standard';
+        if (!inBreakdown[specString]) inBreakdown[specString] = [];
+        inBreakdown[specString].push({ qty, date: log.createdAt });
+      }
+    });
+
+    const freshItem = { name: pName, totalInStock, outToday, inToday, movementBreakdown, inBreakdown };
+
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet('Uniform Stocks Report', {
+      views: [{ showGridLines: false }]
+    });
+
+    const thinBorder = { style: 'thin' as const, color: { argb: 'FF94A3B8' } };
+    const allBorders = {
+      top: thinBorder, left: thinBorder, bottom: thinBorder, right: thinBorder,
+    };
+
+    // Landscape page setup, 10 columns matching the reference layout
+    ws.pageSetup = {
+      orientation: 'landscape',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: {
+        left: 0.2, right: 0.2, top: 0.2, bottom: 0.2, header: 0, footer: 0,
+      },
+    };
+    ws.columns = [
+      { key: 'a', width: 6 },
+      { key: 'b', width: 12 },
+      { key: 'c', width: 32 },
+      { key: 'd', width: 10 },
+      { key: 'e', width: 12 },
+      { key: 'f', width: 10 },
+      { key: 'g', width: 12 },
+      { key: 'h', width: 10 },
+      { key: 'i', width: 12 },
+      { key: 'j', width: 10 },
+      { key: 'k', width: 12 },
+      { key: 'l', width: 10 },
+    ];
+
+    const fmtStart = new Date(stockHealthRange.start).toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' });
+    const fmtEnd = new Date(stockHealthRange.end).toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' });
+    const runtimeStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+      + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    const opening = freshItem.totalInStock + freshItem.outToday - freshItem.inToday;
+
+    // ── Company Header ──
+    ws.mergeCells('A1:L1');
+    const h1 = ws.getCell('A1');
+    h1.value = 'CENTRO SERVICES COOPERATIVE';
+    h1.font = { name: 'Segoe UI', size: 14, bold: true, color: { argb: 'FF0F172A' } };
+    h1.alignment = { horizontal: 'left', vertical: 'middle' };
+    ws.getRow(1).height = 28;
+
+    ws.mergeCells('A2:L2');
+    const h2 = ws.getCell('A2');
+    h2.value = 'Purok Camachille, Brgy. Tambler, General Santos City';
+    h2.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF64748B' } };
+    h2.alignment = { horizontal: 'left', vertical: 'middle' };
+    ws.getRow(2).height = 18;
+
+    ws.mergeCells('A3:L3');
+    const h3 = ws.getCell('A3');
+    h3.value = 'centrocooperative21@gmail.com | (083) 554 5552';
+    h3.font = { name: 'Segoe UI', size: 9, color: { argb: 'FF94A3B8' } };
+    h3.alignment = { horizontal: 'left', vertical: 'middle' };
+    ws.getRow(3).height = 18;
+
+    // ── Spacer ──
+    ws.getRow(4).height = 8;
+
+    // ── Title ──
+    ws.mergeCells('A5:L5');
+    const title = ws.getCell('A5');
+    title.value = 'UNIFORM STOCKS REPORT';
+    title.font = { name: 'Segoe UI', size: 16, bold: true, color: { argb: 'FF0F172A' } };
+    title.alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getRow(5).height = 32;
+
+    // ── Spacer ──
+    ws.getRow(6).height = 8;
+
+    // ── Period Covered ──
+    ws.mergeCells('C7:L7');
+    const periodLabel = ws.getCell('A7');
+    periodLabel.value = 'Period Covered:';
+    periodLabel.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF475569' } };
+    periodLabel.alignment = { horizontal: 'left', vertical: 'middle' };
+    const periodVal = ws.getCell('C7');
+    periodVal.value = `${fmtStart} - ${fmtEnd}`;
+    periodVal.font = { name: 'Segoe UI', size: 10, color: { argb: 'FF0F172A' } };
+    ws.getRow(7).height = 20;
+
+    // ── Runtime ──
+    ws.mergeCells('C8:L8');
+    const runtimeLabel = ws.getCell('A8');
+    runtimeLabel.value = 'Runtime:';
+    runtimeLabel.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF475569' } };
+    runtimeLabel.alignment = { horizontal: 'left', vertical: 'middle' };
+    const runtimeVal = ws.getCell('C8');
+    runtimeVal.value = runtimeStr;
+    runtimeVal.font = { name: 'Segoe UI', size: 10, color: { argb: 'FF0F172A' } };
+    ws.getRow(8).height = 20;
+
+    // ── Spacer ──
+    ws.getRow(9).height = 8;
+    ws.getRow(11).height = 6;
+    ws.getRow(13).height = 6;
+
+    // ── Item Name ──
+    ws.mergeCells('A10:L10');
+    const itemRow = ws.getCell('A10');
+    itemRow.value = `ITEM: ${freshItem.name?.toUpperCase() || 'N/A'}`;
+    itemRow.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF0F172A' } };
+    ws.getRow(10).height = 22;
+
+    // ── Collect spec data ──
+    const allSpecKeys = new Set([
+      ...Object.keys(freshItem.inBreakdown || {}),
+      ...Object.keys(freshItem.movementBreakdown || {}),
+    ]);
+
+    const specData = Array.from(allSpecKeys).map(spec => {
+      const inEntries = (freshItem.inBreakdown?.[spec] || []) as { qty: number; date: string }[];
+      const outEntries = (freshItem.movementBreakdown?.[spec] || []) as { qty: number; date: string }[];
+      const inTotal = inEntries.reduce((s, e) => s + e.qty, 0);
+      const outTotal = outEntries.reduce((s, e) => s + e.qty, 0);
+      return { spec, inTotal, outTotal, net: inTotal - outTotal, specOpening: 0 };
+    });
+
+    // Calculate each spec's opening from current stock minus period movement
+    specData.forEach(d => {
+      d.specOpening = (specCurrentStock[d.spec] || 0) - d.inTotal + d.outTotal;
+    });
+
+    let cr = 12;
+    const dataStartRow = cr;
+
+    if (specData.length > 0) {
+      // ── Table Header (matches reference file structure) ──
+      const hRow = cr;
+      // A: NO. (merged hRow to hRow+2)
+      ws.mergeCells(`A${hRow}:A${hRow + 2}`);
+      const hA = ws.getCell(`A${hRow}`);
+      hA.value = 'NO.';
+      hA.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF334155' } };
+      hA.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      hA.alignment = { horizontal: 'center', vertical: 'middle' };
+      hA.border = allBorders;
+      ws.getCell(`A${hRow + 1}`).border = allBorders;
+      ws.getCell(`A${hRow + 2}`).border = allBorders;
+
+      // B: empty (merged hRow to hRow+2)
+      ws.mergeCells(`B${hRow}:B${hRow + 2}`);
+      const hB = ws.getCell(`B${hRow}`);
+      hB.value = '';
+      hB.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      hB.border = allBorders;
+      ws.getCell(`B${hRow + 1}`).border = allBorders;
+      ws.getCell(`B${hRow + 2}`).border = allBorders;
+
+      // C: SPECIFICATION (merged hRow to hRow+2)
+      ws.mergeCells(`C${hRow}:C${hRow + 2}`);
+      const hC = ws.getCell(`C${hRow}`);
+      hC.value = 'SPECIFICATION';
+      hC.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF334155' } };
+      hC.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      hC.alignment = { horizontal: 'center', vertical: 'middle' };
+      hC.border = allBorders;
+      ws.getCell(`C${hRow + 1}`).border = allBorders;
+      ws.getCell(`C${hRow + 2}`).border = allBorders;
+
+      // D: (empty — no price, merged hRow to hRow+2)
+      ws.mergeCells(`D${hRow}:D${hRow + 2}`);
+      const hD = ws.getCell(`D${hRow}`);
+      hD.value = '';
+      hD.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      hD.border = allBorders;
+      ws.getCell(`D${hRow + 1}`).border = allBorders;
+      ws.getCell(`D${hRow + 2}`).border = allBorders;
+
+      // E-F: OPENING (merged hRow to hRow+1)
+      ws.mergeCells(`E${hRow}:F${hRow + 1}`);
+      const hEF = ws.getCell(`E${hRow}`);
+      hEF.value = 'OPENING';
+      hEF.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF334155' } };
+      hEF.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      hEF.alignment = { horizontal: 'center', vertical: 'middle' };
+      hEF.border = allBorders;
+      ws.getCell(`F${hRow}`).border = allBorders;
+      ws.getCell(`E${hRow + 1}`).border = allBorders;
+      ws.getCell(`F${hRow + 1}`).border = allBorders;
+
+      // G-H: STOCK IN (merged hRow to hRow+1)
+      ws.mergeCells(`G${hRow}:H${hRow + 1}`);
+      const hGH = ws.getCell(`G${hRow}`);
+      hGH.value = 'STOCK IN';
+      hGH.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF334155' } };
+      hGH.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      hGH.alignment = { horizontal: 'center', vertical: 'middle' };
+      hGH.border = allBorders;
+      ws.getCell(`H${hRow}`).border = allBorders;
+      ws.getCell(`G${hRow + 1}`).border = allBorders;
+      ws.getCell(`H${hRow + 1}`).border = allBorders;
+
+      // I-J: STOCK OUT (merged hRow to hRow+1)
+      ws.mergeCells(`I${hRow}:J${hRow + 1}`);
+      const hIJ = ws.getCell(`I${hRow}`);
+      hIJ.value = 'STOCK OUT';
+      hIJ.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF334155' } };
+      hIJ.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      hIJ.alignment = { horizontal: 'center', vertical: 'middle' };
+      hIJ.border = allBorders;
+      ws.getCell(`J${hRow}`).border = allBorders;
+      ws.getCell(`I${hRow + 1}`).border = allBorders;
+      ws.getCell(`J${hRow + 1}`).border = allBorders;
+
+      // K-L: ENDING (merged hRow to hRow+1)
+      ws.mergeCells(`K${hRow}:L${hRow + 1}`);
+      const hKL = ws.getCell(`K${hRow}`);
+      hKL.value = 'ENDING';
+      hKL.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF334155' } };
+      hKL.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      hKL.alignment = { horizontal: 'center', vertical: 'middle' };
+      hKL.border = allBorders;
+      ws.getCell(`L${hRow}`).border = allBorders;
+      ws.getCell(`K${hRow + 1}`).border = allBorders;
+      ws.getCell(`L${hRow + 1}`).border = allBorders;
+
+      // Row hRow+2: sub-headers
+      ws.getCell(`E${hRow + 2}`).value = 'QTY';
+      ws.getCell(`E${hRow + 2}`).font = { name: 'Segoe UI', size: 8, bold: true, color: { argb: 'FF64748B' } };
+      ws.getCell(`E${hRow + 2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      ws.getCell(`E${hRow + 2}`).alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getCell(`E${hRow + 2}`).border = allBorders;
+
+      ws.getCell(`F${hRow + 2}`).value = '';
+      ws.getCell(`F${hRow + 2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      ws.getCell(`F${hRow + 2}`).border = allBorders;
+
+      ws.getCell(`G${hRow + 2}`).value = 'QTY';
+      ws.getCell(`G${hRow + 2}`).font = { name: 'Segoe UI', size: 8, bold: true, color: { argb: 'FF64748B' } };
+      ws.getCell(`G${hRow + 2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      ws.getCell(`G${hRow + 2}`).alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getCell(`G${hRow + 2}`).border = allBorders;
+
+      ws.getCell(`H${hRow + 2}`).value = '';
+      ws.getCell(`H${hRow + 2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      ws.getCell(`H${hRow + 2}`).border = allBorders;
+
+      ws.getCell(`I${hRow + 2}`).value = 'QTY';
+      ws.getCell(`I${hRow + 2}`).font = { name: 'Segoe UI', size: 8, bold: true, color: { argb: 'FF64748B' } };
+      ws.getCell(`I${hRow + 2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      ws.getCell(`I${hRow + 2}`).alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getCell(`I${hRow + 2}`).border = allBorders;
+
+      ws.getCell(`J${hRow + 2}`).value = '';
+      ws.getCell(`J${hRow + 2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      ws.getCell(`J${hRow + 2}`).border = allBorders;
+
+      ws.getCell(`K${hRow + 2}`).value = 'QTY';
+      ws.getCell(`K${hRow + 2}`).font = { name: 'Segoe UI', size: 8, bold: true, color: { argb: 'FF64748B' } };
+      ws.getCell(`K${hRow + 2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      ws.getCell(`K${hRow + 2}`).alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getCell(`K${hRow + 2}`).border = allBorders;
+
+      ws.getCell(`L${hRow + 2}`).value = '';
+      ws.getCell(`L${hRow + 2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      ws.getCell(`L${hRow + 2}`).border = allBorders;
+
+      ws.getRow(hRow).height = 20;
+      ws.getRow(hRow + 1).height = 4;
+      ws.getRow(hRow + 2).height = 20;
+
+      cr = hRow + 3;
+
+      // ── Data Rows ──
+      specData.forEach((d, i) => {
+        const ending = d.specOpening + d.net;
+        const r = cr;
+
+        ws.getCell(`A${r}`).value = i + 1;
+        ws.getCell(`A${r}`).font = { name: 'Segoe UI', size: 9, color: { argb: 'FF475569' } };
+        ws.getCell(`A${r}`).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(`A${r}`).border = allBorders;
+
+        ws.getCell(`B${r}`).value = '';
+        ws.getCell(`B${r}`).border = allBorders;
+
+        ws.getCell(`C${r}`).value = d.spec;
+        ws.getCell(`C${r}`).font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF0F172A' } };
+        ws.getCell(`C${r}`).alignment = { vertical: 'middle' };
+        ws.getCell(`C${r}`).border = allBorders;
+
+        ws.getCell(`D${r}`).value = '';
+        ws.getCell(`D${r}`).border = allBorders;
+
+        ws.getCell(`E${r}`).value = d.specOpening;
+        ws.getCell(`E${r}`).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF0F172A' } };
+        ws.getCell(`E${r}`).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(`E${r}`).border = allBorders;
+
+        ws.getCell(`F${r}`).value = '';
+        ws.getCell(`F${r}`).border = allBorders;
+
+        ws.getCell(`G${r}`).value = d.inTotal || '';
+        ws.getCell(`G${r}`).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: d.inTotal > 0 ? 'FF059669' : 'FF94A3B8' } };
+        ws.getCell(`G${r}`).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(`G${r}`).border = allBorders;
+
+        ws.getCell(`H${r}`).value = '';
+        ws.getCell(`H${r}`).border = allBorders;
+
+        ws.getCell(`I${r}`).value = d.outTotal || '';
+        ws.getCell(`I${r}`).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: d.outTotal > 0 ? 'FFDC2626' : 'FF94A3B8' } };
+        ws.getCell(`I${r}`).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(`I${r}`).border = allBorders;
+
+        ws.getCell(`J${r}`).value = '';
+        ws.getCell(`J${r}`).border = allBorders;
+
+        ws.getCell(`K${r}`).value = ending;
+        ws.getCell(`K${r}`).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: ending >= 0 ? 'FF0F172A' : 'FFDC2626' } };
+        ws.getCell(`K${r}`).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(`K${r}`).border = allBorders;
+
+        ws.getCell(`L${r}`).value = '';
+        ws.getCell(`L${r}`).border = allBorders;
+
+        ws.getRow(r).height = 22;
+        cr++;
+      });
+    }
+
+    // ── Totals Row ──
+    const totalIn = specData.reduce((s, d) => s + d.inTotal, 0);
+    const totalOut = specData.reduce((s, d) => s + d.outTotal, 0);
+    const totalEnd = opening + totalIn - totalOut;
+
+    ws.mergeCells(`A${cr}:C${cr}`);
+    const totLabel = ws.getCell(`A${cr}`);
+    totLabel.value = 'TOTAL';
+    totLabel.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF1E293B' } };
+    totLabel.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+    totLabel.alignment = { horizontal: 'right', vertical: 'middle' };
+    totLabel.border = allBorders;
+
+    ws.getCell(`D${cr}`).border = allBorders;
+    ws.getCell(`D${cr}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+
+    ws.getCell(`E${cr}`).value = opening;
+    ws.getCell(`E${cr}`).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF0F172A' } };
+    ws.getCell(`E${cr}`).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(`E${cr}`).border = allBorders;
+    ws.getCell(`E${cr}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+
+    ws.getCell(`F${cr}`).border = allBorders;
+    ws.getCell(`F${cr}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+
+    ws.getCell(`G${cr}`).value = totalIn;
+    ws.getCell(`G${cr}`).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF059669' } };
+    ws.getCell(`G${cr}`).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(`G${cr}`).border = allBorders;
+    ws.getCell(`G${cr}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+
+    ws.getCell(`H${cr}`).border = allBorders;
+    ws.getCell(`H${cr}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+
+    ws.getCell(`I${cr}`).value = totalOut;
+    ws.getCell(`I${cr}`).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FFDC2626' } };
+    ws.getCell(`I${cr}`).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(`I${cr}`).border = allBorders;
+    ws.getCell(`I${cr}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+
+    ws.getCell(`J${cr}`).border = allBorders;
+    ws.getCell(`J${cr}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+
+    ws.getCell(`K${cr}`).value = totalEnd;
+    ws.getCell(`K${cr}`).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF0F172A' } };
+    ws.getCell(`K${cr}`).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(`K${cr}`).border = allBorders;
+    ws.getCell(`K${cr}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+
+    ws.getCell(`L${cr}`).border = allBorders;
+    ws.getCell(`L${cr}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+    ws.getRow(cr).height = 24;
+
+    cr += 2;
+
+    // ── Footer ──
+    ws.mergeCells(`A${cr}:L${cr}`);
+    const footer = ws.getCell(`A${cr}`);
+    footer.value = `Smart Tracking System • Printed: ${new Date().toLocaleString()}`;
+    footer.font = { name: 'Segoe UI', size: 8, italic: true, color: { argb: 'FF94A3B8' } };
+    footer.alignment = { horizontal: 'right', vertical: 'middle' };
+    ws.getRow(cr).height = 20;
+
+    // ── Export ──
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const ts = `${pad(now.getMonth() + 1)}${pad(now.getDate())}${now.getFullYear()}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    saveAs(blob, `Uniform Stocks Report (${fmtStart} - ${fmtEnd}) ${ts}.xlsx`);
+  };
+
   const toggleFilter = (productName: string, specKey: string, specValue: string) => {
     setProductFilters(prev => {
       if (productName === '') return {}; // Clear all
@@ -468,9 +975,9 @@ function UnitTrackingContent() {
 
   const displayRequests = useMemo(() => {
     let filtered = requests;
-    if (dateRange.start) filtered = filtered.filter(r => new Date(r.createdAt) >= new Date(dateRange.start));
+    if (dateRange.start) filtered = filtered.filter(r => new Date(r.createdAt) >= new Date(dateRange.start + 'T00:00:00'));
     if (dateRange.end) {
-      const end = new Date(dateRange.end); end.setHours(23, 59, 59, 999);
+      const end = new Date(dateRange.end + 'T23:59:59.999');
       filtered = filtered.filter(r => new Date(r.createdAt) <= end);
     }
     if (requisitionSubTab === 'pending') filtered = filtered.filter(r => r.status === 'PENDING' || r.status === 'SUBMITTED');
@@ -572,6 +1079,7 @@ function UnitTrackingContent() {
           exportType={exportType}
           setExportType={setExportType}
           onConfirmExport={handleExportPDF}
+          onPrintItem={handlePrintItem}
         />
       )}
 

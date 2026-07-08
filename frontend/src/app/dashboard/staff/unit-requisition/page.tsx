@@ -69,6 +69,7 @@ function UnitRequisitionContent() {
 
   const [historySubTab, setHistorySubTab] = useState<'pending' | 'all'>('pending');
   const [myRequests, setMyRequests] = useState<any[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Staff Inventory & Releasing
@@ -129,6 +130,15 @@ function UnitRequisitionContent() {
     }
   };
 
+  const fetchPendingRequests = async () => {
+    try {
+      const res = await api.get('/pull-out-requests', { params: { status: 'PENDING', take: 100 } });
+      setPendingRequests(res.data.data || []);
+    } catch (err) {
+      console.error('Failed to fetch pending requests', err);
+    }
+  };
+
   const fetchStaffInventory = async () => {
     try {
       const res = await api.get('/staff-inventory/mine');
@@ -167,6 +177,7 @@ function UnitRequisitionContent() {
     fetchInventory();
     fetchStaffInventory();
     fetchMyRequests();
+    fetchPendingRequests();
     fetchAuditRequests();
     fetchStaffReleases();
   }, [page]);
@@ -252,6 +263,7 @@ function UnitRequisitionContent() {
           await api.delete(`/pull-out-requests/${id}`);
           toast.success('Request deleted');
           fetchMyRequests();
+          fetchPendingRequests();
         } catch (err) {
           toast.error('Failed to delete request');
         } finally {
@@ -417,6 +429,7 @@ function UnitRequisitionContent() {
         {activeTab === 'create' && (
           <UnitReqCreateTab 
             form={form} setForm={setForm} cart={cart} myRequests={myRequests}
+            pendingRequests={pendingRequests}
             handleDeleteRequest={handleDeleteRequest} removeFromCart={removeFromCart}
             updateCartItem={updateCartItem} handleFileUpload={handleFileUpload}
             addToCart={addToCart} setShowSubmitModal={setShowSubmitModal}

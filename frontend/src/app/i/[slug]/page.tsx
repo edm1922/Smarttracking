@@ -272,6 +272,11 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
 
 
   const handleConfirmPullOut = async () => {
+    if (unitTracking.qty === 0) {
+      alert('This item is out of stock. Please select another item with available stock.');
+      return;
+    }
+
     if (pullOutQty <= 0) {
       alert('Please enter a valid quantity to pull out.');
       return;
@@ -295,7 +300,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
 
       await api.post('/pull-out-requests', payload);
       
-      alert(`Pull-out request for ${slug} has been submitted. Please go to the Unit Requisition Portal to review and finalize.`);
+      alert(`Pull-out request for ${slug} has been created. Please go to the Unit Requisition Portal to print the form and have your supervisor sign it.`);
       
       // Reset state
       setPullOutRemarks('');
@@ -802,10 +807,13 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Unit Type</p>
                             <p className="text-sm font-black text-gray-900">{unitTracking.unit}</p>
                          </div>
-                         <div>
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Current Stock</p>
-                            <p className="text-sm font-black text-gray-900">{unitTracking.qty}</p>
-                         </div>
+                          <div>
+                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Current Stock</p>
+                             <p className={`text-sm font-black ${unitTracking.qty === 0 ? 'text-red-500' : 'text-gray-900'}`}>
+                               {unitTracking.qty}
+                               {unitTracking.qty === 0 && <span className="ml-2 text-[10px] text-red-500 uppercase tracking-wider">OUT OF STOCK</span>}
+                             </p>
+                          </div>
 
                       </div>
                    )}
@@ -813,12 +821,13 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
 
                 {!isGuest && isLoggedIn && (
                    <div className="pt-8 space-y-3">
-                     <button 
+                      <button 
+                        disabled={unitTracking.qty === 0}
                         onClick={() => {
                           setFormData({...formData, status: 'Released'});
                           setIsPullingOut(true);
                         }}
-                        className="w-full py-5 bg-orange-600 text-white rounded-3xl font-black uppercase tracking-widest text-xs flex items-center justify-center shadow-xl shadow-orange-900/20 active:scale-95 transition-all"
+                        className={`w-full py-5 rounded-3xl font-black uppercase tracking-widest text-xs flex items-center justify-center shadow-xl active:scale-95 transition-all ${unitTracking.qty === 0 ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none' : 'bg-orange-600 text-white shadow-orange-900/20'}`}
                       >
                         <Truck className="mr-2 h-5 w-5" /> Request Pull Out
                       </button>
@@ -885,9 +894,13 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
                            }}
                            className="w-full rounded-2xl bg-orange-50 border-orange-100 px-5 py-4 text-sm font-bold text-orange-700 outline-none focus:ring-4 focus:ring-orange-500/10"
                          />
-                         <div className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-black text-orange-300 uppercase">
-                           / {unitTracking.qty} Total
-                         </div>
+                          <div className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase">
+                            {unitTracking.qty === 0 ? (
+                              <span className="text-red-400">OUT OF STOCK</span>
+                            ) : (
+                              <span className="text-orange-300">/ {unitTracking.qty} Total</span>
+                            )}
+                          </div>
                       </div>
                       <p className="mt-2 text-[10px] text-gray-400 font-bold italic">
                          {pullOutQty === unitTracking.qty 
@@ -926,7 +939,7 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
             <div className="p-8 pt-4 border-t border-gray-50 flex flex-col gap-3 bg-gray-50/30 rounded-b-[2.5rem]">
               <button 
                 onClick={handleConfirmPullOut}
-                disabled={isSaving}
+                disabled={isSaving || unitTracking.qty === 0}
                 className="w-full py-5 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl shadow-gray-900/20 active:scale-[0.98] disabled:opacity-50 transition-all"
               >
                 {isSaving ? 'Submitting...' : 'Confirm Request'}

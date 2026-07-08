@@ -42,6 +42,117 @@ export class RsqService {
     });
   }
 
+  // --- Apparels ---
+  async getApparels() {
+    return this.prisma.apparel.findMany({
+      include: { fabric: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async createApparel(data: { name: string; fabricId?: string }) {
+    return this.prisma.apparel.create({
+      data: {
+        name: data.name.toUpperCase().trim(),
+        fabricId: data.fabricId || null,
+      },
+    });
+  }
+
+  async updateApparel(id: string, data: { name?: string; fabricId?: string | null }) {
+    const existing = await this.prisma.apparel.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Apparel not found');
+
+    return this.prisma.apparel.update({
+      where: { id },
+      data: {
+        ...(data.name !== undefined && { name: data.name.toUpperCase().trim() }),
+        ...(data.fabricId !== undefined && { fabricId: data.fabricId }),
+      },
+    });
+  }
+
+  async deleteApparel(id: string) {
+    const existing = await this.prisma.apparel.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Apparel not found');
+
+    return this.prisma.apparel.delete({
+      where: { id },
+    });
+  }
+
+  async seedApparels() {
+    const fabrics = await this.prisma.fabric.findMany();
+
+    const normalizeFabricName = (name: string) => {
+      if (!name) return '';
+      let n = name.trim().toUpperCase();
+      n = n.replace('APHAGINA', 'ALPHAGINA');
+      n = n.replace('ALPAGINA', 'ALPHAGINA');
+      n = n.replace('LAVANDER', 'LAVENDER');
+      n = n.replace('SKYBLUE', 'SKY BLUE');
+      return n;
+    };
+
+    const APPAREL_MAP: Record<string, string> = {
+      "HOODCAP- YELLOW (KATRINA)": "KATRINA - YELLOW",
+      "PANTS (LARGE) - KATRINA": "KATRINA - NAVY BLUE",
+      "TRAPAL- TRANSPARENT": "TRAPAL- TRANSPARENT",
+      "HOODCAP YELLOW WITH GREEN BAND (KATRINA)": "KATRINA - YELLOW",
+      "HOODCAP YELLOW WITH ORANGE BAND (KATRINA)": "KATRINA - YELLOW",
+      "HOODCAP- YELLOW W/ BLUE BAND (KATRINA)": "KATRINA - YELLOW",
+      "HAIRNET WHITE (SOFTULE)": "SOFT TULE - WHITE",
+      "PANTS MEDIUM- NAVY BLUE (KATRINA)": "KATRINA - NAVY BLUE",
+      "PANTS LARGE- NAVY BLUE (KATRINA)": "KATRINA - NAVY BLUE",
+      "SMOCKGOWN- YELLOW (ALPAGINA)": "ALPHAGINA - YELLOW",
+      "SMOCK GOWN- PINK (ALPHAGINA)": "ALPHAGINA - PINK",
+      "HOODCAP- PINK (KATRINA)": "KATRINA - PINK",
+      "BULLCAP- ORANGE (KATRINA)": "KATRINA - ORANGE",
+      "BULLCAP- RED (KATRINA)": "KATRINA - RED",
+      "SMOCK GOWN - PINK (ALPHAGINA)": "ALPHAGINA - PINK",
+      "MASK- WHITE (KATRINA)": "KATRINA - WHITE",
+      "HOOD CAP - ORANGE (KATRINA)": "KATRINA - ORANGE",
+      "SMOCK GOWN- ORANGE (ALPHAGINA)": "ALPHAGINA - ORANGE",
+      "PANTS LARGE - NAVY BLUE KATRINA": "KATRINA - NAVY BLUE",
+      "PANTS (MEDIUM) - KATRINA": "KATRINA - NAVY BLUE",
+      "PANTS SMALL- NAVY BLUE (KATRINA)": "KATRINA - NAVY BLUE",
+      "SMOCK GOWN - LAVANDER (ALPHAGINA)": "ALPHAGINA - LAVENDER",
+      "HOOD CAP - LAVANDER (KATRINA)": "KATRINA - LAVANDER",
+      "BULLCAP - YELLOW (KATRINA)": "KATRINA - YELLOW",
+      "BULLCAP- NAVY BLUE (KATRINA)": "KATRINA - NAVY BLUE",
+      "BULLCAP- VIOLET (KATRINA)": "KATRINA - VIOLET",
+      "HOODCAP- ORANGE W/YELLOW BAND (KATRINA)": "KATRINA - ORANGE",
+      "SMOCK GOWN - BROWN (ALPHAGINA)": "ALPHAGINA - BROWN",
+      "HOOD CAP - BROWN (KATRINA)": "KATRINA - BROWN",
+      "APRON- SKY BLUE (KATRINA)": "KATRINA - SKY BLUE",
+      "BULLCAP- MAROON (KATRINA)": "KATRINA - MAROON",
+      "BULLCAP- APPLE GREEN (KATRINA)": "KATRINA - APPLE GREEN",
+    };
+
+    let seeded = 0;
+
+    for (const [apparelName, targetFabricName] of Object.entries(APPAREL_MAP)) {
+      const existing = await this.prisma.apparel.findUnique({
+        where: { name: apparelName },
+      });
+
+      if (existing) continue;
+
+      let fabricId: string | null = null;
+      const matchingFabric = fabrics.find(
+        (f) => normalizeFabricName(f.name) === normalizeFabricName(targetFabricName),
+      );
+      if (matchingFabric) fabricId = matchingFabric.id;
+
+      await this.prisma.apparel.create({
+        data: { name: apparelName, fabricId },
+      });
+      seeded++;
+    }
+
+    return { seeded, total: Object.keys(APPAREL_MAP).length };
+  }
+
   // --- Transactions ---
   async getTransactions(params?: { fabricId?: string }) {
     return this.prisma.fabricTransaction.findMany({

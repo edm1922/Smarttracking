@@ -32,24 +32,31 @@ export function StockModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-2xl">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Stock ${form.type === 'IN' ? 'In' : 'Out'}`}
+      onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+    >
+      <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-lg">
         <div className="flex items-center justify-between mb-6">
           <h2 className={`text-xl font-bold ${form.type === 'IN' ? 'text-green-700' : 'text-red-700'}`}>
-            Stock {form.type === 'IN' ? 'In' : 'Out'} - {form.productName}
+            Stock {form.type === 'IN' ? 'In' : 'Out'} - <span className="truncate max-w-[200px] inline-block align-bottom">{form.productName}</span>
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-900"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-900" aria-label="Close stock modal"><X className="h-5 w-5" /></button>
         </div>
         <form onSubmit={onSubmit} className="space-y-6">
           <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase mb-1 tracking-widest">Select Location</label>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1 tracking-wider">Select Location</label>
             <div className="relative">
-              <MapPin className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
+              <MapPin className="absolute left-3 top-3.5 h-4 w-4 text-gray-500" />
               <select 
                 required 
                 value={form.locationId} 
                 onChange={(e) => setForm({...form, locationId: e.target.value})} 
-                className="w-full rounded-lg border border-gray-200 pl-10 pr-4 py-3 text-sm outline-none focus:ring-2"
+                className="w-full rounded-lg border border-gray-200 pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                aria-label="Select location for stock transaction"
               >
                 {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                 {locations.length === 0 && <option value="">No locations available</option>}
@@ -57,27 +64,31 @@ export function StockModal({
             </div>
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase mb-1 tracking-widest">Quantity</label>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1 tracking-wider">Quantity</label>
             <input 
               required 
               type="number" 
               min="1" 
+              max="999999"
               value={form.quantity || ''} 
               onChange={(e) => setForm({...form, quantity: parseInt(e.target.value) || 0})} 
-              className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2"
+              className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              aria-label="Transaction quantity"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase mb-1 tracking-widest">Remarks</label>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1 tracking-wider">Remarks</label>
             <input 
               type="text" 
               value={form.remarks} 
               onChange={(e) => setForm({...form, remarks: e.target.value})} 
-              className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2" 
+              className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" 
               placeholder="Reference number, purpose, etc."
+              maxLength={500}
+              aria-label="Transaction remarks"
             />
           </div>
-          <div className="bg-blue-50 p-4 rounded-lg flex items-start">
+          <div className="bg-blue-50 p-4 rounded-lg flex items-start" role="status" aria-live="polite">
             <Info className="h-5 w-5 text-blue-500 mr-3 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-blue-700">
               {form.type === 'IN' 
@@ -88,7 +99,7 @@ export function StockModal({
           <div className="flex justify-end space-x-3 pt-4">
             <button type="button" onClick={onClose} className="px-6 py-2 text-sm font-bold text-gray-500 hover:text-gray-900">Cancel</button>
             <button 
-              disabled={isProcessing}
+              disabled={isProcessing || !form.quantity || form.quantity < 1}
               type="submit" 
               className={`px-8 py-2 text-sm font-bold text-white rounded-lg shadow-md transition-all active:scale-95 disabled:opacity-50 ${form.type === 'IN' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
             >

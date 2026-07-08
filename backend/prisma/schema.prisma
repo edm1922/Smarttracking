@@ -1043,6 +1043,18 @@ model Fabric {
   updatedAt         DateTime            @updatedAt
   transactions      FabricTransaction[]
   tailoringRequests TailoringRequest[]
+  apparels          Apparel[]
+
+  @@schema("public")
+}
+
+model Apparel {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  fabricId  String?
+  fabric    Fabric?  @relation(fields: [fabricId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@schema("public")
 }

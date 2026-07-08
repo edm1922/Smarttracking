@@ -19,6 +19,7 @@ interface UnitTrackingInsightsProps {
   exportType: 'all' | 'stock-in' | 'stock-out';
   setExportType: (val: 'all' | 'stock-in' | 'stock-out') => void;
   onConfirmExport: () => void;
+  onPrintItem: (item: any) => void;
 }
 
 export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
@@ -35,6 +36,7 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
   exportType,
   setExportType,
   onConfirmExport,
+  onPrintItem,
 }) => {
   const [selectedMovementItem, setSelectedMovementItem] = useState<any | null>(null);
 
@@ -107,9 +109,7 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {productSummary
-                .filter(item => item.inToday > 0 || item.outToday > 0)
-                .map((item, idx) => (
+              {productSummary.map((item, idx) => (
                 <tr 
                   key={item.name} 
                   className="hover:bg-gray-50/50 transition-all group cursor-pointer"
@@ -132,7 +132,7 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                   <td className="px-10 py-8 text-right">
                     <div className="inline-flex flex-col items-end">
                       <span className={`text-lg font-black ${item.inToday > 0 ? 'text-[#50C878]' : 'text-gray-300'}`}>
-                        {item.inToday > 0 ? `+${item.inToday}` : '0'}
+                        {item.inToday > 0 ? `+${item.inToday}` : ''}
                       </span>
                       {Object.keys(item.inBreakdown).length > 0 && (
                         <span className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter mt-1 italic">Distributed Input</span>
@@ -142,7 +142,7 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                   <td className="px-10 py-8 text-right">
                     <div className="inline-flex flex-col items-end">
                       <span className={`text-lg font-black ${item.outToday > 0 ? 'text-red-500' : 'text-gray-300'}`}>
-                        {item.outToday > 0 ? `-${item.outToday}` : '0'}
+                        {item.outToday > 0 ? `-${item.outToday}` : ''}
                       </span>
                       {Object.keys(item.movementBreakdown).length > 0 && (
                         <span className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter mt-1 italic">Allocated Output</span>
@@ -159,13 +159,15 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                     <button 
                       onClick={() => setSelectedMovementItem(item)}
                       className="h-10 w-10 bg-gray-50 text-gray-300 rounded-xl flex items-center justify-center hover:bg-primary hover:text-white transition-all shadow-sm"
+                      title="View movement breakdown"
+                      aria-label={`View movement details for ${item.name}`}
                     >
                       <TrendingUp className="h-5 w-5" />
                     </button>
                   </td>
                 </tr>
               ))}
-              {productSummary.filter(item => exportType === 'stock-in' ? item.inToday > item.outToday : exportType === 'stock-out' ? item.outToday > item.inToday : item.inToday > 0 || item.outToday > 0).length === 0 && (
+              {productSummary.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-10 py-40 text-center">
                     <div className="max-w-xs mx-auto space-y-6 opacity-30">
@@ -196,12 +198,22 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Movement Breakdown Details</p>
                 </div>
               </div>
-              <button 
-                onClick={() => setSelectedMovementItem(null)}
-                className="h-10 w-10 bg-white border border-gray-200 text-gray-400 rounded-xl flex items-center justify-center hover:bg-gray-100 hover:text-gray-900 transition-all shadow-sm"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => { onPrintItem(selectedMovementItem); }}
+                  className="h-10 w-10 bg-white border border-gray-200 text-gray-400 rounded-xl flex items-center justify-center hover:bg-gray-900 hover:text-white hover:border-gray-900 transition-all shadow-sm"
+                  title="Print movement grouped by spec"
+                  aria-label="Print movement report grouped by specification"
+                >
+                  <Printer className="h-5 w-5" />
+                </button>
+                <button 
+                  onClick={() => setSelectedMovementItem(null)}
+                  className="h-10 w-10 bg-white border border-gray-200 text-gray-400 rounded-xl flex items-center justify-center hover:bg-gray-100 hover:text-gray-900 transition-all shadow-sm"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
             
             <div className="p-10 overflow-y-auto flex-1 bg-white custom-scrollbar space-y-8">
@@ -215,15 +227,27 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                 </div>
                 {Object.keys(selectedMovementItem.inBreakdown || {}).length > 0 ? (
                   <div className="grid grid-cols-1 gap-3">
-                    {Object.entries(selectedMovementItem.inBreakdown).map(([spec, qty]) => (
-                      <div key={spec} className="bg-gray-50 border border-gray-100 rounded-2xl p-4 flex items-center justify-between group hover:border-gray-200 transition-all">
-                        <div className="flex flex-wrap gap-2">
-                          {spec.split(', ').map((s: string, i: number) => (
-                            <span key={i} className="text-[9px] font-black text-gray-500 bg-white border border-gray-200 px-2 py-1 rounded-md uppercase shadow-sm">{s}</span>
-                          ))}
+                    {Object.entries(selectedMovementItem.inBreakdown as Record<string, { qty: number; date: string; slug?: string }[]>).map(([spec, entries]) => (
+                      entries.map((entry, idx) => (
+                        <div key={`${spec}-${idx}`} className="bg-gray-50 border border-gray-100 rounded-2xl p-4 flex items-center justify-between group hover:border-gray-200 transition-all">
+                          <div className="flex flex-col gap-2">
+                            <div className="flex flex-wrap gap-2">
+                              {spec.split(', ').map((s: string, i: number) => (
+                                <span key={i} className="text-[9px] font-black text-gray-500 bg-white border border-gray-200 px-2 py-1 rounded-md uppercase shadow-sm">{s}</span>
+                              ))}
+                            </div>
+                            <span className="text-[9px] font-bold text-gray-400">
+                              {new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                            {entry.slug && (
+                              <span className="text-[8px] font-mono text-gray-400 bg-white border border-gray-200 px-1.5 py-0.5 rounded self-start">
+                                {entry.slug}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-lg font-black text-[#50C878]">+{entry.qty}</span>
                         </div>
-                        <span className="text-lg font-black text-[#50C878]">+{qty as React.ReactNode}</span>
-                      </div>
+                      ))
                     ))}
                   </div>
                 ) : (
@@ -243,15 +267,27 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                 </div>
                 {Object.keys(selectedMovementItem.movementBreakdown || {}).length > 0 ? (
                   <div className="grid grid-cols-1 gap-3">
-                    {Object.entries(selectedMovementItem.movementBreakdown).map(([spec, qty]) => (
-                      <div key={spec} className="bg-gray-50 border border-gray-100 rounded-2xl p-4 flex items-center justify-between group hover:border-gray-200 transition-all">
-                        <div className="flex flex-wrap gap-2">
-                          {spec.split(', ').map((s: string, i: number) => (
-                            <span key={i} className="text-[9px] font-black text-gray-500 bg-white border border-gray-200 px-2 py-1 rounded-md uppercase shadow-sm">{s}</span>
-                          ))}
+                    {Object.entries(selectedMovementItem.movementBreakdown as Record<string, { qty: number; date: string; slug?: string }[]>).map(([spec, entries]) => (
+                      entries.map((entry, idx) => (
+                        <div key={`${spec}-${idx}`} className="bg-gray-50 border border-gray-100 rounded-2xl p-4 flex items-center justify-between group hover:border-gray-200 transition-all">
+                          <div className="flex flex-col gap-2">
+                            <div className="flex flex-wrap gap-2">
+                              {spec.split(', ').map((s: string, i: number) => (
+                                <span key={i} className="text-[9px] font-black text-gray-500 bg-white border border-gray-200 px-2 py-1 rounded-md uppercase shadow-sm">{s}</span>
+                              ))}
+                            </div>
+                            <span className="text-[9px] font-bold text-gray-400">
+                              {new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                            {entry.slug && (
+                              <span className="text-[8px] font-mono text-gray-400 bg-white border border-gray-200 px-1.5 py-0.5 rounded self-start">
+                                {entry.slug}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-lg font-black text-red-500">-{entry.qty}</span>
                         </div>
-                        <span className="text-lg font-black text-red-500">-{qty as React.ReactNode}</span>
-                      </div>
+                      ))
                     ))}
                   </div>
                 ) : (
@@ -427,13 +463,14 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {productSummary.filter(p => exportType === 'stock-in' ? p.inToday > p.outToday : exportType === 'stock-out' ? p.outToday > p.inToday : p.inToday > 0 || p.outToday > 0).map((p, idx) => {
+                          const sumQty = (entries: { qty: number; date: string }[]) => entries.reduce((s: number, e: { qty: number; date: string }) => s + e.qty, 0);
                           const breakdownParts = exportType === 'stock-in'
-                            ? Object.entries(p.inBreakdown || {}).map(([spec, qty]) => `IN ${spec}: +${qty}`)
+                            ? Object.entries(p.inBreakdown || {}).map(([spec, entries]) => `IN ${spec}: +${sumQty(entries as { qty: number; date: string }[])}`)
                             : exportType === 'stock-out'
-                            ? Object.entries(p.movementBreakdown || {}).map(([spec, qty]) => `OUT ${spec}: ${qty}`)
+                            ? Object.entries(p.movementBreakdown || {}).map(([spec, entries]) => `OUT ${spec}: ${sumQty(entries as { qty: number; date: string }[])}`)
                             : [
-                                ...Object.entries(p.movementBreakdown || {}).map(([spec, qty]) => `OUT ${spec}: ${qty}`),
-                                ...Object.entries(p.inBreakdown || {}).map(([spec, qty]) => `IN ${spec}: +${qty}`),
+                                ...Object.entries(p.movementBreakdown || {}).map(([spec, entries]) => `OUT ${spec}: ${sumQty(entries as { qty: number; date: string }[])}`),
+                                ...Object.entries(p.inBreakdown || {}).map(([spec, entries]) => `IN ${spec}: +${sumQty(entries as { qty: number; date: string }[])}`),
                               ];
                           const breakdownStr = breakdownParts.join(' | ') || '—';
                           return (
