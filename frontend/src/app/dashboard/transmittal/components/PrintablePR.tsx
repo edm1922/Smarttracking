@@ -60,9 +60,10 @@ export const PrintablePR: React.FC<PrintablePRProps> = ({
       <table className="w-full border-collapse mb-4 border border-gray-900">
         <thead>
           <tr className="border-y-2 border-gray-900 bg-gray-50">
-            <th className="py-1.5 px-3 text-left text-[9px] font-black uppercase w-12 border-r border-gray-900">No.</th>
+            <th className="py-1.5 px-3 text-left text-[9px] font-black uppercase w-10 border-r border-gray-900">No.</th>
             <th className="py-1.5 px-3 text-left text-[9px] font-black uppercase border-r border-gray-900">Description / Specifications</th>
-            <th className="py-1.5 px-3 text-center text-[9px] font-black uppercase w-20 border-r border-gray-900">Unit</th>
+            <th className="py-1.5 px-3 text-center text-[9px] font-black uppercase w-16 border-r border-gray-900">Stock</th>
+            <th className="py-1.5 px-3 text-center text-[9px] font-black uppercase w-16 border-r border-gray-900">Unit</th>
             <th className="py-1.5 px-3 text-center text-[9px] font-black uppercase w-20 border-r border-gray-900">Qty</th>
             <th className="py-1.5 px-3 text-right text-[9px] font-black uppercase w-32 border-r border-gray-900">Est. Cost</th>
             <th className="py-1.5 px-3 text-right text-[9px] font-black uppercase w-32">Total</th>
@@ -72,7 +73,13 @@ export const PrintablePR: React.FC<PrintablePRProps> = ({
           {prItems.map((item, idx) => (
             <tr key={item.id} className="border-b border-gray-900">
               <td className="py-1.5 px-3 text-[10px] font-bold border-r border-gray-900 text-center">{idx + 1}</td>
-              <td className="py-1.5 px-3 text-[10px] font-bold uppercase border-r border-gray-900">{item.name}</td>
+              <td className="py-1.5 px-3 border-r border-gray-900">
+                <div className="text-[10px] font-black uppercase">{item.name}</div>
+                {item.description && <div className="text-[7px] font-medium text-gray-500 italic mt-0.5 leading-tight">{item.description}</div>}
+              </td>
+              <td className="py-1.5 px-3 text-center border-r border-gray-900">
+                <span className="text-[10px] font-black">{item.currentStock ?? '-'}</span>
+              </td>
               <td className="py-1.5 px-3 text-[10px] text-center uppercase border-r border-gray-900">{item.unit}</td>
               <td className="py-1.5 px-3 text-[10px] font-black text-center border-r border-gray-900">{item.quantity}</td>
               <td className="py-1.5 px-3 text-right text-[10px] font-mono border-r border-gray-900">₱{(item.estimatedCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
@@ -80,7 +87,7 @@ export const PrintablePR: React.FC<PrintablePRProps> = ({
             </tr>
           ))}
           <tr className="border-t-2 border-gray-900 bg-gray-50">
-            <td colSpan={5} className="py-2 px-3 text-right text-[10px] font-black uppercase tracking-widest">
+            <td colSpan={6} className="py-2 px-3 text-right text-[10px] font-black uppercase tracking-widest">
               Total Estimated Amount:
             </td>
             <td className="py-2 px-3 text-right text-base font-black text-blue-900">
