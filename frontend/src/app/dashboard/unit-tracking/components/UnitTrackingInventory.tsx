@@ -44,7 +44,7 @@ export const UnitTrackingInventory: React.FC<UnitTrackingInventoryProps> = ({
     const totalQty = items.reduce((sum: number, item: any) => sum + item.qty, 0);
     const now = new Date().toLocaleString();
 
-    const specsHeader = [...new Set(items.flatMap((item: any) => item.fieldValues?.map((fv: any) => fv.name) || []))];
+    const specsHeader = [...new Set(items.flatMap((item: any) => item.fieldValues?.map((fv: any) => fv.name) || []))] as string[];
 
     const html = `
       <html>
