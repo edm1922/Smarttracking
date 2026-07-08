@@ -400,17 +400,23 @@ export class ReportsService {
           const fulfilledIRs = allIRs.filter((ir: any) => ir.status === 'FULFILLED');
           const outTxs = (p as any).ProductTransaction.filter((t: any) => t.type === 'OUT');
           const inTxs = (p as any).ProductTransaction.filter((t: any) => t.type === 'IN');
+          const endingStock = p.stocks.reduce((sum: number, s: any) => sum + s.quantity, 0);
+          const stockInQty = inTxs.reduce((sum: number, t: any) => sum + t.quantity, 0);
+          const allOutQty = outTxs.reduce((sum: number, t: any) => sum + t.quantity, 0);
+          const stockOut = (fulfilledIRs.reduce((sum: number, ir: any) => sum + ir.quantity, 0))
+            + (outTxs.filter((t: any) => t.remarks?.startsWith('Bulk Release:')).reduce((sum: number, t: any) => sum + t.quantity, 0));
+          const hasDateRange = !!(options.startDate || options.endDate);
+          const beginningStock = hasDateRange ? endingStock - stockInQty + allOutQty : endingStock;
           return {
             sku: p.sku,
             name: p.name,
             description: p.description || '',
             unit: p.unit,
-            threshold: p.threshold,
-            totalStock: p.stocks.reduce((sum: number, s: any) => sum + s.quantity, 0),
+            beginningStock,
+            stockIn: stockInQty,
+            stockOut,
+            endingStock,
             requestCount: allIRs.length,
-            issuedQty: fulfilledIRs.reduce((sum: number, ir: any) => sum + ir.quantity, 0),
-            mainOfficeCount: outTxs.filter((t: any) => t.remarks?.startsWith('Bulk Release:')).reduce((sum: number, t: any) => sum + t.quantity, 0),
-            stockInQty: inTxs.reduce((sum: number, t: any) => sum + t.quantity, 0),
           };
         });
 

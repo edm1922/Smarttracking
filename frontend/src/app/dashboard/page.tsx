@@ -189,12 +189,11 @@ function ReportModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void
           Description: p.description,
           Name: p.name,
           Unit: p.unit,
-          Threshold: p.threshold,
-          'Total Stock': p.totalStock,
+          Beginning: p.beginningStock ?? 0,
+          'Stock In': p.stockIn ?? 0,
+          'Stock Out': p.stockOut ?? 0,
+          Ending: p.endingStock ?? 0,
           Requests: p.requestCount,
-          'Issued Qty': p.issuedQty ?? 0,
-          'MAIN OFFICE request': p.mainOfficeCount ?? 0,
-          'Stock In': p.stockInQty ?? 0,
         }));
       default:
         return data;
