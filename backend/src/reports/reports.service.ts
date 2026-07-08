@@ -389,20 +389,19 @@ export class ReportsService {
           const endingStock = p.stocks.reduce((sum: number, s: any) => sum + s.quantity, 0);
           const stockInQty = inTxs.reduce((sum: number, t: any) => sum + t.quantity, 0);
           const allOutQty = outTxs.reduce((sum: number, t: any) => sum + t.quantity, 0);
-          const stockOut = (fulfilledIRs.reduce((sum: number, ir: any) => sum + ir.quantity, 0))
-            + (outTxs.filter((t: any) => t.remarks?.startsWith('Bulk Release:')).reduce((sum: number, t: any) => sum + t.quantity, 0));
           const hasDateRange = !!(options.startDate || options.endDate);
           const beginningStock = hasDateRange ? endingStock - stockInQty + allOutQty : endingStock;
+          const stockIn = hasDateRange ? stockInQty : 0;
+          const stockOut = hasDateRange ? allOutQty : 0;
           return {
             sku: p.sku,
             name: p.name,
             description: p.description || '',
             unit: p.unit,
             beginningStock,
-            stockIn: stockInQty,
+            stockIn,
             stockOut,
             endingStock,
-            requestCount: allIRs.length,
 
           };
         });

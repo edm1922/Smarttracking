@@ -154,7 +154,6 @@ function ReportModal({ isOpen, onClose, section }: { isOpen: boolean, onClose: (
           'Stock In': p.stockIn ?? 0,
           'Stock Out': p.stockOut ?? 0,
           Ending: p.endingStock ?? 0,
-          Requests: p.requestCount,
         }));
       default:
         return data;
