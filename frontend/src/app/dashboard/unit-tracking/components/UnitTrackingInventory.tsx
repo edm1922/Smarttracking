@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   Search, ChevronDown, ChevronUp, Box, MapPin, 
-  Clock, User, ArrowUpRight, LayoutGrid, Package, Info
+  Clock, User, ArrowUpRight, LayoutGrid, Package, Info, Printer
 } from 'lucide-react';
 
 interface UnitTrackingInventoryProps {
@@ -33,6 +33,102 @@ export const UnitTrackingInventory: React.FC<UnitTrackingInventoryProps> = ({
   invTotal,
   pageSize,
 }) => {
+  const handlePrintProduct = (product: any) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const items = product.items
+      .filter((item: any) => item.qty > 0)
+      .sort((a: any, b: any) => a.slug.localeCompare(b.slug));
+
+    const totalQty = items.reduce((sum: number, item: any) => sum + item.qty, 0);
+    const now = new Date().toLocaleString();
+
+    const specsHeader = [...new Set(items.flatMap((item: any) => item.fieldValues?.map((fv: any) => fv.name) || []))];
+
+    const html = `
+      <html>
+        <head>
+          <title>${product.name} - Stock Report</title>
+          <style>
+            @page { margin: 15mm 20mm; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; color: #222; padding: 0; margin: 0; }
+            .header { text-align: center; margin-bottom: 30px; padding-bottom: 15px; border-bottom: 2px solid #1a73e8; }
+            .header h1 { font-size: 16px; margin: 0 0 2px; letter-spacing: 1px; color: #1a73e8; }
+            .header h2 { font-size: 20px; margin: 4px 0; text-transform: uppercase; }
+            .header p { font-size: 11px; color: #666; margin: 2px 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 11px; }
+            th { background: #1a73e8; color: white; padding: 8px 6px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+            td { padding: 6px; border-bottom: 1px solid #ddd; }
+            tr:nth-child(even) td { background: #f8f9fa; }
+            .total td { font-weight: bold; background: #e8f0fe !important; border-top: 2px solid #1a73e8; }
+            .footer { margin-top: 40px; display: flex; justify-content: space-between; }
+            .footer div { text-align: center; }
+            .footer .line { width: 180px; border-top: 1px solid #222; margin: 30px auto 4px; }
+            .footer .label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+            .meta { font-size: 10px; color: #888; margin-top: 10px; text-align: right; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>CENTRO SERVICES COOPERATIVE</h1>
+            <h2>${product.name}</h2>
+            <p>Unit Stock Report</p>
+            <p>Printed: ${now}</p>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width:6px">#</th>
+                <th style="width:1px">Slug</th>
+                <th style="width:1px">Qty</th>
+                <th style="width:1px">Unit</th>
+                ${specsHeader.map(s => `<th>${s}</th>`).join('')}
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map((item: any, i: number) => {
+                const specMap: Record<string, string> = {};
+                item.fieldValues?.forEach((fv: any) => {
+                  const val = fv.value;
+                  specMap[fv.name] = val && typeof val === 'object' ? String(val.main ?? val.qty ?? '') : String(val ?? '');
+                });
+                return `
+                  <tr>
+                    <td>${i + 1}</td>
+                    <td style="font-family:monospace;font-size:10px">${item.slug}</td>
+                    <td style="font-weight:bold">${item.qty}</td>
+                    <td>${item.unit || 'Units'}</td>
+                    ${specsHeader.map(s => `<td>${specMap[s] || '-'}</td>`).join('')}
+                    <td>${new Date(item.updatedAt).toLocaleDateString()}</td>
+                  </tr>
+                `;
+              }).join('')}
+              <tr class="total">
+                <td></td>
+                <td>TOTAL</td>
+                <td>${totalQty}</td>
+                <td>${product.unit || 'Units'}</td>
+                <td colspan="${specsHeader.length}"></td>
+                <td>${items.length} asset(s)</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="meta">${items.length} asset identifier(s) &middot; Total batch qty: ${totalQty}</div>
+          <div class="footer">
+            <div><div class="line"></div><div class="label">Prepared By</div></div>
+            <div><div class="line"></div><div class="label">Verified By</div></div>
+            <div><div class="line"></div><div class="label">Approved By</div></div>
+          </div>
+          <script>window.print();</script>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Search Bar */}
@@ -92,6 +188,13 @@ export const UnitTrackingInventory: React.FC<UnitTrackingInventoryProps> = ({
                       </span>
                     </div>
                   </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handlePrintProduct(product); }}
+                    className="h-12 w-12 rounded-xl bg-gray-50 flex items-center justify-center text-gray-300 hover:text-primary hover:bg-primary/5 transition-all no-print"
+                    title="Print stock report"
+                  >
+                    <Printer className="h-5 w-5" />
+                  </button>
                   <div className={`h-12 w-12 rounded-xl flex items-center justify-center transition-all ${
                     isExpanded ? 'bg-primary/5 text-primary rotate-180' : 'bg-gray-50 text-gray-300'
                   }`}>

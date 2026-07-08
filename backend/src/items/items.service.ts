@@ -268,15 +268,19 @@ export class ItemsService {
         const qtyDiff = newQty - oldQty;
 
         if (!oldUnitField && newUnitField && newQty > 0) {
-          // First time setting fieldValues — update CREATE_ITEM log to actual qty
           await this.prisma.activityLog.updateMany({
             where: { itemId: item.id, action: 'CREATE_ITEM' },
             data: { changes: { name: item.name, quantity: newQty } },
           });
+          await this.logsService.create({
+            userId,
+            itemId: item.id,
+            action: 'STOCK_IN',
+            changes: { quantity: newQty },
+          });
         } else if (qtyDiff !== 0) {
           const type = qtyDiff > 0 ? 'IN' : 'OUT';
           const absDiff = Math.abs(qtyDiff);
-
           await this.logsService.create({
             userId,
             itemId: item.id,
@@ -562,10 +566,15 @@ export class ItemsService {
         const qtyDiff = newQty - oldQty;
 
         if (!oldUnitField && newUnitField && newQty > 0) {
-          // First time setting fieldValues — update CREATE_ITEM log to actual qty
           await this.prisma.activityLog.updateMany({
             where: { itemId: item.id, action: 'CREATE_ITEM' },
             data: { changes: { name: item.name, quantity: newQty } },
+          });
+          await this.logsService.create({
+            userId: systemUser?.id || '7b026b2a-d53a-486d-9a15-3cc0229e43cf',
+            itemId: item.id,
+            action: 'STOCK_IN',
+            changes: { quantity: newQty },
           });
         } else if (qtyDiff !== 0) {
           const type = qtyDiff > 0 ? 'IN' : 'OUT';

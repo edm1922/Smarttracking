@@ -132,11 +132,21 @@ function UnitTrackingContent() {
 
     stockInLogs.forEach(log => {
       const pName = log.product?.name || log.item?.name;
-      if (!pName || pName.trim() === '') return;
+      if (!pName || pName.trim() === '') {
+        if (log.action === 'CREATE_ITEM' && log.item?.name?.includes('MASK')) {
+          console.log('MASK CREATE_ITEM skipped at pName check', { pName, itemName: log.item?.name, changes: log.changes, item: log.item });
+        }
+        return;
+      }
       
       if (log.item) {
         const isUnitTracked = log.item.fieldValues?.some((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty);
-        if (!isUnitTracked) return;
+        if (!isUnitTracked) {
+          if (pName.includes('MASK')) {
+            console.log('MASK CREATE_ITEM skipped at isUnitTracked', { pName, fieldValues: log.item.fieldValues, changes: log.changes });
+          }
+          return;
+        }
       } else {
         if (!summary[pName]) return;
       }
@@ -210,7 +220,7 @@ function UnitTrackingContent() {
     try {
       const startUTC = new Date(stockHealthRange.start + 'T00:00:00').toISOString();
       const endUTC = new Date(stockHealthRange.end + 'T23:59:59.999').toISOString();
-      const res = await api.get('/logs', { params: { action: 'STOCK_IN,CREATE_ITEM', startDate: startUTC, endDate: endUTC, take: 10000 } });
+      const res = await api.get('/logs', { params: { action: 'STOCK_IN,SUBMIT_CONTENT,CREATE_ITEM', startDate: startUTC, endDate: endUTC, take: 10000 } });
       setStockInLogs(res.data.data || []);
     } catch (err) {
       console.error(err);
