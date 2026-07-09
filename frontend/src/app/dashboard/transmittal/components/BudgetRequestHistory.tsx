@@ -1,11 +1,12 @@
 import React from 'react';
-import { History, Download, Copy, Trash2 } from 'lucide-react';
+import { History, Download, Copy, Trash2, RefreshCw } from 'lucide-react';
 
 interface BudgetRequestHistoryProps {
   history: any[];
   loadFromHistory: (item: any) => void;
   appendItems: (item: any) => void;
   deleteItem: (id: string) => void;
+  updateHistory: (item: any) => void;
 }
 
 export const BudgetRequestHistory: React.FC<BudgetRequestHistoryProps> = ({
@@ -13,6 +14,7 @@ export const BudgetRequestHistory: React.FC<BudgetRequestHistoryProps> = ({
   loadFromHistory,
   appendItems,
   deleteItem,
+  updateHistory,
 }) => {
   return (
     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
@@ -60,6 +62,13 @@ export const BudgetRequestHistory: React.FC<BudgetRequestHistoryProps> = ({
                   title="Copy items"
                 >
                   <Copy className="h-3 w-3" /> Copy
+                </button>
+                <button
+                  onClick={() => updateHistory(item)}
+                  className="flex-1 text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 hover:bg-emerald-100 px-2 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1"
+                  title="Update this record with current form data"
+                >
+                  <RefreshCw className="h-3 w-3" /> Update
                 </button>
                 <button
                   onClick={() => deleteItem(item.id)}

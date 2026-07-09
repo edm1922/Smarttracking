@@ -205,6 +205,33 @@ export default function BudgetRequestPage() {
     setItems(prev => [...prev, ...newItems]);
   };
 
+  const updateHistory = async (record: any) => {
+    if (items.length === 0) return toast.warning('Add line items first');
+    try {
+      const data = {
+        bgtNo,
+        department: headerInfo.department,
+        endUser: headerInfo.endUser,
+        position: headerInfo.position,
+        category: headerInfo.category,
+        customSubHeader: headerInfo.customSubHeader,
+        items,
+        remarks: headerInfo.remarks,
+        signatoryConfig: visibleSignatories,
+        preparedBy: headerInfo.preparedBy,
+        checkedBy: headerInfo.checkedBy,
+        receivedBy: headerInfo.receivedBy,
+        approvedBy: headerInfo.approvedBy
+      };
+      await api.patch(`/budget-requests/${record.id}`, data);
+      toast.success('History Updated!');
+      const res = await api.get('/budget-requests');
+      setHistory(res.data);
+    } catch (err) {
+      toast.error('Failed to update history');
+    }
+  };
+
   const deleteItem = async (id: string) => {
     if (!confirm('Delete this budget request from history?')) return;
     try {
@@ -271,6 +298,7 @@ export default function BudgetRequestPage() {
               loadFromHistory={loadFromHistory}
               appendItems={appendItems}
               deleteItem={deleteItem}
+              updateHistory={updateHistory}
             />
           </div>
         </div>
