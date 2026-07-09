@@ -165,7 +165,6 @@ function UnitTrackingContent() {
          return val && typeof val === 'object' && val.useUnitQty;
       });
       const liveQty = unitField && !isNaN(Number(unitField.value?.qty)) ? Number(unitField.value.qty) : undefined;
-      
       let qty: number;
       if (log.action === 'SUBMIT_CONTENT') {
         qty = 0;
