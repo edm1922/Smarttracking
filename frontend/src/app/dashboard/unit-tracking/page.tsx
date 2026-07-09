@@ -88,14 +88,19 @@ function UnitTrackingContent() {
     inventory.forEach(p => {
       const pName = p.name || 'Unnamed Product';
       if (!summary[pName]) {
-        summary[pName] = { name: pName, totalInStock: 0, outToday: 0, inToday: 0, specs: new Set(), movementBreakdown: {}, inBreakdown: {} };
+        summary[pName] = { name: pName, totalInStock: 0, outToday: 0, inToday: 0, specs: {}, movementBreakdown: {}, inBreakdown: {} };
       }
       summary[pName].totalInStock += p.totalQty;
       p.items.forEach((item: any) => {
-        item.fieldValues?.forEach((fv: any) => {
+        item.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).forEach((fv: any) => {
           const v = fv.value;
           const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-          if (val) summary[pName].specs.add(String(val));
+          if (val != null && String(val).trim() !== '') {
+            const fieldName = fv.field?.name || fv.name || '';
+            const key = fieldName || '__value__';
+            if (!summary[pName].specs[key]) summary[pName].specs[key] = new Set();
+            summary[pName].specs[key].add(String(val));
+          }
         });
       });
     });
@@ -115,14 +120,15 @@ function UnitTrackingContent() {
       if (!isUnitTracked) return;
 
       if (!summary[pName]) {
-        summary[pName] = { name: pName, totalInStock: 0, outToday: 0, inToday: 0, specs: new Set(), movementBreakdown: {}, inBreakdown: {} };
+        summary[pName] = { name: pName, totalInStock: 0, outToday: 0, inToday: 0, specs: {}, movementBreakdown: {}, inBreakdown: {} };
       }
       
       summary[pName].outToday += req.qty;
-      const specString = req.item.fieldValues?.map((fv: any) => {
+      const specString = req.item.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).map((fv: any) => {
         const v = fv.value;
         const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-        return val ? String(val) : '';
+        const fieldName = fv.field?.name || fv.name || '';
+        return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
       }).filter(Boolean).sort().join(', ') || 'Standard';
       summary[pName].movementBreakdown[specString] = (summary[pName].movementBreakdown[specString] || 0) + req.qty;
     });
@@ -149,28 +155,42 @@ function UnitTrackingContent() {
       }
 
       if (!summary[pName]) {
-        summary[pName] = { name: pName, totalInStock: 0, outToday: 0, inToday: 0, specs: new Set(), movementBreakdown: {}, inBreakdown: {} };
+        summary[pName] = { name: pName, totalInStock: 0, outToday: 0, inToday: 0, specs: {}, movementBreakdown: {}, inBreakdown: {} };
       }
       
-      const unitField = log.item?.fieldValues?.find((fv: any) => {
-         const val = fv.value;
-         return val && typeof val === 'object' && val.useUnitQty;
-      });
-      const liveQty = unitField && !isNaN(Number(unitField.value?.qty)) ? Number(unitField.value.qty) : undefined;
-      
-      let qty = liveQty ?? Number(log.changes?.quantity);
-      if (isNaN(qty) || (liveQty === undefined && log.changes?.quantity === undefined)) {
-         qty = (log.action === 'SUBMIT_CONTENT' || log.action === 'CREATE_ITEM' ? 1 : 0);
+      let qty: number;
+      if (log.action === 'SUBMIT_CONTENT') {
+        qty = 0;
+      } else if (log.action === 'CREATE_ITEM') {
+        const isNewItem = log.item?.createdAt && new Date(log.createdAt).getTime() - new Date(log.item.createdAt).getTime() < 1000;
+        if (isNewItem) {
+          qty = Number(log.changes?.quantity);
+          if (isNaN(qty)) qty = 1;
+        } else {
+          qty = 0;
+        }
+      } else {
+        qty = Number(log.changes?.quantity);
+        if (isNaN(qty)) qty = 0;
       }
 
       if (qty > 0) {
-        summary[pName].inToday += qty;
-        const specString = log.item?.fieldValues?.map((fv: any) => {
+        const specParts: string[] = [];
+        log.item?.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).forEach((fv: any) => {
           const v = fv.value;
           const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-          return val ? String(val) : '';
-        }).filter(Boolean).sort().join(', ') || 'Standard';
-        summary[pName].inBreakdown[specString] = (summary[pName].inBreakdown[specString] || 0) + qty;
+          const fieldName = fv.field?.name || fv.name || '';
+          if (val != null) specParts.push(`${fieldName ? fieldName + ': ' : ''}${val}`);
+        });
+        const specString = specParts.length > 0 ? specParts.sort().join(', ') : 'Standard';
+
+        if (log.action === 'STOCK_OUT') {
+          summary[pName].outToday += qty;
+          summary[pName].movementBreakdown[specString] = (summary[pName].movementBreakdown[specString] || 0) + qty;
+        } else {
+          summary[pName].inToday += qty;
+          summary[pName].inBreakdown[specString] = (summary[pName].inBreakdown[specString] || 0) + qty;
+        }
       }
     });
 
@@ -210,7 +230,7 @@ function UnitTrackingContent() {
     try {
       const startUTC = new Date(stockHealthRange.start + 'T00:00:00').toISOString();
       const endUTC = new Date(stockHealthRange.end + 'T23:59:59.999').toISOString();
-      const res = await api.get('/logs', { params: { action: 'STOCK_IN,SUBMIT_CONTENT,CREATE_ITEM', startDate: startUTC, endDate: endUTC, take: 10000 } });
+      const res = await api.get('/logs', { params: { action: 'STOCK_IN,STOCK_OUT,SUBMIT_CONTENT,CREATE_ITEM', startDate: startUTC, endDate: endUTC, take: 10000 } });
       setStockInLogs(res.data.data || []);
     } catch (err) {
       console.error(err);

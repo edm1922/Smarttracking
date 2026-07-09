@@ -120,9 +120,13 @@ export const UnitTrackingInsights: React.FC<UnitTrackingInsightsProps> = ({
                     <div className="flex flex-col">
                       <span className="text-base font-black text-gray-900 uppercase tracking-tight group-hover:text-primary transition-colors">{item.name}</span>
                       <div className="flex flex-wrap gap-2 mt-2">
-                        {Array.from(item.specs || []).slice(0, 3).map((spec: any) => (
-                          <span key={spec} className="text-[8px] font-black text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded uppercase">{spec}</span>
-                        ))}
+                        {item.specs && Object.entries(item.specs).slice(0, 3).flatMap(([fieldName, values]) =>
+                          Array.from(values as Set<string>).slice(0, 1).map(val => (
+                            <span key={`${fieldName}-${val}`} className="text-[8px] font-black text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded uppercase">
+                              {fieldName === '__value__' ? val : `${fieldName}: ${val}`}
+                            </span>
+                          ))
+                        )}
                       </div>
                     </div>
                   </td>
