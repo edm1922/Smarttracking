@@ -90,14 +90,19 @@ function UnitTrackingContent() {
     inventory.forEach(p => {
       const pName = p.name || 'Unnamed Product';
       if (!summary[pName]) {
-        summary[pName] = { name: pName, totalInStock: 0, outToday: 0, inToday: 0, specs: new Set(), movementBreakdown: {}, inBreakdown: {} };
+        summary[pName] = { name: pName, totalInStock: 0, outToday: 0, inToday: 0, specs: {}, movementBreakdown: {}, inBreakdown: {} };
       }
       summary[pName].totalInStock += p.totalQty;
       p.items.forEach((item: any) => {
-        item.fieldValues?.forEach((fv: any) => {
+        item.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).forEach((fv: any) => {
           const v = fv.value;
           const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-          if (val) summary[pName].specs.add(String(val));
+          if (val != null && String(val).trim() !== '') {
+            const fieldName = fv.field?.name || fv.name || '';
+            const key = fieldName || '__value__';
+            if (!summary[pName].specs[key]) summary[pName].specs[key] = new Set();
+            summary[pName].specs[key].add(String(val));
+          }
         });
       });
     });
@@ -116,11 +121,11 @@ function UnitTrackingContent() {
       if (!isUnitTracked) return;
 
       if (!summary[pName]) {
-        summary[pName] = { name: pName, totalInStock: 0, outToday: 0, inToday: 0, specs: new Set(), movementBreakdown: {}, inBreakdown: {} };
+        summary[pName] = { name: pName, totalInStock: 0, outToday: 0, inToday: 0, specs: {}, movementBreakdown: {}, inBreakdown: {} };
       }
       
       summary[pName].outToday += req.qty;
-      const specString = req.item.fieldValues?.map((fv: any) => {
+      const specString = req.item.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).map((fv: any) => {
         const v = fv.value;
         const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
         const fieldName = fv.field?.name || fv.name || '';
@@ -152,7 +157,7 @@ function UnitTrackingContent() {
       }
 
       if (!summary[pName]) {
-        summary[pName] = { name: pName, totalInStock: 0, outToday: 0, inToday: 0, specs: new Set(), movementBreakdown: {}, inBreakdown: {} };
+        summary[pName] = { name: pName, totalInStock: 0, outToday: 0, inToday: 0, specs: {}, movementBreakdown: {}, inBreakdown: {} };
       }
       
       const unitField = log.item?.fieldValues?.find((fv: any) => {
@@ -162,9 +167,16 @@ function UnitTrackingContent() {
       const liveQty = unitField && !isNaN(Number(unitField.value?.qty)) ? Number(unitField.value.qty) : undefined;
       
       let qty: number;
-      if (log.action === 'CREATE_ITEM') {
-        qty = Number(log.changes?.quantity);
-        if (isNaN(qty)) qty = liveQty ?? 1;
+      if (log.action === 'SUBMIT_CONTENT') {
+        qty = 0;
+      } else if (log.action === 'CREATE_ITEM') {
+        const isNewItem = log.item?.createdAt && new Date(log.createdAt).getTime() - new Date(log.item.createdAt).getTime() < 1000;
+        if (isNewItem) {
+          qty = Number(log.changes?.quantity);
+          if (isNaN(qty)) qty = liveQty ?? 1;
+        } else {
+          qty = 0;
+        }
       } else {
         qty = Number(log.changes?.quantity);
         if (isNaN(qty)) qty = liveQty ?? 0;
@@ -172,15 +184,27 @@ function UnitTrackingContent() {
       }
 
       if (qty > 0) {
-        summary[pName].inToday += qty;
-        const specString = log.item?.fieldValues?.map((fv: any) => {
-          const v = fv.value;
-          const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-          const fieldName = fv.field?.name || '';
-          return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
-        }).filter(Boolean).sort().join(', ') || 'Standard';
-        if (!summary[pName].inBreakdown[specString]) summary[pName].inBreakdown[specString] = [];
-        summary[pName].inBreakdown[specString].push({ qty, date: log.createdAt, slug: log.item?.slug });
+        if (log.action === 'STOCK_OUT') {
+          summary[pName].outToday += qty;
+          const specString = log.item?.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).map((fv: any) => {
+            const v = fv.value;
+            const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+            const fieldName = fv.field?.name || '';
+            return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
+          }).filter(Boolean).sort().join(', ') || 'Standard';
+          if (!summary[pName].movementBreakdown[specString]) summary[pName].movementBreakdown[specString] = [];
+          summary[pName].movementBreakdown[specString].push({ qty, date: log.createdAt, slug: log.item?.slug });
+        } else {
+          summary[pName].inToday += qty;
+          const specString = log.item?.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).map((fv: any) => {
+            const v = fv.value;
+            const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+            const fieldName = fv.field?.name || '';
+            return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
+          }).filter(Boolean).sort().join(', ') || 'Standard';
+          if (!summary[pName].inBreakdown[specString]) summary[pName].inBreakdown[specString] = [];
+          summary[pName].inBreakdown[specString].push({ qty, date: log.createdAt, slug: log.item?.slug });
+        }
       }
     });
 
@@ -220,7 +244,7 @@ function UnitTrackingContent() {
     try {
       const startUTC = new Date(stockHealthRange.start + 'T00:00:00').toISOString();
       const endUTC = new Date(stockHealthRange.end + 'T23:59:59.999').toISOString();
-      const res = await api.get('/logs', { params: { action: 'STOCK_IN,SUBMIT_CONTENT,CREATE_ITEM', startDate: startUTC, endDate: endUTC, take: 10000 } });
+      const res = await api.get('/logs', { params: { action: 'STOCK_IN,STOCK_OUT,SUBMIT_CONTENT,CREATE_ITEM', startDate: startUTC, endDate: endUTC, take: 10000 } });
       setStockInLogs(res.data.data || []);
     } catch (err) {
       console.error(err);
@@ -466,7 +490,7 @@ function UnitTrackingContent() {
       api.get('/pull-out-requests', { params: { skip: 0, take: 9999 } }),
       api.get('/logs', {
         params: {
-          action: 'STOCK_IN,CREATE_ITEM',
+          action: 'STOCK_IN,STOCK_OUT,SUBMIT_CONTENT,CREATE_ITEM',
           startDate: new Date(stockHealthRange.start + 'T00:00:00').toISOString(),
           endDate: new Date(stockHealthRange.end + 'T23:59:59.999').toISOString(),
           take: 10000,
@@ -487,7 +511,7 @@ function UnitTrackingContent() {
       if (p.name !== pName) return;
       totalInStock += p.totalQty;
       p.items?.forEach((item: any) => {
-        const specString = item.fieldValues?.map((fv: any) => {
+        const specString = item.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).map((fv: any) => {
           const v = fv.value;
           const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
           const fieldName = fv.field?.name || fv.name || '';
@@ -505,7 +529,7 @@ function UnitTrackingContent() {
       const isUnitTracked = req.item.fieldValues?.some((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty);
       if (!isUnitTracked) return;
       outToday += req.qty;
-      const specString = req.item.fieldValues?.map((fv: any) => {
+      const specString = req.item.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).map((fv: any) => {
         const v = fv.value;
         const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
         const fieldName = fv.field?.name || fv.name || '';
@@ -530,24 +554,43 @@ function UnitTrackingContent() {
       });
       const liveQty = unitField && !isNaN(Number(unitField.value?.qty)) ? Number(unitField.value.qty) : undefined;
       let qty: number;
-      if (log.action === 'CREATE_ITEM') {
-        qty = Number(log.changes?.quantity);
-        if (isNaN(qty)) qty = liveQty ?? 1;
+      if (log.action === 'SUBMIT_CONTENT') {
+        qty = 0;
+      } else if (log.action === 'CREATE_ITEM') {
+        const isNewItem = log.item?.createdAt && new Date(log.createdAt).getTime() - new Date(log.item.createdAt).getTime() < 1000;
+        if (isNewItem) {
+          qty = Number(log.changes?.quantity);
+          if (isNaN(qty)) qty = liveQty ?? 1;
+        } else {
+          qty = 0;
+        }
       } else {
         qty = Number(log.changes?.quantity);
         if (isNaN(qty)) qty = liveQty ?? 0;
         if (isNaN(qty) || qty === 0) qty = 0;
       }
       if (qty > 0) {
-        inToday += qty;
-        const specString = log.item?.fieldValues?.map((fv: any) => {
-          const v = fv.value;
-          const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-          const fieldName = fv.field?.name || '';
-          return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
-        }).filter(Boolean).sort().join(', ') || 'Standard';
-        if (!inBreakdown[specString]) inBreakdown[specString] = [];
-        inBreakdown[specString].push({ qty, date: log.createdAt });
+        if (log.action === 'STOCK_OUT') {
+          outToday += qty;
+          const specString = log.item?.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).map((fv: any) => {
+            const v = fv.value;
+            const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+            const fieldName = fv.field?.name || '';
+            return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
+          }).filter(Boolean).sort().join(', ') || 'Standard';
+          if (!movementBreakdown[specString]) movementBreakdown[specString] = [];
+          movementBreakdown[specString].push({ qty, date: log.createdAt });
+        } else {
+          inToday += qty;
+          const specString = log.item?.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).map((fv: any) => {
+            const v = fv.value;
+            const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+            const fieldName = fv.field?.name || '';
+            return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
+          }).filter(Boolean).sort().join(', ') || 'Standard';
+          if (!inBreakdown[specString]) inBreakdown[specString] = [];
+          inBreakdown[specString].push({ qty, date: log.createdAt });
+        }
       }
     });
 
