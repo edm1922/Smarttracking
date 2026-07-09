@@ -757,6 +757,29 @@ model PurchaseRequest {
   @@schema("public")
 }
 
+model BudgetRequest {
+  id              String   @id @default(uuid())
+  bgtNo           String   @unique
+  date            DateTime @default(now())
+  department      String
+  endUser         String
+  position        String?
+  category        String?
+  items           Json
+  preparedBy      String?
+  checkedBy       String?
+  receivedBy      String?
+  approvedBy      String?
+  status          String   @default("PENDING")
+  createdAt       DateTime @default(now())
+  subTitle        String?
+  remarks         String?
+  signatoryConfig Json?
+  customSubHeader String?
+
+  @@schema("public")
+}
+
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model StaffActivity {
   id          String   @id @default(uuid())

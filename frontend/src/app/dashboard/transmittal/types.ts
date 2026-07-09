@@ -50,6 +50,18 @@ export interface TransmittalItem {
   dateRequested?: string;
 }
 
+export interface BudgetItem {
+  id: string;
+  description: string;
+  estimatedCost: number;
+  vendor?: string;
+  contractor?: string;
+  startDate?: string;
+  endDate?: string;
+  duration?: string;
+  remarks?: string;
+}
+
 export interface PRItem {
   id: string;
   name: string;
