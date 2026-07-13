@@ -1,33 +1,84 @@
 import React from 'react';
-import { Printer, ClipboardList } from 'lucide-react';
+import { ClipboardList, FileText, Printer } from 'lucide-react';
 
 interface RSQHeaderProps {
   onPrintBlank: () => void;
+  employeeCount: number;
+  productCount: number;
+  totalQuantity: number;
 }
 
-export const RSQHeader: React.FC<RSQHeaderProps> = ({ onPrintBlank }) => {
+const steps = ['Request Info', 'Employees', 'Materials', 'Review'];
+
+export const RSQHeader: React.FC<RSQHeaderProps> = ({
+  onPrintBlank,
+  employeeCount,
+  productCount,
+  totalQuantity,
+}) => {
   return (
-    <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
-      <div>
-        <div className="flex items-center gap-4 mb-2">
-          <div className="h-12 w-12 bg-gradient-to-br from-primary to-blue-500 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-primary/30 transform transition-transform hover:scale-105 duration-300">
-            <ClipboardList className="h-6 w-6" />
+    <header className="no-print mb-6 rounded-lg border border-slate-200 bg-white px-5 py-5 shadow-sm">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
+              <ClipboardList className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase text-slate-500">Staff Request</p>
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+                Requisition Workspace
+              </h1>
+            </div>
           </div>
-          <h1 className="text-4xl font-black text-gray-900 tracking-tight">Staff Requisition Portal</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+            Build one signed material request by setting the request details, tagging employees, assigning materials, and reviewing quantities before upload.
+          </p>
         </div>
-        <p className="text-sm font-bold text-gray-500 uppercase tracking-widest ml-1">
-          RSQ • Material Issuance & Resource Supply Queue
-        </p>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="grid grid-cols-3 rounded-lg border border-slate-200 bg-slate-50 text-center">
+            <div className="px-4 py-2">
+              <p className="text-base font-semibold tabular-nums text-slate-950">{employeeCount}</p>
+              <p className="text-[11px] font-medium text-slate-500">Employees</p>
+            </div>
+            <div className="border-x border-slate-200 px-4 py-2">
+              <p className="text-base font-semibold tabular-nums text-slate-950">{productCount}</p>
+              <p className="text-[11px] font-medium text-slate-500">Products</p>
+            </div>
+            <div className="px-4 py-2">
+              <p className="text-base font-semibold tabular-nums text-slate-950">{totalQuantity}</p>
+              <p className="text-[11px] font-medium text-slate-500">Qty</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onPrintBlank}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+          >
+            <Printer className="h-4 w-4" aria-hidden="true" />
+            Blank Form
+          </button>
+        </div>
       </div>
 
-      <div className="flex gap-4 no-print">
-        <button 
-          onClick={onPrintBlank}
-          className="px-7 py-3.5 bg-gradient-to-r from-gray-900 to-black text-white rounded-2xl text-[10px] font-extrabold uppercase tracking-widest transition-all duration-300 ease-out shadow-lg shadow-gray-900/20 hover:shadow-2xl hover:shadow-gray-900/40 flex items-center gap-2 hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-px active:scale-100 focus:outline-none focus:ring-4 focus:ring-gray-900/30"
-        >
-          <Printer className="h-4 w-4" /> Blank Form
-        </button>
+      <div className="mt-5 grid gap-2 sm:grid-cols-4" aria-label="Requisition progress">
+        {steps.map((step, index) => (
+          <div key={step} className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-semibold text-blue-700">
+              {index + 1}
+            </span>
+            <span className="text-xs font-semibold text-slate-700">{step}</span>
+          </div>
+        ))}
       </div>
-    </div>
+
+      <div className="mt-4 flex items-start gap-3 rounded-md border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+        <FileText className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <p>
+          Keep the printed form and uploaded signed copy aligned. The system will submit one request row per employee and material quantity.
+        </p>
+      </div>
+    </header>
   );
 };
