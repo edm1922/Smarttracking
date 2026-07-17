@@ -72,7 +72,8 @@ function ReportModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void
 
   const activityReports = [
     { id: 'top-consumed-stock', name: 'Top Consumed Stock' },
-    { id: 'top-requesters', name: 'Top Requesters' }
+    { id: 'top-requesters', name: 'Top Requesters' },
+    { id: 'frequency', name: 'Frequency' },
   ];
 
   const reports = activeSection === 'product' ? productReports : activeSection === 'employee' ? employeeReports : activityReports;
@@ -183,6 +184,14 @@ function ReportModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void
           Rank: `#${idx + 1}`,
           'Requester Name': u.name,
           'Total Requested': `${u.count} ITEMS REQUESTED`
+        }));
+      case 'frequency':
+        return data.map((item: any, idx: number) => ({
+          Rank: `#${idx + 1}`,
+          'Item Name': item.productName,
+          SKU: item.sku,
+          'Total Requests': item.totalCount,
+          'Frequency': `${item.frequencyPerWeek} times/week`,
         }));
       case 'custom-item-report':
         return data.map((p) => ({
