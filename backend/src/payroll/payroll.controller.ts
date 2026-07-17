@@ -86,6 +86,11 @@ export class PayrollController {
     return this.payrollService.portalLogin(body.username, body.password);
   }
 
+  @Post('portal-change-password')
+  async changePassword(@Body() body: any) {
+    return this.payrollService.changePassword(body.userId, body.currentPassword, body.newPassword);
+  }
+
   @Post('revise')
   @UseInterceptors(FilesInterceptor('file'))
   async reviseDocuments(

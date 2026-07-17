@@ -1,5 +1,5 @@
 
-import { Controller, Get, Post, Body, Param, Patch, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Patch, Query, Delete } from '@nestjs/common';
 import { RsqService } from './rsq.service';
 
 @Controller('rsq')
@@ -24,6 +24,31 @@ export class RsqController {
   @Post('tailors')
   createTailor(@Body() data: any) {
     return this.rsqService.createTailor(data);
+  }
+
+  @Get('apparels')
+  getApparels() {
+    return this.rsqService.getApparels();
+  }
+
+  @Post('apparels')
+  createApparel(@Body() data: any) {
+    return this.rsqService.createApparel(data);
+  }
+
+  @Patch('apparels/:id')
+  updateApparel(@Param('id') id: string, @Body() data: any) {
+    return this.rsqService.updateApparel(id, data);
+  }
+
+  @Delete('apparels/:id')
+  deleteApparel(@Param('id') id: string) {
+    return this.rsqService.deleteApparel(id);
+  }
+
+  @Post('apparels/seed')
+  seedApparels() {
+    return this.rsqService.seedApparels();
   }
 
   @Get('requests')

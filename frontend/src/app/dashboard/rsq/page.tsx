@@ -20,8 +20,10 @@ import {
   ChevronLeft,
   Filter,
   CheckCircle2,
-  FileText
+  FileText,
+  Shirt
 } from 'lucide-react';
+import Link from 'next/link';
 import { exportRSQToExcel, exportTransactionToExcel } from './utils/excelExport';
 
 // Parse Remarks formatted: "RSQ: RSQ-00588 | Month: MAY 2026 | Remarks: Custom text"
@@ -141,6 +143,7 @@ export default function RSQPage() {
   const [requests, setRequests] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [tailors, setTailors] = useState<any[]>([]);
+  const [apparels, setApparels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Modal control
@@ -149,6 +152,7 @@ export default function RSQPage() {
   useEffect(() => {
     fetchData();
     fetchTailors();
+    fetchApparels();
   }, []);
 
   const fetchData = async () => {
@@ -175,6 +179,15 @@ export default function RSQPage() {
       setTailors(res.data);
     } catch (e) {
       console.error('Error fetching tailors:', e);
+    }
+  };
+
+  const fetchApparels = async () => {
+    try {
+      const res = await api.get('/rsq/apparels');
+      setApparels(res.data);
+    } catch (e) {
+      console.error('Error fetching apparels:', e);
     }
   };
 
@@ -213,6 +226,13 @@ export default function RSQPage() {
             <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Raw Material Movements &amp; Transactions</p>
           </div>
           <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard/rsq/apparels"
+              className="flex items-center gap-2 bg-gray-100 text-gray-600 px-5 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-gray-200 transition-all active:scale-95"
+            >
+              <Shirt className="h-4 w-4" />
+              Manage Apparels
+            </Link>
             <button 
               className="flex items-center gap-2 bg-primary text-white px-5 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all hover:scale-[1.02] active:scale-[0.98]"
               onClick={() => setIsBatchModalOpen(true)}
@@ -251,6 +271,7 @@ export default function RSQPage() {
           onClose={() => setIsBatchModalOpen(false)} 
           fabrics={fabrics} 
           tailors={tailors}
+          apparels={apparels}
           onSuccess={() => { setIsBatchModalOpen(false); fetchData(); }} 
         />
       )}
@@ -815,12 +836,13 @@ interface FormItemRow {
   seriesNo?: string;
 }
 
-function BatchTransactionModal({ onClose, fabrics, tailors: initialTailors, onSuccess }: any) {
+function BatchTransactionModal({ onClose, fabrics, tailors: initialTailors, apparels: initialApparels, onSuccess }: any) {
   const [loading, setLoading] = useState(false);
   const [transactionNo, setTransactionNo] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [applicableMonth, setApplicableMonth] = useState('');
   const [tailorsList, setTailorsList] = useState<any[]>(initialTailors || []);
+  const [apparelsList, setApparelsList] = useState<any[]>(initialApparels || []);
 
   const [sequenceData, setSequenceData] = useState<any>(null);
   
@@ -1059,31 +1081,67 @@ function BatchTransactionModal({ onClose, fabrics, tailors: initialTailors, onSu
 
                       {/* Apparel Name (Text Input with Datalist) */}
                       <td className="py-3 px-2">
-                        <input 
-                          type="text" 
-                          list={`apparel-list-${idx}`}
-                          placeholder="e.g. BULLCAP, APRON"
-                          value={row.apparelName} 
-                          onChange={e => {
-                            const val = e.target.value;
-                            const targetFabricName = APPAREL_MAP[val];
-                            let updateFields: Partial<FormItemRow> = { apparelName: val };
-                            
-                            if (targetFabricName) {
-                              const matchingFab = fabrics.find((f: any) => 
-                                normalizeFabricName(f.name) === normalizeFabricName(targetFabricName)
+                        <div className="flex gap-1 items-center">
+                          <input 
+                            type="text" 
+                            list={`apparel-list-${idx}`}
+                            placeholder="e.g. BULLCAP, APRON"
+                            value={row.apparelName} 
+                            onChange={e => {
+                              const val = e.target.value;
+                              let updateFields: Partial<FormItemRow> = { apparelName: val };
+                              
+                              // Try DB apparels first (they have fabricId)
+                              const dbMatch = apparelsList.find(
+                                (a: any) => a.name.toUpperCase() === val.toUpperCase() && a.fabricId
                               );
-                              if (matchingFab) {
-                                updateFields.fabricId = matchingFab.id;
-                                updateFields.price = matchingFab.unitPrice;
+                              if (dbMatch) {
+                                updateFields.fabricId = dbMatch.fabricId;
+                                const fab = fabrics.find((f: any) => f.id === dbMatch.fabricId);
+                                if (fab) updateFields.price = fab.unitPrice;
+                              } else {
+                                // Fall back to APPAREL_MAP
+                                const targetFabricName = APPAREL_MAP[val];
+                                if (targetFabricName) {
+                                  const matchingFab = fabrics.find((f: any) => 
+                                    normalizeFabricName(f.name) === normalizeFabricName(targetFabricName)
+                                  );
+                                  if (matchingFab) {
+                                    updateFields.fabricId = matchingFab.id;
+                                    updateFields.price = matchingFab.unitPrice;
+                                  }
+                                }
                               }
-                            }
-                            handleUpdateRow(idx, updateFields);
-                          }} 
-                          className="w-full rounded-lg border-gray-200 py-1 px-2 text-[10px] font-bold bg-white focus:ring-primary focus:border-primary shadow-sm"
-                        />
+                              handleUpdateRow(idx, updateFields);
+                            }} 
+                            className="flex-1 rounded-lg border-gray-200 py-1 px-2 text-[10px] font-bold bg-white focus:ring-primary focus:border-primary shadow-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const name = prompt('Enter the name of the new apparel:');
+                              if (!name) return;
+                              try {
+                                const res = await api.post('/rsq/apparels', { name: name.toUpperCase().trim() });
+                                const newApparel = res.data;
+                                setApparelsList(prev => [...prev, newApparel].sort((a, b) => a.name.localeCompare(b.name)));
+                                handleUpdateRow(idx, { apparelName: newApparel.name });
+                              } catch (err) {
+                                console.error(err);
+                                alert('Error saving new apparel.');
+                              }
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors active:scale-95"
+                            title="Add new apparel"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                         <datalist id={`apparel-list-${idx}`}>
-                          {Object.keys(APPAREL_MAP).map(name => (
+                          {[...new Set([
+                            ...apparelsList.map((a: any) => a.name),
+                            ...Object.keys(APPAREL_MAP),
+                          ])].map(name => (
                             <option key={name} value={name}>{name}</option>
                           ))}
                         </datalist>

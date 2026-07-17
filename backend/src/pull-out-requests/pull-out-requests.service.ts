@@ -112,10 +112,14 @@ export class PullOutRequestsService {
 
     if (startDate || endDate) {
       where.createdAt = {};
-      if (startDate) where.createdAt.gte = new Date(startDate);
+      if (startDate) {
+        const start = new Date(startDate);
+        if (startDate.length <= 10) start.setHours(0, 0, 0, 0);
+        where.createdAt.gte = start;
+      }
       if (endDate) {
         const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
+        if (endDate.length <= 10) end.setHours(23, 59, 59, 999);
         where.createdAt.lte = end;
       }
     }
@@ -176,10 +180,11 @@ export class PullOutRequestsService {
     return { data, total };
   }
 
-  async findAll(params: { skip?: number; take?: number; search?: string } = {}) {
-    const { skip = 0, take = 20, search } = params;
+  async findAll(params: { skip?: number; take?: number; search?: string; status?: string } = {}) {
+    const { skip = 0, take = 20, search, status } = params;
 
     const where: any = {};
+    if (status) where.status = status;
     if (search) {
       where.OR = [
         { remarks: { contains: search, mode: 'insensitive' } },
@@ -242,10 +247,48 @@ export class PullOutRequestsService {
   async approve(id: string) {
     const request = await this.prisma.pullOutRequest.findUnique({
       where: { id },
+      include: {
+        item: {
+          include: { fieldValues: true }
+        }
+      }
     });
 
     if (!request) throw new NotFoundException('Request not found');
     if (request.status !== 'PENDING' && request.status !== 'SUBMITTED') throw new BadRequestException('Request is already processed');
+
+    // Deduct qty from the item's unit-tracking field value
+    const unitField = request.item.fieldValues.find(fv => {
+      const val = fv.value as any;
+      return val && typeof val === 'object' && val.useUnitQty === true;
+    });
+
+    if (unitField) {
+      const currentQty = Number((unitField.value as any).qty) || 0;
+      if (currentQty < request.qty) {
+        throw new BadRequestException(
+          `Insufficient stock: only ${currentQty} available, ${request.qty} requested`
+        );
+      }
+
+      const newQty = currentQty - request.qty;
+      await this.prisma.itemFieldValue.update({
+        where: { id: unitField.id },
+        data: {
+          value: { ...(unitField.value as any), qty: newQty }
+        }
+      });
+
+      // Log the stock deduction
+      await this.prisma.activityLog.create({
+        data: {
+          userId: request.userId,
+          itemId: request.itemId,
+          action: 'STOCK_OUT',
+          changes: { quantity: request.qty, unit: request.unit },
+        },
+      });
+    }
 
     const result = await this.prisma.pullOutRequest.update({
       where: { id },
@@ -382,5 +425,80 @@ export class PullOutRequestsService {
       }
     }
     return results;
+  }
+
+  /**
+   * One-time reconciliation: deducts stock for all APPROVED pull-out requests
+   * that were approved before the approve() method deducted stock.
+   * Idempotent — skips items whose field value qty is already 0 or unchanged.
+   */
+  async reconcileStock() {
+    const approvedRequests = await this.prisma.pullOutRequest.findMany({
+      where: { status: 'APPROVED' },
+      select: { id: true, qty: true, itemId: true },
+    });
+
+    // Group approved qtys by itemId
+    const itemDeductions = new Map<string, { totalQty: number; requestIds: string[] }>();
+    for (const req of approvedRequests) {
+      if (!itemDeductions.has(req.itemId)) {
+        itemDeductions.set(req.itemId, { totalQty: 0, requestIds: [] });
+      }
+      const entry = itemDeductions.get(req.itemId)!;
+      entry.totalQty += req.qty;
+      entry.requestIds.push(req.id);
+    }
+
+    const results = [];
+    for (const [itemId, { totalQty, requestIds }] of itemDeductions) {
+      const item = await this.prisma.item.findUnique({
+        where: { id: itemId },
+        select: { fieldValues: true },
+      });
+
+      if (!item) {
+        results.push({ itemId, status: 'skipped', reason: 'Item not found' });
+        continue;
+      }
+
+      const unitField = item.fieldValues.find((fv) => {
+        const val = fv.value as any;
+        return val && typeof val === 'object' && val.useUnitQty === true;
+      });
+
+      if (!unitField) {
+        results.push({ itemId, status: 'skipped', reason: 'No unit-tracking field' });
+        continue;
+      }
+
+      const currentQty = Number((unitField.value as any).qty) || 0;
+      const newQty = Math.max(0, currentQty - totalQty);
+
+      if (newQty === currentQty) {
+        results.push({ itemId, status: 'skipped', reason: 'Already deducted or qty already 0' });
+        continue;
+      }
+
+      await this.prisma.itemFieldValue.update({
+        where: { id: unitField.id },
+        data: {
+          value: { ...(unitField.value as any), qty: newQty },
+        },
+      });
+
+      results.push({
+        itemId,
+        status: 'deducted',
+        previousQty: currentQty,
+        newQty,
+        totalApprovedQty: totalQty,
+      });
+    }
+
+    return {
+      totalApprovedRequests: approvedRequests.length,
+      totalItemsAffected: itemDeductions.size,
+      results,
+    };
   }
 }

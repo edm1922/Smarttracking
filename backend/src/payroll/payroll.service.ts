@@ -755,6 +755,44 @@ export class PayrollService {
     };
   }
 
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+    }
+
+    const dbPass = (user.password || '').trim();
+    let isMatch = false;
+
+    if (dbPass.startsWith('$2a$') || dbPass.startsWith('$2b$')) {
+      isMatch = await bcrypt.compare(currentPassword, dbPass);
+    } else {
+      isMatch = dbPass.toLowerCase() === currentPassword.toLowerCase();
+    }
+
+    if (!isMatch) {
+      throw new HttpException('Current password is incorrect', HttpStatus.UNAUTHORIZED);
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
+
+    await this.logsService.create({
+      userId,
+      action: 'PASSWORD_CHANGE',
+      changes: { username: user.username },
+    });
+
+    return { success: true, message: 'Password updated successfully' };
+  }
+
   async deleteBatch(batchId: string) {
     const batch = await this.prisma.storageBatch.findUnique({
       where: { id: batchId },

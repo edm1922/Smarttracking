@@ -552,14 +552,14 @@ function PayrollContent() {
           }}
           onDelete={async (id) => {
             setModalConfig({
-              isOpen: true, title: "Purge Batch", message: "Permanently delete this batch and all associated disbursements?",
-              confirmText: "Purge Now", isDestructive: true, requireConfirmationText: "PURGE",
+              isOpen: true, title: "Delete Batch", message: "Are you sure you want to delete this batch and all associated disbursements?",
+              confirmText: "Delete", isDestructive: true,
               onConfirm: async () => {
                 const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
                 await fetch(`${apiUrl}/payroll/batch/${id}`, { method: 'DELETE' });
                 fetchRuns();
                 setModalConfig((prev: any) => ({ ...prev, isOpen: false }));
-                toast.success('Batch purged successfully.');
+                toast.success('Batch deleted successfully.');
               }
             });
           }}

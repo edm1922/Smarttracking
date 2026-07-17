@@ -20,11 +20,13 @@ export class PullOutRequestsController {
     @Query('skip') skip?: string,
     @Query('take') take?: string,
     @Query('search') search?: string,
+    @Query('status') status?: string,
   ) {
     return this.pullOutRequestsService.findAll({
       skip: skip ? parseInt(skip, 10) : 0,
       take: take ? parseInt(take, 10) : 20,
       search,
+      status,
     });
   }
 
@@ -79,6 +81,11 @@ export class PullOutRequestsController {
   @Post('bulk-reject')
   async bulkReject(@Body() data: { ids: string[] }, @Req() req: any) {
     return this.pullOutRequestsService.bulkReject(data.ids, req.user.sub);
+  }
+
+  @Post('reconcile-stock')
+  async reconcileStock() {
+    return this.pullOutRequestsService.reconcileStock();
   }
 
   @Patch(':id/approve')
