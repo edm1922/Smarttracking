@@ -218,7 +218,7 @@ function UnitTrackingContent() {
     } catch (err) {
       console.error(err);
       if (err && typeof err === 'object' && 'response' in err && !err.response) {
-        toast.error('Cannot reach server Ã¢â‚¬â€ data may be stale');
+        toast.error('Cannot reach server ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â data may be stale');
       }
     }
   };
@@ -232,7 +232,7 @@ function UnitTrackingContent() {
     } catch (err) {
       console.error(err);
       if (err && typeof err === 'object' && 'response' in err && !err.response) {
-        toast.error('Cannot reach server Ã¢â‚¬â€ data may be stale');
+        toast.error('Cannot reach server ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â data may be stale');
       }
     }
   };
@@ -246,7 +246,7 @@ function UnitTrackingContent() {
     } catch (err) {
       console.error(err);
       if (err && typeof err === 'object' && 'response' in err && !err.response) {
-        toast.error('Cannot reach server Ã¢â‚¬â€ data may be stale');
+        toast.error('Cannot reach server ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â data may be stale');
       }
     }
   };
@@ -306,7 +306,7 @@ function UnitTrackingContent() {
     const mr = 28;
     const usableWidth = pageWidth - ml - mr;
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Title Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Title ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(22);
     doc.text('UNIFORM TRANSACTION', pageWidth / 2, 22, { align: 'center' });
@@ -317,11 +317,11 @@ function UnitTrackingContent() {
       : 'STOCK HEALTH REPORT';
     doc.text(subtitle, pageWidth / 2, 32, { align: 'center' });
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Separator line Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Separator line ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
     doc.setDrawColor(200, 200, 200);
     doc.line(ml, 36, pageWidth - mr, 36);
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Metadata Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Metadata ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
 
@@ -347,7 +347,7 @@ function UnitTrackingContent() {
       doc.text(line, pageWidth - mr, metaStartY + i * 6, { align: 'right' });
     });
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Data Table Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Data Table ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
     const dataRows = productSummary
       .filter((item: any) =>
         exportType === 'stock-in' ? item.inToday > item.outToday
@@ -410,7 +410,7 @@ function UnitTrackingContent() {
       });
     }
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Summary / Total Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Summary / Total ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
     const totalY = dataRows.length > 0
       ? (doc as any).lastAutoTable.finalY + 8
       : tableStartY + 10;
@@ -425,7 +425,7 @@ function UnitTrackingContent() {
       doc.text(`TOTAL ITEMS RECORDED: ${dataRows.length}`, ml, totalY);
     }
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Signatory Section Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Signatory Section ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
     const signFields = ['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy']
       .filter(f => (enabledSignatories as any)[f]);
 
@@ -460,7 +460,7 @@ function UnitTrackingContent() {
       });
     }
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Footer Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Footer ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
     const footerY = pageHeight - 10;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
@@ -474,7 +474,7 @@ function UnitTrackingContent() {
     doc.text(`Uniform Transaction - ${transmittalHeader.transmittalNo}`, pageWidth / 2, footerY, { align: 'center' });
     doc.text('1/1', pageWidth - mr, footerY, { align: 'right' });
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Print Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Print ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
     doc.autoPrint();
     window.open(doc.output('bloburl'), '_blank');
     setIsBuildingTransmittal(false);
@@ -487,7 +487,7 @@ function UnitTrackingContent() {
       api.get('/pull-out-requests', { params: { skip: 0, take: 9999 } }),
       api.get('/logs', {
         params: {
-          action: 'STOCK_IN,CREATE_ITEM',
+          action: 'STOCK_IN,STOCK_OUT,SUBMIT_CONTENT,CREATE_ITEM',
           startDate: new Date(stockHealthRange.start + 'T00:00:00').toISOString(),
           endDate: new Date(stockHealthRange.end + 'T23:59:59.999').toISOString(),
           take: 10000,
@@ -508,7 +508,7 @@ function UnitTrackingContent() {
       if (p.name !== pName) return;
       totalInStock += p.totalQty;
       p.items?.forEach((item: any) => {
-        const specString = item.fieldValues?.map((fv: any) => {
+        const specString = item.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).map((fv: any) => {
           const v = fv.value;
           const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
           const fieldName = fv.field?.name || fv.name || '';
@@ -526,7 +526,7 @@ function UnitTrackingContent() {
       const isUnitTracked = req.item.fieldValues?.some((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty);
       if (!isUnitTracked) return;
       outToday += req.qty;
-      const specString = req.item.fieldValues?.map((fv: any) => {
+      const specString = req.item.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).map((fv: any) => {
         const v = fv.value;
         const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
         const fieldName = fv.field?.name || fv.name || '';
@@ -551,24 +551,43 @@ function UnitTrackingContent() {
       });
       const liveQty = unitField && !isNaN(Number(unitField.value?.qty)) ? Number(unitField.value.qty) : undefined;
       let qty: number;
-      if (log.action === 'CREATE_ITEM') {
-        qty = Number(log.changes?.quantity);
-        if (isNaN(qty)) qty = liveQty ?? 1;
+      if (log.action === 'SUBMIT_CONTENT') {
+        qty = 0;
+      } else if (log.action === 'CREATE_ITEM') {
+        const isNewItem = log.item?.createdAt && new Date(log.createdAt).getTime() - new Date(log.item.createdAt).getTime() < 1000;
+        if (isNewItem) {
+          qty = Number(log.changes?.quantity);
+          if (isNaN(qty)) qty = liveQty ?? 1;
+        } else {
+          qty = 0;
+        }
       } else {
         qty = Number(log.changes?.quantity);
         if (isNaN(qty)) qty = liveQty ?? 0;
         if (isNaN(qty) || qty === 0) qty = 0;
       }
       if (qty > 0) {
-        inToday += qty;
-        const specString = log.item?.fieldValues?.map((fv: any) => {
-          const v = fv.value;
-          const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-          const fieldName = fv.field?.name || '';
-          return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
-        }).filter(Boolean).sort().join(', ') || 'Standard';
-        if (!inBreakdown[specString]) inBreakdown[specString] = [];
-        inBreakdown[specString].push({ qty, date: log.createdAt });
+        if (log.action === 'STOCK_OUT') {
+          outToday += qty;
+          const specString = log.item?.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).map((fv: any) => {
+            const v = fv.value;
+            const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+            const fieldName = fv.field?.name || '';
+            return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
+          }).filter(Boolean).sort().join(', ') || 'Standard';
+          if (!movementBreakdown[specString]) movementBreakdown[specString] = [];
+          movementBreakdown[specString].push({ qty, date: log.createdAt });
+        } else {
+          inToday += qty;
+          const specString = log.item?.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).map((fv: any) => {
+            const v = fv.value;
+            const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+            const fieldName = fv.field?.name || '';
+            return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
+          }).filter(Boolean).sort().join(', ') || 'Standard';
+          if (!inBreakdown[specString]) inBreakdown[specString] = [];
+          inBreakdown[specString].push({ qty, date: log.createdAt });
+        }
       }
     });
 
@@ -616,7 +635,7 @@ function UnitTrackingContent() {
 
     const opening = freshItem.totalInStock + freshItem.outToday - freshItem.inToday;
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Company Header Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Company Header ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
     ws.mergeCells('A1:L1');
     const h1 = ws.getCell('A1');
     h1.value = 'CENTRO SERVICES COOPERATIVE';
@@ -638,10 +657,10 @@ function UnitTrackingContent() {
     h3.alignment = { horizontal: 'left', vertical: 'middle' };
     ws.getRow(3).height = 18;
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Spacer Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Spacer ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
     ws.getRow(4).height = 8;
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Title Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Title ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
     ws.mergeCells('A5:L5');
     const title = ws.getCell('A5');
     title.value = 'UNIFORM STOCKS REPORT';
@@ -649,10 +668,10 @@ function UnitTrackingContent() {
     title.alignment = { horizontal: 'center', vertical: 'middle' };
     ws.getRow(5).height = 32;
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Spacer Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Spacer ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
     ws.getRow(6).height = 8;
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Period Covered Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Period Covered ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
     ws.mergeCells('C7:L7');
     const periodLabel = ws.getCell('A7');
     periodLabel.value = 'Period Covered:';
@@ -663,7 +682,7 @@ function UnitTrackingContent() {
     periodVal.font = { name: 'Segoe UI', size: 10, color: { argb: 'FF0F172A' } };
     ws.getRow(7).height = 20;
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Runtime Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Runtime ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
     ws.mergeCells('C8:L8');
     const runtimeLabel = ws.getCell('A8');
     runtimeLabel.value = 'Runtime:';
@@ -674,19 +693,19 @@ function UnitTrackingContent() {
     runtimeVal.font = { name: 'Segoe UI', size: 10, color: { argb: 'FF0F172A' } };
     ws.getRow(8).height = 20;
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Spacer Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Spacer ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
     ws.getRow(9).height = 8;
     ws.getRow(11).height = 6;
     ws.getRow(13).height = 6;
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Item Name Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Item Name ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
     ws.mergeCells('A10:L10');
     const itemRow = ws.getCell('A10');
     itemRow.value = `ITEM: ${freshItem.name?.toUpperCase() || 'N/A'}`;
     itemRow.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF0F172A' } };
     ws.getRow(10).height = 22;
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Collect spec data Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Collect spec data ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
     const allSpecKeys = new Set([
       ...Object.keys(freshItem.inBreakdown || {}),
       ...Object.keys(freshItem.movementBreakdown || {}),
@@ -709,7 +728,7 @@ function UnitTrackingContent() {
     const dataStartRow = cr;
 
     if (specData.length > 0) {
-      // Ã¢â€â‚¬Ã¢â€â‚¬ Table Header (matches reference file structure) Ã¢â€â‚¬Ã¢â€â‚¬
+      // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Table Header (matches reference file structure) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
       const hRow = cr;
       // A: NO. (merged hRow to hRow+2)
       ws.mergeCells(`A${hRow}:A${hRow + 2}`);
@@ -742,7 +761,7 @@ function UnitTrackingContent() {
       ws.getCell(`C${hRow + 1}`).border = allBorders;
       ws.getCell(`C${hRow + 2}`).border = allBorders;
 
-      // D: (empty Ã¢â‚¬â€ no price, merged hRow to hRow+2)
+      // D: (empty ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â no price, merged hRow to hRow+2)
       ws.mergeCells(`D${hRow}:D${hRow + 2}`);
       const hD = ws.getCell(`D${hRow}`);
       hD.value = '';
@@ -846,7 +865,7 @@ function UnitTrackingContent() {
 
       cr = hRow + 3;
 
-      // Ã¢â€â‚¬Ã¢â€â‚¬ Data Rows Ã¢â€â‚¬Ã¢â€â‚¬
+      // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Data Rows ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
       specData.forEach((d, i) => {
         const ending = d.specOpening + d.net;
         const r = cr;
@@ -904,7 +923,7 @@ function UnitTrackingContent() {
       });
     }
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Totals Row Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Totals Row ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
     const totalIn = specData.reduce((s, d) => s + d.inTotal, 0);
     const totalOut = specData.reduce((s, d) => s + d.outTotal, 0);
     const totalEnd = opening + totalIn - totalOut;
@@ -959,15 +978,15 @@ function UnitTrackingContent() {
 
     cr += 2;
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Footer Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Footer ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
     ws.mergeCells(`A${cr}:L${cr}`);
     const footer = ws.getCell(`A${cr}`);
-    footer.value = `Smart Tracking System Ã¢â‚¬Â¢ Printed: ${new Date().toLocaleString()}`;
+    footer.value = `Smart Tracking System ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ Printed: ${new Date().toLocaleString()}`;
     footer.font = { name: 'Segoe UI', size: 8, italic: true, color: { argb: 'FF94A3B8' } };
     footer.alignment = { horizontal: 'right', vertical: 'middle' };
     ws.getRow(cr).height = 20;
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Export Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Export ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 

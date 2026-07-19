@@ -419,6 +419,46 @@ export class ReportsService {
           };
         });
 
+      case 'frequency':
+        const freqStart = options.startDate ? (() => { const d = new Date(options.startDate); if (options.startDate.length <= 10) d.setHours(0, 0, 0, 0); return d; })() : null;
+        const freqEnd = options.endDate ? (() => { const d = new Date(options.endDate); if (options.endDate.length <= 10) d.setDate(d.getDate() + 1); else d.setDate(d.getDate() + 1); return d; })() : null;
+
+        const freqDateSql = freqStart && freqEnd
+          ? Prisma.sql`AND ir.date >= ${freqStart} AND ir.date < ${freqEnd}`
+          : freqStart
+          ? Prisma.sql`AND ir.date >= ${freqStart}`
+          : freqEnd
+          ? Prisma.sql`AND ir.date < ${freqEnd}`
+          : Prisma.sql``;
+
+        const freqData = await this.prisma.$queryRaw<any[]>`
+          SELECT
+            p.name as "productName",
+            p.sku,
+            COUNT(*)::int as "totalCount",
+            MIN(ir.date) as "earliestDate",
+            MAX(ir.date) as "latestDate"
+          FROM "InternalRequest" ir
+          JOIN "Product" p ON ir."productId" = p.id
+          WHERE 1=1 ${freqDateSql}
+          GROUP BY p.name, p.sku
+          ORDER BY "totalCount" DESC
+          LIMIT 50
+        `;
+
+        const rangeStart = freqStart || (freqData.length > 0 ? new Date(freqData[0].earliestDate) : new Date());
+        const rangeEnd = freqEnd || new Date();
+        const msInWeek = 7 * 24 * 60 * 60 * 1000;
+        const numberOfWeeks = Math.max(1, (rangeEnd.getTime() - rangeStart.getTime()) / msInWeek);
+
+        return freqData.map((t, idx) => ({
+          rank: idx + 1,
+          productName: t.productName,
+          sku: t.sku,
+          totalCount: t.totalCount,
+          frequencyPerWeek: parseFloat((t.totalCount / numberOfWeeks).toFixed(1)),
+        }));
+
       default:
         return [];
     }
