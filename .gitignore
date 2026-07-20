@@ -13,6 +13,8 @@ frontend/.next
 frontend/.env
 *.xlsb
 *.xlsx
+redesign plan.docx
+redesign-plan.md
 backend/scratch
 frontend/scratch
 scratch

@@ -1,5 +1,11 @@
+'use client';
+
 import React from 'react';
-import { ClipboardList, FileText, Printer } from 'lucide-react';
+import { ClipboardList, Printer, Users, Package, Hash } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { motion } from 'framer-motion';
 
 interface RSQHeaderProps {
   onPrintBlank: () => void;
@@ -8,77 +14,66 @@ interface RSQHeaderProps {
   totalQuantity: number;
 }
 
-const steps = ['Request Info', 'Employees', 'Materials', 'Review'];
-
 export const RSQHeader: React.FC<RSQHeaderProps> = ({
   onPrintBlank,
   employeeCount,
   productCount,
   totalQuantity,
 }) => {
+  const stats = [
+    { label: 'Employees', value: employeeCount, icon: Users, color: 'text-blue-600' },
+    { label: 'Products', value: productCount, icon: Package, color: 'text-emerald-600' },
+    { label: 'Qty', value: totalQuantity, icon: Hash, color: 'text-violet-600' },
+  ];
+
   return (
-    <header className="no-print mb-6 rounded-lg border border-slate-200 bg-white px-5 py-5 shadow-sm">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
+    <motion.header
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      className="no-print mb-4"
+    >
+      <Card>
+        <CardContent className="py-2.5 px-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
-              <ClipboardList className="h-5 w-5" aria-hidden="true" />
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <ClipboardList className="h-4.5 w-4.5" aria-hidden="true" />
             </span>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase text-slate-500">Staff Request</p>
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-                Requisition Workspace
-              </h1>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base font-bold tracking-tight text-foreground">
+                  Requisition Workspace
+                </h1>
+                <Badge variant="secondary" className="text-[9px] font-semibold px-1 py-0 h-4 uppercase tracking-wider">
+                  Staff Request
+                </Badge>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Build signed material requests: set details, tag staff, assign materials, and submit.
+              </p>
             </div>
           </div>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-            Build one signed material request by setting the request details, tagging employees, assigning materials, and reviewing quantities before upload.
-          </p>
-        </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="grid grid-cols-3 rounded-lg border border-slate-200 bg-slate-50 text-center">
-            <div className="px-4 py-2">
-              <p className="text-base font-semibold tabular-nums text-slate-950">{employeeCount}</p>
-              <p className="text-[11px] font-medium text-slate-500">Employees</p>
+          <div className="flex items-center gap-3 self-end sm:self-center">
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-2 py-1">
+              {stats.map((stat) => (
+                <div key={stat.label} className="flex items-center gap-1.5 px-1.5 py-0.5">
+                  <stat.icon className={`h-3 w-3 ${stat.color}`} aria-hidden="true" />
+                  <div className="text-left">
+                    <p className="text-xs font-bold tabular-nums text-foreground leading-none">{stat.value}</p>
+                    <p className="text-[8px] font-medium text-muted-foreground leading-none mt-0.5">{stat.label}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="border-x border-slate-200 px-4 py-2">
-              <p className="text-base font-semibold tabular-nums text-slate-950">{productCount}</p>
-              <p className="text-[11px] font-medium text-slate-500">Products</p>
-            </div>
-            <div className="px-4 py-2">
-              <p className="text-base font-semibold tabular-nums text-slate-950">{totalQuantity}</p>
-              <p className="text-[11px] font-medium text-slate-500">Qty</p>
-            </div>
+            <Button onClick={onPrintBlank} size="sm" className="h-8 text-xs font-semibold px-3">
+              <Printer className="h-3.5 w-3.5 mr-1" aria-hidden="true" />
+              Blank Form
+            </Button>
           </div>
-          <button
-            type="button"
-            onClick={onPrintBlank}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
-          >
-            <Printer className="h-4 w-4" aria-hidden="true" />
-            Blank Form
-          </button>
-        </div>
-      </div>
-
-      <div className="mt-5 grid gap-2 sm:grid-cols-4" aria-label="Requisition progress">
-        {steps.map((step, index) => (
-          <div key={step} className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-semibold text-blue-700">
-              {index + 1}
-            </span>
-            <span className="text-xs font-semibold text-slate-700">{step}</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-4 flex items-start gap-3 rounded-md border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-        <FileText className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-        <p>
-          Keep the printed form and uploaded signed copy aligned. The system will submit one request row per employee and material quantity.
-        </p>
-      </div>
-    </header>
+        </CardContent>
+      </Card>
+    </motion.header>
   );
 };
+

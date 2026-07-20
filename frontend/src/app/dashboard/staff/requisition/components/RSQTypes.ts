@@ -53,6 +53,7 @@ export interface DraftItem {
   availableQty: number;
   quantity: number;
   description: string | null;
+  unit?: string;
 }
 
 export const formatEmpName = (lastName: string, firstName: string) =>

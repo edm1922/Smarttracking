@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { LayoutDashboard, LogOut, Package, Printer, User, Box, Settings, MapPin, FileText, QrCode, ClipboardList, Database, Activity, Users, Info, X, ShieldCheck, Wallet } from 'lucide-react';
+import { Menu, LayoutDashboard, LogOut, Package, Printer, User, Box, Settings, MapPin, FileText, QrCode, ClipboardList, Database, Activity, Users, Info, X, ShieldCheck, Wallet } from 'lucide-react';
 import AdminNotifications from './AdminNotifications';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import api from '@/lib/api';
@@ -19,6 +19,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState('');
   const [showDevNotice, setShowDevNotice] = useState(false);
   const [pendingPullOutCount, setPendingPullOutCount] = useState(0);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [pathname, currentTab]);
 
 
 useEffect(() => {
@@ -162,11 +167,46 @@ useEffect(() => {
 
   return (
     <div className="flex min-h-screen bg-[#e2e8f0] print:block print:bg-white">
+      {/* Sticky top bar for mobile */}
+      <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-200 flex items-center px-4 justify-between lg:hidden z-35 no-print">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none"
+            aria-label="Open sidebar"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <span className="font-bold text-primary text-base">Smart Tracking</span>
+        </div>
+        {!isStaff && !isPayrollUser && <AdminNotifications />}
+      </header>
+
+      {/* Backdrop overlay for mobile */}
+      {isSidebarOpen && (
+        <div
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 z-30 bg-black/45 lg:hidden"
+          role="presentation"
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 w-64 border-r border-gray-200 bg-white no-print flex flex-col z-[40]">
+      <aside className={`fixed inset-y-0 left-0 w-64 border-r border-gray-200 bg-white no-print flex flex-col z-[40] transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <div className="flex h-16 items-center border-b border-gray-200 px-6 shrink-0 justify-between">
           <span className="text-xl font-bold text-primary">Smart Tracking</span>
-          {!isStaff && !isPayrollUser && <AdminNotifications />}
+          <div className="flex items-center gap-1.5">
+            {!isStaff && !isPayrollUser && <AdminNotifications />}
+            <button
+              type="button"
+              onClick={() => setIsSidebarOpen(false)}
+              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none lg:hidden"
+              aria-label="Close sidebar"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
         <nav className="flex-1 space-y-6 p-4 overflow-y-auto custom-scrollbar">
           {!isStaff ? (
@@ -452,8 +492,8 @@ useEffect(() => {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 pl-64 print:pl-0 print:block">
-        <div className="mx-auto max-w-7xl p-8 print:max-w-none print:p-0 print:m-0 w-full print:block">
+      <main className="flex-1 pl-0 lg:pl-64 pt-14 lg:pt-0 print:pl-0 print:pt-0 print:block">
+        <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8 print:max-w-none print:p-0 print:m-0 w-full print:block">
           <Breadcrumbs />
           {children}
         </div>

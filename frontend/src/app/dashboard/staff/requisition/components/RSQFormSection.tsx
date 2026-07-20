@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import {
   AlertCircle,
@@ -14,7 +16,15 @@ import {
   UserPlus,
   X,
 } from 'lucide-react';
-import { Employee, DraftEntry, Product, Location, employeeKey } from './RSQTypes';
+import { Employee, DraftEntry, Product, Location, employeeKey, SelectedItem } from './RSQTypes';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { motion, AnimatePresence } from 'framer-motion';
+import { RSQCartSection } from './RSQCartSection';
 
 interface RSQFormSectionProps {
   form: any;
@@ -49,21 +59,17 @@ interface RSQFormSectionProps {
   updateDraftItemQuantity: (id: string, qty: number) => void;
   removeProductFromDraft: (id: string) => void;
   confirmDraftEntry: () => void;
-}
 
-const inputClass =
-  'min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-950 shadow-sm transition-colors placeholder:text-slate-400 hover:border-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500';
-
-const iconInputClass =
-  'min-h-11 w-full rounded-md border border-slate-300 bg-white py-2 pl-10 pr-3 text-sm font-medium text-slate-950 shadow-sm transition-colors placeholder:text-slate-400 hover:border-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500';
-
-function FieldLabel({ htmlFor, children, required }: { htmlFor: string; children: React.ReactNode; required?: boolean }) {
-  return (
-    <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-semibold text-slate-800">
-      {children}
-      {required ? <span className="ml-1 text-red-600">*</span> : null}
-    </label>
-  );
+  // Cart/Review Section parameters
+  selectedItems: SelectedItem[];
+  updateCartItemQuantity: (productId: string, empName: string, qty: number) => void;
+  removeCartItem: (productId: string) => void;
+  handleOpenSubmitModal: () => void;
+  isSubmitting: boolean;
+  onSaveDraft: () => void;
+  savedDrafts: string[];
+  onLoadDraft: (name: string) => void;
+  onDeleteDraft: (name: string) => void;
 }
 
 export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
@@ -99,6 +105,17 @@ export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
   updateDraftItemQuantity,
   removeProductFromDraft,
   confirmDraftEntry,
+
+  // Cart review props
+  selectedItems,
+  updateCartItemQuantity,
+  removeCartItem,
+  handleOpenSubmitModal,
+  isSubmitting,
+  onSaveDraft,
+  savedDrafts,
+  onLoadDraft,
+  onDeleteDraft,
 }) => {
   const itemSearchRef = React.useRef<HTMLInputElement>(null);
   const lastNameInputRef = React.useRef<HTMLInputElement>(null);
@@ -141,8 +158,6 @@ export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
   }, [filteredExistingEmployees.length, highlightedIndex, setHighlightedIndex, showEmployeeDropdown]);
 
   const canTagEmployees = Boolean(form.shift?.trim() && form.supervisorName?.trim());
-  const shiftReady = Boolean(form.shift?.trim());
-  const supervisorReady = Boolean(form.supervisorName?.trim());
 
   const handleEmployeeKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (!showEmployeeDropdown || filteredExistingEmployees.length === 0) return;
@@ -168,37 +183,26 @@ export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
   };
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 px-5 py-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase text-blue-700">Step 1</p>
-            <h2 className="text-lg font-semibold text-slate-950">Request Details & Employees</h2>
-          </div>
-          <div className="flex flex-wrap gap-2 text-xs font-medium">
-            <span className={`rounded-full px-3 py-1 ${shiftReady ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-              Shift {shiftReady ? 'Ready' : 'Needed'}
-            </span>
-            <span className={`rounded-full px-3 py-1 ${supervisorReady ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-              Supervisor {supervisorReady ? 'Ready' : 'Needed'}
-            </span>
-          </div>
+    <Card>
+      <CardHeader className="py-2.5 border-b">
+        <div>
+          <CardTitle className="text-sm font-bold">Request Details & Employees</CardTitle>
         </div>
-      </div>
+      </CardHeader>
 
-      <div className="space-y-8 p-5">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <CardContent className="space-y-4 pt-3.5 pb-4">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           <div>
-            <FieldLabel htmlFor="rsq-location">Source Location</FieldLabel>
-            <div className="relative">
-              <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <Label htmlFor="rsq-location" className="text-xs">Source Location</Label>
+            <div className="relative mt-1">
+              <MapPin className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <select
                 id="rsq-location"
                 name="sourceLocation"
                 value={form.locationId}
                 onChange={e => setForm({ ...form, locationId: e.target.value })}
                 disabled
-                className={`${iconInputClass} appearance-none`}
+                className="h-8 w-full min-w-0 appearance-none rounded-lg border border-input bg-transparent py-1 pl-8 pr-2.5 text-xs transition-colors outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50"
                 aria-describedby="rsq-location-help"
               >
                 {locations.map(loc => (
@@ -206,23 +210,22 @@ export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
                 ))}
               </select>
             </div>
-            <p id="rsq-location-help" className="mt-1.5 text-xs text-slate-500">Fixed by inventory source.</p>
+            <p id="rsq-location-help" className="mt-0.5 text-[9px] text-muted-foreground">Fixed by inventory source.</p>
           </div>
 
           <div>
-            <FieldLabel htmlFor="rsq-shift" required>Operational Shift</FieldLabel>
-            <div className="relative">
-              <Clock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-              <input
+            <Label htmlFor="rsq-shift" className="text-xs">Operational Shift <span className="text-destructive">*</span></Label>
+            <div className="relative mt-1">
+              <Clock className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input
                 id="rsq-shift"
                 name="shift"
-                type="text"
                 list="shift-options"
                 autoComplete="off"
                 placeholder="Example: SHIFT 1"
                 value={form.shift}
                 onChange={e => setForm({ ...form, shift: e.target.value.toUpperCase() })}
-                className={iconInputClass}
+                className="pl-8 h-8 text-xs"
               />
               <datalist id="shift-options">
                 <option value="SHIFT 1" />
@@ -235,36 +238,34 @@ export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
           </div>
 
           <div>
-            <FieldLabel htmlFor="rsq-supervisor" required>Supervisor Name</FieldLabel>
-            <div className="relative">
-              <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-              <input
+            <Label htmlFor="rsq-supervisor" className="text-xs">Supervisor Name <span className="text-destructive">*</span></Label>
+            <div className="relative mt-1">
+              <User className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input
                 id="rsq-supervisor"
                 name="supervisorName"
-                type="text"
                 autoComplete="off"
                 placeholder="Supervisor name"
                 value={form.supervisorName || ''}
                 onChange={e => setForm({ ...form, supervisorName: e.target.value.toUpperCase() })}
-                className={iconInputClass}
+                className="pl-8 h-8 text-xs"
               />
             </div>
           </div>
 
           <div>
-            <FieldLabel htmlFor="rsq-department">Department / Area</FieldLabel>
-            <div className="relative">
-              <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-              <input
+            <Label htmlFor="rsq-department" className="text-xs">Department / Area</Label>
+            <div className="relative mt-1">
+              <MapPin className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input
                 id="rsq-department"
                 name="departmentArea"
-                type="text"
                 list="dept-options"
                 autoComplete="off"
                 placeholder="Example: Operations"
                 value={form.departmentArea || ''}
                 onChange={e => setForm({ ...form, departmentArea: e.target.value.toUpperCase() })}
-                className={iconInputClass}
+                className="pl-8 h-8 text-xs"
               />
               <datalist id="dept-options">
                 <option value="MAIN OFFICE" />
@@ -277,32 +278,30 @@ export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
           </div>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase text-blue-700">Step 2</p>
-              <h3 className="text-base font-semibold text-slate-950">Employees</h3>
-            </div>
+        <div className="rounded-lg border border-border bg-muted/20 p-3">
+          <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <h3 className="text-xs font-bold text-foreground">Tag Employees</h3>
             {!canTagEmployees ? (
-              <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>Complete shift and supervisor before tagging employees.</span>
-              </div>
+              <Alert className="w-auto py-1 px-2.5 border-amber-200 bg-amber-50">
+                <AlertCircle className="h-3 w-3 text-amber-600 mr-1 inline-block align-middle" />
+                <AlertDescription className="text-[10px] text-amber-900 inline-block align-middle p-0">
+                  Complete shift & supervisor.
+                </AlertDescription>
+              </Alert>
             ) : (
-              <span className="text-sm text-slate-500">Search existing staff or add a manual entry.</span>
+              <span className="text-[10px] text-muted-foreground">Search staff or enter manually.</span>
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-            <div className="relative lg:col-span-3">
-              <FieldLabel htmlFor="employee-lastname-input">Last Name</FieldLabel>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                <input
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            <div className="relative">
+              <Label htmlFor="employee-lastname-input" className="text-xs">Last Name</Label>
+              <div className="relative mt-1">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                <Input
                   ref={lastNameInputRef}
                   id="employee-lastname-input"
                   name="employeeLastName"
-                  type="text"
                   autoComplete="off"
                   placeholder="Last name"
                   value={lastNameInput}
@@ -313,7 +312,7 @@ export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
                   onFocus={() => setShowEmployeeDropdown(true)}
                   onKeyDown={handleEmployeeKeyDown}
                   disabled={!canTagEmployees}
-                  className={iconInputClass}
+                  className="pl-8 h-8 text-xs"
                   aria-expanded={showEmployeeDropdown}
                   aria-controls="employee-search-results"
                 />
@@ -321,7 +320,7 @@ export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
               {showEmployeeDropdown && filteredExistingEmployees.length > 0 && canTagEmployees && (
                 <div
                   id="employee-search-results"
-                  className="absolute z-50 mt-2 max-h-72 w-full overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-xl"
+                  className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-border bg-popover py-1 shadow-lg ring-1 ring-foreground/5"
                   role="listbox"
                 >
                   {filteredExistingEmployees.map((emp, idx) => (
@@ -330,27 +329,26 @@ export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
                       type="button"
                       onMouseEnter={() => setHighlightedIndex(idx)}
                       onClick={() => selectExistingEmployee(emp)}
-                      className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm transition-colors ${highlightedIndex === idx ? 'bg-blue-50 text-blue-900' : 'text-slate-700 hover:bg-slate-50'}`}
+                      className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs transition-colors ${highlightedIndex === idx ? 'bg-muted text-foreground' : 'text-foreground/80 hover:bg-muted/50'}`}
                       role="option"
                       aria-selected={highlightedIndex === idx}
                     >
                       <span className="min-w-0">
                         <span className="block truncate font-semibold">{emp.lastName}, {emp.firstName}</span>
-                        <span className="block truncate text-xs text-slate-500">{emp.position}{emp.department ? ` - ${emp.department}` : ''}</span>
+                        <span className="block truncate text-[10px] text-muted-foreground">{emp.position}{emp.department ? ` - ${emp.department}` : ''}</span>
                       </span>
-                      <Plus className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      <Plus className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden="true" />
                     </button>
                   ))}
                 </div>
               )}
             </div>
 
-            <div className="lg:col-span-3">
-              <FieldLabel htmlFor="employee-firstname-input">First Name</FieldLabel>
-              <input
+            <div>
+              <Label htmlFor="employee-firstname-input" className="text-xs">First Name</Label>
+              <Input
                 id="employee-firstname-input"
                 name="employeeFirstName"
-                type="text"
                 autoComplete="off"
                 placeholder="First name"
                 value={firstNameInput}
@@ -358,213 +356,243 @@ export const RSQFormSection: React.FC<RSQFormSectionProps> = ({
                 onFocus={() => setShowEmployeeDropdown(true)}
                 onKeyDown={handleEmployeeKeyDown}
                 disabled={!canTagEmployees}
-                className={inputClass}
+                className="mt-1 h-8 text-xs"
               />
             </div>
 
-            <div className="lg:col-span-2">
-              <FieldLabel htmlFor="employee-position-input">Position</FieldLabel>
-              <div className="relative">
-                <Briefcase className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                <input
+            <div>
+              <Label htmlFor="employee-position-input" className="text-xs">Position</Label>
+              <div className="relative mt-1">
+                <Briefcase className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                <Input
                   id="employee-position-input"
                   name="employeePosition"
-                  type="text"
                   autoComplete="off"
                   placeholder="Position"
                   value={positionInput}
                   onChange={e => setPositionInput(e.target.value.toUpperCase())}
                   disabled={!canTagEmployees}
-                  className={iconInputClass}
+                  className="pl-8 h-8 text-xs"
                 />
               </div>
             </div>
 
-            <div className="lg:col-span-2">
-              <FieldLabel htmlFor="employee-department-input">Department</FieldLabel>
-              <input
+            <div>
+              <Label htmlFor="employee-department-input" className="text-xs">Department</Label>
+              <Input
                 id="employee-department-input"
                 name="employeeDepartment"
-                type="text"
                 autoComplete="off"
                 placeholder="Department"
                 value={departmentInput}
                 onChange={e => setDepartmentInput(e.target.value.toUpperCase())}
                 disabled={!canTagEmployees}
-                className={inputClass}
+                className="mt-1 h-8 text-xs"
               />
             </div>
 
-            <div className="flex items-end lg:col-span-2">
-              <button
-                type="button"
+            <div className="sm:col-span-2 mt-1">
+              <Button
                 onClick={addEmployee}
                 disabled={!canTagEmployees || (!lastNameInput.trim() && !firstNameInput.trim())}
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="w-full h-8 text-xs font-semibold"
+                size="sm"
               >
-                <UserPlus className="h-4 w-4" aria-hidden="true" />
-                Add
-              </button>
+                <UserPlus className="h-3.5 w-3.5 mr-1" aria-hidden="true" />
+                Add Employee
+              </Button>
             </div>
           </div>
 
           {employees.length > 0 ? (
-            <div className="mt-5">
-              <div className="mb-3 flex items-center justify-between">
-                <h4 className="text-sm font-semibold text-slate-900">Tagged Employees</h4>
-                <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">{employees.length} tagged</span>
+            <div className="mt-3">
+              <div className="mb-1.5 flex items-center justify-between">
+                <h4 className="text-[11px] font-bold text-foreground">Tagged Employees</h4>
+                <Badge variant="secondary" className="text-[9px] h-4 py-0 px-1">{employees.length} tagged</Badge>
               </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {employees.map(emp => {
-                  const key = employeeKey(emp);
-                  return (
-                    <div key={key} className="flex items-center gap-2 rounded-md border border-slate-200 bg-white p-2 shadow-sm">
-                      <button
-                        type="button"
-                        onClick={() => editAndDraftEmployee(emp)}
-                        className="min-w-0 flex-1 rounded px-2 py-1.5 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+              <div className="grid grid-cols-1 gap-1.5 md:grid-cols-2">
+                <AnimatePresence mode="popLayout">
+                  {employees.map(emp => {
+                    const key = employeeKey(emp);
+                    return (
+                      <motion.div
+                        key={key}
+                        layout
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.15 }}
+                        className="flex items-center gap-1.5 rounded-lg border border-border bg-card p-1"
                       >
-                        <span className="block truncate text-sm font-semibold text-slate-950">{emp.lastName}, {emp.firstName}</span>
-                        <span className="block truncate text-xs text-slate-500">{emp.position}{emp.department ? ` - ${emp.department}` : ''}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeEmployee(key)}
-                        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-                        aria-label={`Remove ${emp.lastName}, ${emp.firstName}`}
-                      >
-                        <X className="h-4 w-4" aria-hidden="true" />
-                      </button>
-                    </div>
-                  );
-                })}
+                        <button
+                          type="button"
+                          onClick={() => editAndDraftEmployee(emp)}
+                          className="min-w-0 flex-1 rounded-md px-1.5 py-0.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <span className="block truncate text-xs font-semibold text-foreground">{emp.lastName}, {emp.firstName}</span>
+                          <span className="block truncate text-[9px] text-muted-foreground">{emp.position}{emp.department ? ` - ${emp.department}` : ''}</span>
+                        </button>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => removeEmployee(key)}
+                          aria-label={`Remove ${emp.lastName}, ${emp.firstName}`}
+                          className="text-muted-foreground hover:text-destructive h-6 w-6"
+                        >
+                          <X className="h-3 w-3" aria-hidden="true" />
+                        </Button>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
               </div>
             </div>
           ) : (
-            <div className="mt-5 rounded-md border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
-              No employees tagged yet. Add at least one employee before assigning materials.
+            <div className="mt-3 rounded-lg border border-dashed border-border bg-card px-3 py-4 text-center text-[11px] text-muted-foreground">
+              No employees tagged. Tag staff to start adding materials.
             </div>
           )}
         </div>
 
-        {draftEntry && (
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex items-start gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
-                  <ClipboardList className="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div>
-                  <p className="text-xs font-semibold uppercase text-blue-700">Step 3</p>
-                  <h4 className="text-base font-semibold text-slate-950">Assign Materials for {draftEntry.lastName}, {draftEntry.firstName}</h4>
-                  <p className="text-sm text-slate-600">Search items, set quantities, then add this employee entry to the request.</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDraftEntry(null)}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-white hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-                aria-label="Cancel material assignment"
-              >
-                <X className="h-4 w-4" aria-hidden="true" />
-              </button>
-            </div>
-
-            <div className="relative">
-              <FieldLabel htmlFor="draft-item-search">Material Search</FieldLabel>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                <input
-                  ref={itemSearchRef}
-                  id="draft-item-search"
-                  name="draftMaterialSearch"
-                  type="text"
-                  autoComplete="off"
-                  placeholder="Search item or SKU"
-                  value={quickItemInput}
-                  onChange={(e) => {
-                    setQuickItemInput(e.target.value.toUpperCase());
-                    setShowItemDropdown(true);
-                  }}
-                  onFocus={() => setShowItemDropdown(true)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') setShowItemDropdown(false);
-                  }}
-                  className={iconInputClass}
-                  aria-expanded={showItemDropdown}
-                  aria-controls="draft-item-results"
-                />
-              </div>
-              {showItemDropdown && filteredQuickProducts.length > 0 && (
-                <div id="draft-item-results" className="absolute z-50 mt-2 max-h-64 w-full overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-xl">
-                  {filteredQuickProducts.map((prod) => (
-                    <button
-                      key={prod.id}
-                      type="button"
-                      onClick={() => handleSelectProduct(prod)}
-                      className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left text-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate font-semibold text-slate-950">{prod.name}</span>
-                        <span className="block truncate text-xs text-slate-500">{prod.description || 'No description'} - Stock: {prod.totalStock ?? 0} {prod.unit || 'PCS'}</span>
-                      </span>
-                      <PackagePlus className="h-4 w-4 shrink-0 text-blue-700" aria-hidden="true" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {draftEntry.items.length > 0 ? (
-              <div className="mt-4 space-y-3">
-                {draftEntry.items.map(item => (
-                  <div key={item.productId} className="grid gap-3 rounded-md border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-950">{item.name}</p>
-                      <p className="truncate text-xs text-slate-500">{item.description || 'No description'} - {item.availableQty} available</p>
-                    </div>
-                    <div className="w-full md:w-28">
-                      <label htmlFor={`draft-qty-${item.productId}`} className="mb-1 block text-xs font-semibold text-slate-600">Qty</label>
-                      <input
-                        id={`draft-qty-${item.productId}`}
-                        name={`draftQty-${item.productId}`}
-                        type="number"
-                        inputMode="numeric"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) => updateDraftItemQuantity(item.productId, parseInt(e.target.value) || 1)}
-                        className="min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-center text-sm font-semibold tabular-nums text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeProductFromDraft(item.productId)}
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="mt-4 rounded-md border border-dashed border-blue-200 bg-white px-4 py-6 text-center text-sm text-slate-500">
-                Search and add at least one material for this employee.
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={confirmDraftEntry}
-              disabled={draftEntry.items.length === 0}
-              className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300"
+        <AnimatePresence>
+          {draftEntry && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
             >
-              <CheckCircle className="h-4 w-4" aria-hidden="true" />
-              Add Employee to Request
-            </button>
-          </div>
-        )}
-      </div>
-    </section>
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                <div className="mb-2 flex items-start justify-between gap-2.5">
+                  <div className="flex items-start gap-2">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                      <ClipboardList className="h-3.5 w-3.5" aria-hidden="true" />
+                    </span>
+                    <div>
+                      <h4 className="text-xs font-bold text-foreground">Assign Materials for {draftEntry.lastName}, {draftEntry.firstName}</h4>
+                      <p className="text-[10px] text-muted-foreground leading-tight">Search items, set quantities, then confirm.</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => setDraftEntry(null)}
+                    aria-label="Cancel material assignment"
+                    className="h-6 w-6 text-muted-foreground"
+                  >
+                    <X className="h-3.5 w-3.5" aria-hidden="true" />
+                  </Button>
+                </div>
+
+                <div className="relative">
+                  <Label htmlFor="draft-item-search" className="text-xs">Material Search</Label>
+                  <div className="relative mt-1">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                    <Input
+                      ref={itemSearchRef}
+                      id="draft-item-search"
+                      name="draftMaterialSearch"
+                      autoComplete="off"
+                      placeholder="Search item or SKU..."
+                      value={quickItemInput}
+                      onChange={(e) => {
+                        setQuickItemInput(e.target.value.toUpperCase());
+                        setShowItemDropdown(true);
+                      }}
+                      onFocus={() => setShowItemDropdown(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') setShowItemDropdown(false);
+                      }}
+                      className="pl-8 h-8 text-xs"
+                      aria-expanded={showItemDropdown}
+                      aria-controls="draft-item-results"
+                    />
+                  </div>
+                  {showItemDropdown && filteredQuickProducts.length > 0 && (
+                    <div id="draft-item-results" className="absolute z-50 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-border bg-popover py-1 shadow-lg ring-1 ring-foreground/5">
+                      {filteredQuickProducts.map((prod) => (
+                        <button
+                          key={prod.id}
+                          type="button"
+                          onClick={() => handleSelectProduct(prod)}
+                          className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate font-semibold text-foreground">{prod.name}</span>
+                            <span className="block truncate text-[10px] text-muted-foreground">{prod.description || 'No description'} - Stock: {prod.totalStock ?? 0} {prod.unit || 'PCS'}</span>
+                          </span>
+                          <PackagePlus className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {draftEntry.items.length > 0 ? (
+                  <div className="mt-2.5 space-y-1.5">
+                    {draftEntry.items.map(item => (
+                      <div key={item.productId} className="grid gap-2 rounded-lg border border-border bg-card p-2 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center">
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-semibold text-foreground">{item.name}</p>
+                          <p className="truncate text-[10px] text-muted-foreground">{item.description || 'No description'} - {item.availableQty} available</p>
+                        </div>
+                        <div className="w-full md:w-20">
+                          <Input
+                            id={`draft-qty-${item.productId}`}
+                            name={`draftQty-${item.productId}`}
+                            type="number"
+                            inputMode="numeric"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => updateDraftItemQuantity(item.productId, parseInt(e.target.value) || 1)}
+                            className="text-center font-semibold tabular-nums h-8 text-xs py-1"
+                          />
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          onClick={() => removeProductFromDraft(item.productId)}
+                          className="text-muted-foreground hover:text-destructive h-8 px-2 text-xs"
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" aria-hidden="true" />
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-2 rounded-lg border border-dashed border-primary/20 bg-card px-3 py-4 text-center text-[11px] text-muted-foreground">
+                    Search and add materials for this employee.
+                  </div>
+                )}
+
+                <Button
+                  onClick={confirmDraftEntry}
+                  disabled={draftEntry.items.length === 0}
+                  className="mt-2.5 w-full h-8 text-xs font-semibold"
+                  size="sm"
+                >
+                  <CheckCircle className="h-3.5 w-3.5 mr-1" aria-hidden="true" />
+                  Add Employee Request Row
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <RSQCartSection
+          selectedItems={selectedItems}
+          employees={employees}
+          updateCartItemQuantity={updateCartItemQuantity}
+          removeCartItem={removeCartItem}
+          handleOpenSubmitModal={handleOpenSubmitModal}
+          isSubmitting={isSubmitting}
+          onSaveDraft={onSaveDraft}
+          savedDrafts={savedDrafts}
+          onLoadDraft={onLoadDraft}
+          onDeleteDraft={onDeleteDraft}
+        />
+      </CardContent>
+    </Card>
   );
 };

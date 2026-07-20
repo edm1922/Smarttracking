@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+'use client';
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   AlertCircle,
   ArrowDownWideNarrow,
@@ -8,13 +10,25 @@ import {
   ArrowUpWideNarrow,
   Bell,
   Box,
+  ChevronDown,
+  Loader2,
   PackagePlus,
   Search,
+  Sparkles,
+  TrendingUp,
   Warehouse,
   X,
 } from 'lucide-react';
 import { Product } from './RSQTypes';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import api from '@/lib/api';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const sortOptions = [
   { value: 'name-asc', label: 'A-Z', icon: ArrowUpWideNarrow },
@@ -35,28 +49,39 @@ interface Notification {
   expiresAt: string;
 }
 
-interface RSQItemExplorerProps {
-  productSearch: string;
-  setProductSearch: (val: string) => void;
-  displayProducts: Product[];
-  sortBy: string;
-  setSortBy: (val: string) => void;
-  onAddProduct: (product: Product) => void;
-  canAddProducts: boolean;
-  requestCountMap: Record<string, number>;
+interface MostRequested {
+  productId: string;
+  productName: string;
+  requestCount: number;
 }
 
+interface RSQItemExplorerProps {
+  locationId: string;
+  onAddProduct: (product: Product) => void;
+  canAddProducts: boolean;
+  mostRequested: MostRequested[];
+}
+
+const DEBOUNCE_MS = 300;
+const PAGE_SIZE = 10;
+
 export const RSQItemExplorer: React.FC<RSQItemExplorerProps> = ({
-  productSearch,
-  setProductSearch,
-  displayProducts,
-  sortBy,
-  setSortBy,
+  locationId,
   onAddProduct,
   canAddProducts,
-  requestCountMap,
+  mostRequested,
 }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('name-asc');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
   const fetchNotifications = async () => {
     try {
@@ -75,185 +100,340 @@ export const RSQItemExplorer: React.FC<RSQItemExplorerProps> = ({
     return () => clearInterval(interval);
   }, []);
 
-  const prioritizedProducts = (() => {
-    const notifiedIds = new Set(notifications.map(n => n.productId));
-    const notified = displayProducts.filter(p => notifiedIds.has(p.id));
-    const rest = displayProducts.filter(p => !notifiedIds.has(p.id));
-    return [...notified, ...rest];
-  })();
+  const searchProducts = useCallback(async (query: string, page: number = 0, append: boolean = false) => {
+    setIsSearching(true);
+    try {
+      const res = await api.get('/products', {
+        params: {
+          search: query.trim() || undefined,
+          take: PAGE_SIZE,
+          skip: page * PAGE_SIZE,
+        },
+      });
+      const data = res.data.data || res.data || [];
+      const total = res.data.total || data.length;
+      if (append) {
+        setProducts(prev => [...prev, ...data]);
+      } else {
+        setProducts(data);
+      }
+      setTotalCount(total);
+      setHasSearched(true);
+    } catch {
+      if (!append) setProducts([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    searchProducts('', 0, false);
+  }, [searchProducts]);
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(0);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      searchProducts(value, 0, false);
+    }, DEBOUNCE_MS);
+  };
+
+  const handleLoadMore = useCallback(() => {
+    const nextPage = currentPage + 1;
+    setCurrentPage(nextPage);
+    searchProducts(searchQuery, nextPage, true);
+  }, [currentPage, searchQuery, searchProducts]);
+
+  const loadMoreSentinelRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (isSearching) return;
+      if (observerRef.current) observerRef.current.disconnect();
+      observerRef.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && products.length < totalCount) {
+          handleLoadMore();
+        }
+      });
+      if (node) observerRef.current.observe(node);
+    },
+    [isSearching, products.length, totalCount, handleLoadMore]
+  );
+
+  const handleQuickAdd = async (item: MostRequested) => {
+    try {
+      const res = await api.get('/products', {
+        params: { search: item.productName, take: 1 },
+      });
+      const data = res.data.data || res.data || [];
+      const product = data.find((p: Product) => p.id === item.productId) || data[0];
+      if (product) {
+        onAddProduct(product);
+      }
+    } catch {}
+  };
+
+  const getProductStock = (product: Product) => {
+    return product.stocks?.find(s => s.location?.id === locationId)?.quantity || 0;
+  };
+
+  const displayProducts = [...products]
+    .map(p => ({ ...p, totalStock: getProductStock(p) }))
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'name-desc': return b.name.localeCompare(a.name);
+        case 'stock-high': return (b.totalStock || 0) - (a.totalStock || 0);
+        case 'stock-low': return (a.totalStock || 0) - (b.totalStock || 0);
+        default: return a.name.localeCompare(b.name);
+      }
+    });
+
+  const notifiedIds = new Set(notifications.map(n => n.productId));
+  const notified = displayProducts.filter(p => notifiedIds.has(p.id));
+  const rest = displayProducts.filter(p => !notifiedIds.has(p.id));
+  const prioritizedProducts = [...notified, ...rest];
+
+  const hasMore = products.length < totalCount;
 
   return (
-    <aside className="sticky top-4 rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 p-5">
-        <div className="flex items-start justify-between gap-3">
+    <aside className="sticky top-4">
+      <Card>
+        <CardHeader className="py-2.5 px-3 border-b">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-xs font-bold">Materials</CardTitle>
+            </div>
+            {hasSearched && (
+              <Badge variant="outline" className="text-[9px] tabular-nums px-1 py-0 h-4">
+                {totalCount} items
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-2 p-3 pb-2">
           <div>
-            <p className="text-xs font-semibold uppercase text-blue-700">Step 3</p>
-            <h2 className="text-lg font-semibold text-slate-950">Material Picker</h2>
-            <p className="mt-1 text-sm text-slate-500">Search inventory, check stock, then add items to the requisition.</p>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input
+                ref={searchInputRef}
+                id="rsq-product-search"
+                name="productSearch"
+                type="search"
+                autoComplete="off"
+                placeholder="Type to search inventory..."
+                value={searchQuery}
+                onChange={e => handleSearchChange(e.target.value.toUpperCase())}
+                className="pl-8 h-8 text-xs"
+              />
+              {isSearching && (
+                <Loader2 className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />
+              )}
+            </div>
           </div>
-          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 tabular-nums">
-            {displayProducts.length} found
-          </span>
-        </div>
 
-        <div className="mt-4">
-          <label htmlFor="rsq-product-search" className="mb-1.5 block text-sm font-semibold text-slate-800">Search Products</label>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-            <input
-              id="rsq-product-search"
-              name="productSearch"
-              type="search"
-              autoComplete="off"
-              placeholder="Product name or SKU"
-              value={productSearch}
-              onChange={e => setProductSearch(e.target.value.toUpperCase())}
-              className="min-h-11 w-full rounded-md border border-slate-300 bg-white py-2 pl-10 pr-3 text-sm font-medium text-slate-950 shadow-sm transition-colors placeholder:text-slate-400 hover:border-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1"
-            />
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2" aria-label="Sort products">
-          {sortOptions.map(opt => {
-            const Icon = opt.icon;
-            const active = sortBy === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setSortBy(opt.value)}
-                className={`inline-flex min-h-9 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${
-                  active
-                    ? 'bg-slate-900 text-white hover:bg-slate-800'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-                aria-pressed={active}
-              >
-                <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {!canAddProducts && (
-          <div className="mt-4 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>Add at least one employee before adding materials from this picker.</span>
-          </div>
-        )}
-      </div>
-
-      <div className="max-h-[calc(100dvh-18rem)] overflow-y-auto p-4 custom-scrollbar">
-        {notifications.length > 0 && (
-          <div className="mb-4 space-y-2" aria-label="Stock alerts">
-            {notifications.map(n => {
-              const isIn = n.type === 'STOCK_IN';
+          <div className="flex flex-wrap gap-1" aria-label="Sort products">
+            {sortOptions.map(opt => {
+              const Icon = opt.icon;
+              const active = sortBy === opt.value;
               return (
-                <div
-                  key={n.id}
-                  className={`flex items-start gap-3 rounded-md border p-3 ${
-                    isIn ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'
-                  }`}
+                <Button
+                  key={opt.value}
+                  variant={active ? 'default' : 'secondary'}
+                  size="xs"
+                  onClick={() => setSortBy(opt.value)}
+                  aria-pressed={active}
+                  className="h-6 text-[10px] px-2 font-medium"
                 >
-                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${isIn ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                    {isIn ? <ArrowRightFromLine className="h-4 w-4" aria-hidden="true" /> : <ArrowLeftFromLine className="h-4 w-4" aria-hidden="true" />}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-slate-950">{n.productName}</p>
-                    <p className="mt-0.5 text-xs text-slate-600">{n.message}</p>
-                    <span className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${isIn ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                      {isIn ? 'Stock In' : 'Stock Out'}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => dismissNotification(n.id)}
-                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-white hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-                    aria-label={`Dismiss ${n.productName} alert`}
-                  >
-                    <X className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </div>
+                  <Icon className="h-2.5 w-2.5 mr-0.5" aria-hidden="true" />
+                  {opt.label}
+                </Button>
               );
             })}
           </div>
-        )}
 
-        <div className="space-y-3">
-          {prioritizedProducts.map((product) => {
-            const isNotified = notifications.some(n => n.productId === product.id);
-            const notification = notifications.find(n => n.productId === product.id);
-            const stock = product.totalStock || 0;
-            const requestCount = requestCountMap[product.id] || 0;
-            return (
-              <div
-                key={product.id}
-                className={`rounded-md border bg-white p-3 shadow-sm transition-colors ${
-                  isNotified ? 'border-amber-300 bg-amber-50' : 'border-slate-200 hover:border-blue-200'
-                }`}
-              >
-                <div className="flex gap-3">
-                  <div className={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border ${isNotified ? 'border-amber-200 bg-amber-100' : 'border-slate-200 bg-slate-50'}`}>
-                    {product.imageUrl ? (
-                      <img src={product.imageUrl} width={56} height={56} className="h-full w-full object-cover" alt={product.name} loading="lazy" />
-                    ) : (
-                      <Box className="h-6 w-6 text-slate-300" aria-hidden="true" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="min-w-0 break-words text-sm font-semibold text-slate-950">{product.name}</h3>
-                      {isNotified && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
-                          <Bell className="h-3 w-3" aria-hidden="true" />
-                          Alert
-                        </span>
-                      )}
-                      {requestCount > 0 && (
-                        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
-                          {requestCount} recent
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-1 break-words text-xs leading-5 text-slate-500">{product.description || 'No description'}</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${stock > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-                        {stock} {product.unit || 'PCS'} available
-                      </span>
-                      {notification && (
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${notification.type === 'STOCK_IN' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-                          {notification.type === 'STOCK_IN' ? 'Stock In' : 'Stock Out'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => onAddProduct(product)}
-                  disabled={!canAddProducts}
-                  className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
-                >
-                  <PackagePlus className="h-4 w-4" aria-hidden="true" />
-                  Add to Request
-                </button>
-              </div>
-            );
-          })}
-
-          {displayProducts.length === 0 && notifications.length === 0 && (
-            <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-12 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md bg-white text-slate-400 shadow-sm">
-                <Search className="h-5 w-5" aria-hidden="true" />
-              </div>
-              <p className="mt-3 text-sm font-semibold text-slate-700">No products found</p>
-              <p className="mt-1 text-sm text-slate-500">Try another product name or SKU.</p>
-            </div>
+          {!canAddProducts && (
+            <Alert className="py-1 px-2.5 border-amber-200 bg-amber-50">
+              <AlertCircle className="h-3.5 w-3.5 text-amber-600 inline-block align-middle mr-1.5" />
+              <AlertDescription className="text-[10px] text-amber-900 inline-block align-middle p-0">
+                Tag employees first to add materials.
+              </AlertDescription>
+            </Alert>
           )}
-        </div>
-      </div>
+        </CardContent>
+
+        <ScrollArea className="h-[480px] max-h-[calc(100vh-14rem)]">
+          <div className="space-y-1.5 px-3 pb-3">
+            {notifications.length > 0 && (
+              <div className="space-y-1" aria-label="Stock alerts">
+                {notifications.map(n => {
+                  const isIn = n.type === 'STOCK_IN';
+                  return (
+                    <div
+                      key={n.id}
+                      className={`flex items-start gap-2 rounded-lg border p-2 ${
+                        isIn ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'
+                      }`}
+                    >
+                      <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${isIn ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                        {isIn ? <ArrowRightFromLine className="h-3 w-3" aria-hidden="true" /> : <ArrowLeftFromLine className="h-3 w-3" aria-hidden="true" />}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-semibold text-foreground">{n.productName}</p>
+                        <p className="mt-0.5 text-[9px] leading-tight text-muted-foreground">{n.message}</p>
+                      </div>
+                      <Button variant="ghost" size="icon-xs" onClick={() => dismissNotification(n.id)} aria-label={`Dismiss ${n.productName} alert`} className="h-5 w-5 text-muted-foreground">
+                        <X className="h-3 w-3" aria-hidden="true" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {!hasSearched && !isSearching && mostRequested.length > 0 && (
+              <div>
+                <div className="mb-1.5 flex items-center gap-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  <TrendingUp className="h-3 w-3" />
+                  Most Requested
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {mostRequested.slice(0, 8).map(item => (
+                    <button
+                      key={item.productId}
+                      type="button"
+                      onClick={() => handleQuickAdd(item)}
+                      disabled={!canAddProducts}
+                      className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-[10px] font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Sparkles className="h-2.5 w-2.5 text-amber-500" />
+                      <span className="max-w-20 truncate">{item.productName}</span>
+                      <Badge variant="secondary" className="ml-0.5 text-[9px] h-3.5 px-0.5 py-0 flex items-center">{item.requestCount}</Badge>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {!hasSearched && !isSearching && notifications.length === 0 && (
+              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 px-3 py-6 text-center">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-card text-muted-foreground ring-1 ring-border">
+                  <Search className="h-3.5 w-3.5" aria-hidden="true" />
+                </div>
+                <p className="mt-2 text-xs font-semibold text-foreground">Search Inventory</p>
+                <p className="mt-0.5 text-[10px] text-muted-foreground">Find items by product name or SKU above.</p>
+              </div>
+            )}
+
+            {isSearching ? (
+              <div className="space-y-1.5">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="rounded-lg border border-border p-2 flex items-center justify-between gap-2 animate-pulse">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <Skeleton className="h-9 w-9 rounded-md shrink-0 bg-muted/60" />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <Skeleton className="h-3 w-20 bg-muted/60" />
+                        <Skeleton className="h-2.5 w-12 bg-muted/60" />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Skeleton className="h-5 w-8 rounded-md bg-muted/60" />
+                      <Skeleton className="h-7 w-7 rounded-md bg-muted/60" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <AnimatePresence mode="popLayout">
+                {prioritizedProducts.map((product) => {
+                  const isNotified = notifiedIds.has(product.id);
+                  const stock = product.totalStock || 0;
+                  return (
+                    <motion.div
+                      key={product.id}
+                      layout
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className={`rounded-lg border p-2 transition-colors flex items-center justify-between gap-2 ${
+                        isNotified ? 'border-amber-300 bg-amber-50/50' : 'border-border bg-card hover:border-primary/20'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border ${isNotified ? 'border-amber-200 bg-amber-100' : 'border-border bg-muted/30'}`}>
+                          {product.imageUrl ? (
+                            <img src={product.imageUrl} className="h-full w-full object-cover" alt={product.name} loading="lazy" />
+                          ) : (
+                            <Box className="h-4.5 w-4.5 text-muted-foreground/30" aria-hidden="true" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1">
+                            <h3 className="truncate text-xs font-bold text-foreground leading-tight">{product.name}</h3>
+                            {isNotified && (
+                              <span className="shrink-0 h-3.5 w-3.5 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center" title="Active Alert">
+                                <Bell className="h-2 w-2" />
+                              </span>
+                            )}
+                          </div>
+                          <p className="truncate text-[9px] text-muted-foreground mt-0.5">{product.sku || 'No SKU'}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Badge variant={stock > 0 ? 'secondary' : 'destructive'} className="text-[9px] py-0 px-1 h-5 flex items-center font-semibold">
+                          {stock} {product.unit || 'PCS'}
+                        </Badge>
+                        <Button
+                          variant="outline"
+                          size="icon-xs"
+                          onClick={() => onAddProduct(product)}
+                          disabled={!canAddProducts}
+                          title="Add to Request"
+                          className="h-7 w-7 border-dashed hover:border-primary hover:text-primary transition-all"
+                        >
+                          <PackagePlus className="h-3.5 w-3.5" aria-hidden="true" />
+                        </Button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            )}
+
+            {hasSearched && prioritizedProducts.length === 0 && !isSearching && (
+              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 px-3 py-6 text-center">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-card text-muted-foreground ring-1 ring-border">
+                  <Search className="h-3.5 w-3.5" aria-hidden="true" />
+                </div>
+                <p className="mt-2 text-xs font-semibold text-foreground">No products found</p>
+                <p className="mt-0.5 text-[10px] text-muted-foreground">Try another product name or SKU.</p>
+              </div>
+            )}
+
+            {hasMore && !isSearching && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-8 text-xs"
+                onClick={handleLoadMore}
+              >
+                <ChevronDown className="h-3.5 w-3.5 mr-1" />
+                Load More ({products.length}/{totalCount})
+              </Button>
+            )}
+
+            {isSearching && hasSearched && (
+              <div className="flex items-center justify-center py-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                <span className="ml-1.5 text-xs text-muted-foreground">Loading...</span>
+              </div>
+            )}
+
+            <div ref={loadMoreSentinelRef} className="h-2 w-full" />
+          </div>
+        </ScrollArea>
+      </Card>
     </aside>
   );
 };

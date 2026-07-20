@@ -595,11 +595,6 @@ export class ItemsService {
       console.error('Auto stock detection failed:', err.message);
     }
 
-    // Log the submission
-    const unitValue = fieldValues?.find((fv: any) => fv.value?.useUnitQty)?.value;
-    const logQuantity = unitValue?.qty || 1;
-    const logUnit = unitValue?.unit || 'Units';
-    
     await this.logsService.create({
       userId: systemUser?.id || '7b026b2a-d53a-486d-9a15-3cc0229e43cf', 
       itemId: item.id,

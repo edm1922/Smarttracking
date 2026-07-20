@@ -462,6 +462,7 @@ export class InternalRequestsService {
       const allRequests = await this.prisma.internalRequest.findMany({
         select: { employeeName: true, employeeRole: true, departmentArea: true },
         orderBy: { createdAt: 'desc' },
+        take: 1000,
       });
       
       // Manual distinct in memory — keeps most recent record per employee
