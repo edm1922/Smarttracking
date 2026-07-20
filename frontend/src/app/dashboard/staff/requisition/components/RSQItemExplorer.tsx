@@ -76,6 +76,7 @@ export const RSQItemExplorer: React.FC<RSQItemExplorerProps> = ({
   const [sortBy, setSortBy] = useState('name-asc');
   const [products, setProducts] = useState<Product[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
@@ -101,7 +102,12 @@ export const RSQItemExplorer: React.FC<RSQItemExplorerProps> = ({
   }, []);
 
   const searchProducts = useCallback(async (query: string, page: number = 0, append: boolean = false) => {
-    setIsSearching(true);
+    if (append) {
+      setIsLoadingMore(true);
+    } else {
+      setIsSearching(true);
+    }
+
     try {
       const res = await api.get('/products', {
         params: {
@@ -123,6 +129,7 @@ export const RSQItemExplorer: React.FC<RSQItemExplorerProps> = ({
       if (!append) setProducts([]);
     } finally {
       setIsSearching(false);
+      setIsLoadingMore(false);
     }
   }, []);
 
@@ -140,23 +147,27 @@ export const RSQItemExplorer: React.FC<RSQItemExplorerProps> = ({
   };
 
   const handleLoadMore = useCallback(() => {
+    if (isSearching || isLoadingMore) return;
     const nextPage = currentPage + 1;
     setCurrentPage(nextPage);
     searchProducts(searchQuery, nextPage, true);
-  }, [currentPage, searchQuery, searchProducts]);
+  }, [currentPage, searchQuery, searchProducts, isSearching, isLoadingMore]);
 
   const loadMoreSentinelRef = useCallback(
     (node: HTMLDivElement | null) => {
-      if (isSearching) return;
+      if (isSearching || isLoadingMore) return;
       if (observerRef.current) observerRef.current.disconnect();
-      observerRef.current = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting && products.length < totalCount) {
-          handleLoadMore();
-        }
-      });
+      observerRef.current = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting && products.length < totalCount) {
+            handleLoadMore();
+          }
+        },
+        { rootMargin: '250px 0px' }
+      );
       if (node) observerRef.current.observe(node);
     },
-    [isSearching, products.length, totalCount, handleLoadMore]
+    [isSearching, isLoadingMore, products.length, totalCount, handleLoadMore]
   );
 
   const handleQuickAdd = async (item: MostRequested) => {
@@ -204,7 +215,7 @@ export const RSQItemExplorer: React.FC<RSQItemExplorerProps> = ({
             </div>
             {hasSearched && (
               <Badge variant="outline" className="text-[9px] tabular-nums px-1 py-0 h-4">
-                {totalCount} items
+                {products.length} of {totalCount} items
               </Badge>
             )}
           </div>
@@ -411,26 +422,27 @@ export const RSQItemExplorer: React.FC<RSQItemExplorerProps> = ({
               </div>
             )}
 
-            {hasMore && !isSearching && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full h-8 text-xs"
-                onClick={handleLoadMore}
-              >
-                <ChevronDown className="h-3.5 w-3.5 mr-1" />
-                Load More ({products.length}/{totalCount})
-              </Button>
-            )}
-
-            {isSearching && hasSearched && (
-              <div className="flex items-center justify-center py-2">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-                <span className="ml-1.5 text-xs text-muted-foreground">Loading...</span>
+            {isLoadingMore && (
+              <div className="space-y-1.5 pt-1">
+                {[...Array(2)].map((_, i) => (
+                  <div key={`more-skel-${i}`} className="rounded-lg border border-border p-2 flex items-center justify-between gap-2 animate-pulse opacity-70">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <Skeleton className="h-9 w-9 rounded-md shrink-0 bg-muted/60" />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <Skeleton className="h-3 w-20 bg-muted/60" />
+                        <Skeleton className="h-2.5 w-12 bg-muted/60" />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Skeleton className="h-5 w-8 rounded-md bg-muted/60" />
+                      <Skeleton className="h-7 w-7 rounded-md bg-muted/60" />
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 
-            <div ref={loadMoreSentinelRef} className="h-2 w-full" />
+            <div ref={loadMoreSentinelRef} className="h-4 w-full" />
           </div>
         </ScrollArea>
       </Card>
