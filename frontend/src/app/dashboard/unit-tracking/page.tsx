@@ -107,34 +107,6 @@ function UnitTrackingContent() {
       });
     });
 
-    const start = new Date(stockHealthRange.start + 'T00:00:00');
-    const end = new Date(stockHealthRange.end + 'T23:59:59.999');
-
-    requests.filter(r => {
-      const d = new Date(r.createdAt);
-      return r.status === 'APPROVED' && d >= start && d <= end;
-    }).forEach(req => {
-      const pName = req.item.product?.name || req.item.name;
-      if (!pName || pName.trim() === '') return;
-      
-      const isUnitTracked = req.item.fieldValues?.some((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty);
-      if (!isUnitTracked) return;
-
-      if (!summary[pName]) {
-        summary[pName] = { name: pName, totalInStock: 0, outToday: 0, inToday: 0, specs: {}, movementBreakdown: {}, inBreakdown: {} };
-      }
-      
-      summary[pName].outToday += req.qty;
-      const specString = req.item.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).map((fv: any) => {
-        const v = fv.value;
-        const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-        const fieldName = fv.field?.name || fv.name || '';
-        return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
-      }).filter(Boolean).sort().join(', ') || 'Standard';
-      if (!summary[pName].movementBreakdown[specString]) summary[pName].movementBreakdown[specString] = [];
-      summary[pName].movementBreakdown[specString].push({ qty: req.qty, date: req.createdAt, slug: req.item?.slug });
-    });
-
     stockInLogs.forEach(log => {
       const pName = log.product?.name || log.item?.name;
       if (!pName || pName.trim() === '') {
@@ -208,7 +180,7 @@ function UnitTrackingContent() {
     });
 
     return Object.values(summary);
-  }, [inventory, requests, stockInLogs, stockHealthRange]);
+  }, [inventory, stockInLogs, stockHealthRange]);
 
   // API Fetches
   const fetchInventory = async () => {
