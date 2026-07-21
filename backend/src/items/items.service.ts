@@ -282,32 +282,6 @@ export class ItemsService {
       console.error('Auto stock detection failed:', err.message);
     }
 
-    // Auto-detect stock movement from unit-tracking field qty changes
-    try {
-      const oldUnitField = item.fieldValues?.find((fv: any) => fv.value && typeof fv.value === 'object' && (fv.value as any).useUnitQty);
-      const newFieldValuesPayload = data.fieldValues || [];
-      const newUnitField = newFieldValuesPayload.find((fv: any) => fv.value?.useUnitQty);
-
-      if (newUnitField || oldUnitField) {
-        const oldQty = oldUnitField ? Number((oldUnitField.value as any).qty) || 0 : 0;
-        const newQty = newUnitField ? Number(newUnitField.value.qty) || 0 : 0;
-        const qtyDiff = newQty - oldQty;
-
-        if (qtyDiff !== 0) {
-          const type = qtyDiff > 0 ? 'IN' : 'OUT';
-          const absDiff = Math.abs(qtyDiff);
-          await this.logsService.create({
-            userId,
-            itemId: item.id,
-            action: `STOCK_${type}`,
-            changes: { quantity: absDiff },
-          });
-        }
-      }
-    } catch (err) {
-      console.error('Auto stock detection failed:', err.message);
-    }
-
     return updatedItem;
   }
 
