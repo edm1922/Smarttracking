@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Printer } from 'lucide-react';
+import { Printer, Save, RefreshCw } from 'lucide-react';
 import api from '@/lib/api';
 import { TransmittalHeaderInfo, TransmittalItem } from '../types';
 import { TransmittalHeaderForm } from '../components/TransmittalHeaderForm';
 import { TransmittalItemSelector } from '../components/TransmittalItemSelector';
 import { TransmittalSelectedItems } from '../components/TransmittalSelectedItems';
 import { PrintableTransmittal } from '../components/PrintableTransmittal';
+import { TransmittalHistory } from '../components/TransmittalHistory';
 
 export default function ProductTransmittalPage() {
   const [products, setProducts] = useState<any[]>([]);
@@ -23,6 +24,10 @@ export default function ProductTransmittalPage() {
   const [isPrinting, setIsPrinting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
+  const [transmittalHistory, setTransmittalHistory] = useState<any[]>([]);
+  const [editingTransmittalId, setEditingTransmittalId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // Transmittal Header Info
   const [headerInfo, setHeaderInfo] = useState<TransmittalHeaderInfo>({
@@ -64,7 +69,10 @@ export default function ProductTransmittalPage() {
           description: p.description,
           unit: p.unit || 'PCS',
           quantity: 1,
-          logIds: []
+          logIds: [],
+          price: p.price || 0,
+          markupPercent: p.markupPercent ?? null,
+          supplier: p.supplier || null
         })));
         localStorage.removeItem('pending_transmittal');
       }
@@ -102,10 +110,127 @@ export default function ProductTransmittalPage() {
     }
   };
 
+  const fetchTransmittalHistory = async () => {
+    try {
+      const res = await api.get('/transmittals');
+      setTransmittalHistory(res.data || []);
+    } catch (err) {
+      console.error('Failed to fetch transmittal history', err);
+    }
+  };
+
+  const saveTransmittal = async () => {
+    if (selectedItems.length === 0) {
+      alert('Add items before saving.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = {
+        subject: headerInfo.subject,
+        department: headerInfo.department,
+        endUser: headerInfo.endUser,
+        position: headerInfo.position,
+        sourceSupplier: headerInfo.sourceSupplier,
+        subTitle: headerInfo.subTitle,
+        customSubHeader: headerInfo.customSubHeader,
+        transmittalType,
+        items: selectedItems,
+        preparedBy: headerInfo.preparedBy,
+        checkedBy: headerInfo.checkedBy,
+        receivedBy: headerInfo.receivedBy,
+        approvedBy: headerInfo.approvedBy,
+        signatoryConfig: {
+          showPrepared: headerInfo.showPrepared,
+          showChecked: headerInfo.showChecked,
+          showReceived: headerInfo.showReceived,
+          showApproved: headerInfo.showApproved,
+        },
+      };
+
+      if (editingTransmittalId) {
+        await api.patch(`/transmittals/${editingTransmittalId}`, payload);
+      } else {
+        const res = await api.post('/transmittals', payload);
+        setEditingTransmittalId(res.data.id);
+        setHeaderInfo(prev => ({ ...prev, transmittalNo: res.data.transmittalNo }));
+      }
+      await fetchTransmittalHistory();
+    } catch (err) {
+      console.error('Failed to save transmittal', err);
+      alert('Failed to save transmittal. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const loadTransmittal = (t: any) => {
+    setEditingTransmittalId(t.id);
+    setHeaderInfo({
+      transmittalNo: t.transmittalNo,
+      date: t.date ? new Date(t.date).toLocaleDateString('en-CA') : '',
+      department: t.department || '',
+      endUser: t.endUser || '',
+      position: t.position || '',
+      sourceSupplier: t.sourceSupplier || '',
+      subject: t.subject || '',
+      subTitle: t.subTitle || '',
+      customSubHeader: t.customSubHeader || '',
+      preparedBy: t.preparedBy || '',
+      checkedBy: t.checkedBy || '',
+      receivedBy: t.receivedBy || '',
+      approvedBy: t.approvedBy || '',
+      showPrepared: t.signatoryConfig?.showPrepared ?? true,
+      showChecked: t.signatoryConfig?.showChecked ?? false,
+      showReceived: t.signatoryConfig?.showReceived ?? true,
+      showApproved: t.signatoryConfig?.showApproved ?? true,
+    });
+    setTransmittalType(t.transmittalType || 'MATERIAL');
+    setSelectedItems(Array.isArray(t.items) ? t.items : []);
+  };
+
+  const deleteTransmittal = async (id: string) => {
+    try {
+      await api.delete(`/transmittals/${id}`);
+      if (editingTransmittalId === id) resetTransmittal();
+      await fetchTransmittalHistory();
+    } catch (err) {
+      console.error('Failed to delete transmittal', err);
+    }
+  };
+
+  const resetTransmittal = async () => {
+    setEditingTransmittalId(null);
+    setSelectedItems([]);
+    try {
+      const res = await api.get('/transmittals/next-no');
+      setHeaderInfo(prev => ({
+        ...prev,
+        transmittalNo: res.data,
+        date: new Date().toLocaleDateString('en-CA'),
+        department: '',
+        endUser: '',
+        position: '',
+        sourceSupplier: '',
+        subject: 'Material Transmittal',
+      }));
+    } catch {
+      setHeaderInfo(prev => ({
+        ...prev,
+        transmittalNo: `TR-${Date.now().toString().slice(-6)}`,
+        date: new Date().toLocaleDateString('en-CA'),
+        department: '',
+        endUser: '',
+        position: '',
+        sourceSupplier: '',
+        subject: 'Material Transmittal',
+      }));
+    }
+  };
+
   useEffect(() => {
     setHeaderInfo(prev => ({
       ...prev,
-      transmittalNo: prev.transmittalNo || `TR-${Date.now().toString().slice(-6)}`,
       date: prev.date || new Date().toLocaleDateString('en-CA')
     }));
 
@@ -122,7 +247,21 @@ export default function ProductTransmittalPage() {
       }
     };
 
+    const fetchNextNo = async () => {
+      try {
+        const res = await api.get('/transmittals/next-no');
+        setHeaderInfo(prev => ({ ...prev, transmittalNo: res.data }));
+      } catch {
+        setHeaderInfo(prev => ({
+          ...prev,
+          transmittalNo: prev.transmittalNo || `TR-${Date.now().toString().slice(-6)}`
+        }));
+      }
+    };
+
     loadPreset();
+    fetchNextNo();
+    fetchTransmittalHistory();
     setMounted(true);
   }, []);
 
@@ -177,7 +316,10 @@ export default function ProductTransmittalPage() {
       sku: product.sku,
       description: product.description,
       unit: product.unit || 'PCS',
-      quantity: 1
+      quantity: 1,
+      price: product.price || 0,
+      markupPercent: product.markupPercent ?? null,
+      supplier: product.supplier || null
     }]);
   };
 
@@ -227,6 +369,9 @@ export default function ProductTransmittalPage() {
       description: log.product.description,
       unit: log.product.unit || 'PCS',
       quantity: log.quantity,
+      price: log.product.price || 0,
+      markupPercent: log.product.markupPercent ?? null,
+      supplier: log.product.supplier || null,
       requestedBy: parsedRequester || 'System Personnel',
       dateRequested: new Date(log.createdAt).toLocaleDateString()
     }]);
@@ -260,6 +405,9 @@ export default function ProductTransmittalPage() {
       description: rel.specs || rel.description || foundProduct?.description,
       unit: resolvedUnit,
       quantity: rel.qty,
+      price: foundProduct?.price || 0,
+      markupPercent: foundProduct?.markupPercent ?? null,
+      supplier: foundProduct?.supplier || null,
       requestedBy: rel.employeeName,
       dateRequested: new Date(rel.date).toLocaleDateString()
     }]);
@@ -280,6 +428,33 @@ export default function ProductTransmittalPage() {
   const updateQuantity = (id: string, qty: number) => {
     setSelectedItems(selectedItems.map(item =>
       item.id === id ? { ...item, quantity: Math.max(1, qty) } : item
+    ));
+  };
+
+  const updateItemPrice = (id: string, price: number) => {
+    setSelectedItems(selectedItems.map(item =>
+      item.id === id ? { ...item, price: Math.max(0, price) } : item
+    ));
+  };
+
+  const updateItemMarkup = (id: string, markup: number | null) => {
+    setSelectedItems(selectedItems.map(item =>
+      item.id === id ? { ...item, markupPercent: markup } : item
+    ));
+  };
+
+  const updateItemSellingPrice = (id: string, sellingPrice: number) => {
+    setSelectedItems(selectedItems.map(item => {
+      if (item.id !== id) return item;
+      if (item.price <= 0) return item;
+      const markup = ((sellingPrice / item.price) - 1) * 100;
+      return { ...item, markupPercent: Math.max(0, markup) };
+    }));
+  };
+
+  const updateItemSupplier = (id: string, supplier: string) => {
+    setSelectedItems(selectedItems.map(item =>
+      item.id === id ? { ...item, supplier } : item
     ));
   };
 
@@ -339,14 +514,33 @@ export default function ProductTransmittalPage() {
             <h1 className="text-3xl font-black text-gray-900 tracking-tight">Stock Transmittal Builder</h1>
             <p className="text-sm font-bold text-gray-500 uppercase tracking-widest mt-2">Create transmittals for stock issuance and movements</p>
           </div>
-          <button
-            onClick={handlePrint}
-            disabled={selectedItems.length === 0}
-            className="inline-flex items-center rounded-xl bg-primary px-8 py-4 text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-primary/20 hover:bg-primary-dark hover:-translate-y-0.5 transition-all active:translate-y-0 disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none"
-          >
-            <Printer className="mr-3 h-5 w-5" />
-            Generate & Print
-          </button>
+          <div className="flex items-center gap-3">
+            {editingTransmittalId && (
+              <button
+                onClick={resetTransmittal}
+                className="inline-flex items-center rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-50 transition-all"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                New
+              </button>
+            )}
+            <button
+              onClick={saveTransmittal}
+              disabled={selectedItems.length === 0 || saving}
+              className="inline-flex items-center rounded-xl border border-blue-600 bg-white px-5 py-3 text-sm font-bold uppercase tracking-wider text-blue-700 hover:bg-blue-50 transition-all disabled:opacity-50"
+            >
+              <Save className="mr-2 h-4 w-4" />
+              {saving ? 'Saving...' : editingTransmittalId ? 'Update' : 'Save'}
+            </button>
+            <button
+              onClick={handlePrint}
+              disabled={selectedItems.length === 0}
+              className="inline-flex items-center rounded-xl bg-primary px-8 py-4 text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-primary/20 hover:bg-primary-dark hover:-translate-y-0.5 transition-all active:translate-y-0 disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none"
+            >
+              <Printer className="mr-3 h-5 w-5" />
+              Generate & Print
+            </button>
+          </div>
         </div>
 
         <div className="flex bg-white p-1.5 rounded-2xl border border-gray-100 shadow-lg shadow-gray-100/50 w-fit no-print">
@@ -403,16 +597,31 @@ export default function ProductTransmittalPage() {
                 selectedItems={selectedItems}
                 removeItem={removeItem}
                 updateQuantity={updateQuantity}
+                showPricing={showPricing}
+                setShowPricing={setShowPricing}
+                updateItemPrice={updateItemPrice}
+                updateItemMarkup={updateItemMarkup}
+                updateItemSellingPrice={updateItemSellingPrice}
+                updateItemSupplier={updateItemSupplier}
               />
             </div>
           </div>
         </div>
       </div>
 
+      <div className="no-print">
+        <TransmittalHistory
+          history={transmittalHistory}
+          loadTransmittal={loadTransmittal}
+          deleteTransmittal={deleteTransmittal}
+        />
+      </div>
+
       <PrintableTransmittal 
         headerInfo={headerInfo}
         transmittalType={transmittalType}
         selectedItems={selectedItems}
+        showPricing={showPricing}
       />
 
       <style jsx global>{`

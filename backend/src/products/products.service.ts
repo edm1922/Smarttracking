@@ -120,6 +120,8 @@ export class ProductsService {
     sku: string;
     name: string;
     description?: string;
+    supplier?: string;
+    markupPercent?: number;
     unit?: string;
     price?: number;
     threshold?: number;
@@ -449,6 +451,8 @@ export class ProductsService {
       sku,
       name,
       description,
+      supplier,
+      markupPercent,
       price,
       threshold,
       unit,
@@ -462,6 +466,8 @@ export class ProductsService {
     if (sku !== undefined) updateData.sku = sku;
     if (name !== undefined) updateData.name = name;
     if (description !== undefined) updateData.description = description;
+    if (supplier !== undefined) updateData.supplier = supplier;
+    if (markupPercent !== undefined) updateData.markupPercent = markupPercent !== null ? Number(markupPercent) : null;
     if (price !== undefined) updateData.price = Number(price);
     if (threshold !== undefined) updateData.threshold = Number(threshold);
     if (unit !== undefined) updateData.unit = unit;

@@ -46,6 +46,9 @@ export interface TransmittalItem {
   description?: string | null;
   unit: string;
   quantity: number;
+  price: number;
+  markupPercent?: number | null;
+  supplier?: string | null;
   requestedBy?: string;
   dateRequested?: string;
 }

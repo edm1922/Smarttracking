@@ -21,6 +21,8 @@ const apiPrefixes = [
   'budget-requests',
   'rsq',
   'system-analytics',
+  'purchase-requests',
+  'transmittals',
 ];
 
 const nextConfig: NextConfig = {

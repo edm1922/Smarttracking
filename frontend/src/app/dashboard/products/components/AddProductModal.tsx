@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Location } from '../types';
 
@@ -28,6 +29,14 @@ export function AddProductModal({
   isAddingCustomUnit,
   setIsAddingCustomUnit
 }: AddProductModalProps) {
+  const effectiveMarkup = form.markupPercent ?? parseFloat(typeof window !== 'undefined' ? localStorage.getItem('global_markup_percent') || '0' : '0');
+  const computedSellingPrice = form.price > 0 ? parseFloat((form.price * (1 + effectiveMarkup / 100)).toFixed(2)) : 0;
+  const [sellingPriceInput, setSellingPriceInput] = useState(computedSellingPrice.toString());
+
+  useEffect(() => {
+    setSellingPriceInput(computedSellingPrice > 0 ? computedSellingPrice.toString() : '');
+  }, [form.markupPercent, form.price]);
+
   if (!isOpen) return null;
 
   return (
@@ -53,6 +62,24 @@ export function AddProductModal({
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Description</label>
                 <input type="text" value={form.description} onChange={(e) => setForm({...form, description: e.target.value})} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary outline-none" maxLength={500} aria-label="Item description" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Supplier</label>
+                <input type="text" value={form.supplier || ''} onChange={(e) => setForm({...form, supplier: e.target.value})} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary outline-none" maxLength={200} placeholder="Optional supplier name" aria-label="Supplier name" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Markup %</label>
+                  <input type="number" step="0.01" min="0" max="9999" value={form.markupPercent ?? ''} onChange={(e) => setForm({...form, markupPercent: e.target.value === '' ? null : parseFloat(e.target.value) || 0})} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary outline-none" placeholder={`Default: ${typeof window !== 'undefined' ? localStorage.getItem('global_markup_percent') || '0' : '0'}%`} aria-label="Markup percentage" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-green-600 uppercase mb-1">Selling Price</label>
+                  {form.price > 0 ? (
+                    <input type="number" step="0.01" min="0" value={sellingPriceInput} onChange={(e) => { setSellingPriceInput(e.target.value); const val = parseFloat(e.target.value); if (!isNaN(val) && val >= 0) { const markup = ((val / form.price) - 1) * 100; setForm({...form, markupPercent: Math.max(0, markup)}); } else if (e.target.value === '') { setForm({...form, markupPercent: null}); } }} className="w-full rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm font-semibold text-green-700 focus:border-green-500 outline-none" aria-label="Selling price" />
+                  ) : (
+                    <input disabled value="" placeholder="Set cost price first" className="w-full rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-400 cursor-not-allowed" />
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>

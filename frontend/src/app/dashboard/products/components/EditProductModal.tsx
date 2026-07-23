@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { X, Tag, Eye, Trash2, ImageIcon, MapPin, Database, Info, ShoppingCart } from 'lucide-react';
 import { Product, Location } from '../types';
 
@@ -60,6 +61,14 @@ export function EditProductModal({
   setIsAddingCustomUnitEdit,
   locations
 }: EditProductModalProps) {
+  const effectiveMarkup = editingProduct.markupPercent ?? parseFloat(typeof window !== 'undefined' ? localStorage.getItem('global_markup_percent') || '0' : '0');
+  const computedSellingPrice = editingProduct.price > 0 ? parseFloat((editingProduct.price * (1 + effectiveMarkup / 100)).toFixed(2)) : 0;
+  const [sellingPriceInput, setSellingPriceInput] = useState(computedSellingPrice.toString());
+
+  useEffect(() => {
+    setSellingPriceInput(computedSellingPrice > 0 ? computedSellingPrice.toString() : '');
+  }, [editingProduct.markupPercent, editingProduct.price]);
+
   if (!isOpen) return null;
 
   return (
@@ -161,6 +170,10 @@ export function EditProductModal({
                     <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Description</label>
                     <input type="text" value={editingProduct.description || ''} onChange={(e) => setEditingProduct({...editingProduct, description: e.target.value})} className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-5 py-4 text-sm font-bold outline-none focus:bg-white focus:border-primary transition-all" maxLength={500} aria-label="Product description" />
                   </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Supplier</label>
+                    <input type="text" value={editingProduct.supplier || ''} onChange={(e) => setEditingProduct({...editingProduct, supplier: e.target.value})} className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-5 py-4 text-sm font-bold outline-none focus:bg-white focus:border-primary transition-all" maxLength={200} placeholder="Optional supplier name" aria-label="Supplier name" />
+                  </div>
                 </div>
               </div>
 
@@ -233,6 +246,28 @@ export function EditProductModal({
                     <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Price</label>
                     <input type="number" step="0.01" value={editingProduct.price || ''} onChange={(e) => setEditingProduct({...editingProduct, price: parseFloat(e.target.value) || 0})} className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-5 py-4 text-sm font-bold outline-none focus:bg-white focus:border-primary transition-all" />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Markup %</label>
+                    <input type="number" step="0.01" min="0" max="9999" value={editingProduct.markupPercent ?? ''} onChange={(e) => setEditingProduct({...editingProduct, markupPercent: e.target.value === '' ? null : parseFloat(e.target.value) || 0})} className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-5 py-4 text-sm font-bold outline-none focus:bg-white focus:border-primary transition-all" placeholder={`Default: ${typeof window !== 'undefined' ? localStorage.getItem('global_markup_percent') || '0' : '0'}%`} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-green-600 uppercase tracking-wider mb-1.5 ml-1">Selling Price</label>
+                    {editingProduct.price > 0 ? (
+                      <input type="number" step="0.01" min="0" value={sellingPriceInput} onChange={(e) => { setSellingPriceInput(e.target.value); const val = parseFloat(e.target.value); if (!isNaN(val) && val >= 0) { const markup = ((val / editingProduct.price) - 1) * 100; setEditingProduct({...editingProduct, markupPercent: Math.max(0, markup)}); } else if (e.target.value === '') { setEditingProduct({...editingProduct, markupPercent: null}); } }} className="w-full rounded-2xl border border-green-200 bg-green-50 px-5 py-4 text-sm font-bold text-green-700 outline-none focus:bg-white focus:border-green-500 transition-all" />
+                    ) : (
+                      <input disabled value="" placeholder="Set cost price first" className="w-full rounded-2xl border border-green-200 bg-green-50 px-5 py-4 text-sm font-bold text-green-400 cursor-not-allowed" />
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 mt-1 ml-1">
+                  <button type="button" onClick={() => { const val = prompt('Set global default markup %:', localStorage.getItem('global_markup_percent') || '0'); if (val !== null) localStorage.setItem('global_markup_percent', val); }} className="text-[10px] font-semibold text-gray-400 hover:text-primary underline uppercase tracking-wider transition-colors">
+                    Set Global Default Markup
+                  </button>
+                  <span className="text-[10px] text-gray-400">({typeof window !== 'undefined' ? localStorage.getItem('global_markup_percent') || '0' : '0'}%)</span>
                 </div>
                 
                 <div>

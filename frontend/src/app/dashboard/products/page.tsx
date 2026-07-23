@@ -45,7 +45,7 @@ export default function ProductsPage() {
   const [viewingLogProduct, setViewingLogProduct] = useState<Product | null>(null);
   const [systemLogs, setSystemLogs] = useState<any[]>([]);
   const [newProduct, setNewProduct] = useState({
-    name: '', sku: '', description: '', unit: 'PCS', price: 0, threshold: 0, showInInventory: true, initialStock: 0, initialLocationId: ''
+    name: '', sku: '', description: '', supplier: '', markupPercent: null, unit: 'PCS', price: 0, threshold: 0, showInInventory: true, initialStock: 0, initialLocationId: ''
   });
   const [releaseBulkForm, setReleaseBulkForm] = useState<{
     sourceLocationId: string;
@@ -194,7 +194,7 @@ export default function ProductsPage() {
       await api.post('/products', { ...newProduct, name: newProduct.name.trim(), description: newProduct.description.trim() });
       const isFirst = isFirstVisit;
       setIsAddModalOpen(false);
-      setNewProduct({ name: '', sku: '', description: '', unit: 'PCS', price: 0, threshold: 0, showInInventory: true, initialStock: 0, initialLocationId: '' });
+      setNewProduct({ name: '', sku: '', description: '', supplier: '', markupPercent: null, unit: 'PCS', price: 0, threshold: 0, showInInventory: true, initialStock: 0, initialLocationId: '' });
       setHasEverHadProducts(true);
       fetchData();
       if (isFirst) {

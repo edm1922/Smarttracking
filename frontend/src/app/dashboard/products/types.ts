@@ -3,6 +3,8 @@ export interface Product {
   sku: string;
   name: string;
   description: string | null;
+  supplier: string | null;
+  markupPercent: number | null;
   unit: string;
   price: number;
   threshold: number;

@@ -663,6 +663,8 @@ model Product {
   price              Float                @default(0)
   threshold          Float                @default(0)
   unit               String               @default("PCS")
+  supplier           String?
+  markupPercent      Float?
   imageUrl           String?
   imageUrl2          String?
   showInInventory    Boolean              @default(true)
@@ -1155,5 +1157,30 @@ model TailoringRequest {
 
   @@index([status])
   @@index([orderDate])
+  @@schema("public")
+}
+
+model Transmittal {
+  id              String   @id @default(uuid())
+  transmittalNo   String   @unique
+  date            DateTime @default(now())
+  subject         String?
+  department      String?
+  endUser         String?
+  position        String?
+  sourceSupplier  String?
+  subTitle        String?
+  customSubHeader String?
+  transmittalType String   @default("MATERIAL")
+  items           Json
+  preparedBy      String?
+  checkedBy       String?
+  receivedBy      String?
+  approvedBy      String?
+  signatoryConfig Json?
+  remarks         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
   @@schema("public")
 }

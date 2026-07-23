@@ -5,13 +5,24 @@ interface PrintableTransmittalProps {
   headerInfo: TransmittalHeaderInfo;
   transmittalType: 'MATERIAL' | 'EMPLOYEE';
   selectedItems: TransmittalItem[];
+  showPricing: boolean;
 }
 
 export const PrintableTransmittal: React.FC<PrintableTransmittalProps> = ({
   headerInfo,
   transmittalType,
   selectedItems,
+  showPricing,
 }) => {
+  const showPricingCols = showPricing && transmittalType === 'MATERIAL';
+
+  const getSellingPrice = (item: TransmittalItem) => {
+    const markup = item.markupPercent ?? parseFloat(typeof window !== 'undefined' ? localStorage.getItem('global_markup_percent') || '0' : '0');
+    return item.price * (1 + markup / 100);
+  };
+
+  const formatPeso = (val: number) => `₱${val.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
   return (
     <div className="hidden print:block bg-white p-12 text-gray-900 min-h-screen">
       <div className="flex justify-between items-start border-b-2 border-gray-900 pb-8 mb-12">
@@ -77,7 +88,15 @@ export const PrintableTransmittal: React.FC<PrintableTransmittalProps> = ({
               <>
                 <th className="py-2 px-3 text-left text-[8px] font-black uppercase tracking-widest w-8 border-r border-gray-900">No.</th>
                 <th className="py-2 px-3 text-left text-[8px] font-black uppercase tracking-widest border-r border-gray-900">Description</th>
-                <th className="py-2 px-3 text-left text-[8px] font-black uppercase tracking-widest w-20">Qty</th>
+                <th className="py-2 px-3 text-left text-[8px] font-black uppercase tracking-widest w-20 border-r border-gray-900">Qty</th>
+                {showPricingCols && (
+                  <>
+                    <th className="py-2 px-2 text-left text-[8px] font-black uppercase tracking-widest w-24 border-r border-gray-900">Supplier</th>
+                    <th className="py-2 px-2 text-left text-[8px] font-black uppercase tracking-widest w-20 border-r border-gray-900">Cost Price</th>
+                    <th className="py-2 px-2 text-left text-[8px] font-black uppercase tracking-widest w-16 border-r border-gray-900">Markup</th>
+                    <th className="py-2 px-2 text-left text-[8px] font-black uppercase tracking-widest w-24">Selling Price</th>
+                  </>
+                )}
               </>
             )}
           </tr>
@@ -103,13 +122,27 @@ export const PrintableTransmittal: React.FC<PrintableTransmittalProps> = ({
                     {item.name}
                     {item.description ? ` (${item.description})` : ''}
                   </td>
-                  <td className="py-2 px-3 text-[10px] font-black text-center">{item.quantity} {(item.unit || 'PCS').toUpperCase()}</td>
+                  <td className="py-2 px-3 text-[10px] font-black text-center border-r border-gray-900">{item.quantity} {(item.unit || 'PCS').toUpperCase()}</td>
+                  {showPricingCols && (
+                    <>
+                      <td className="py-2 px-2 text-[10px] font-medium border-r border-gray-900">{item.supplier || '—'}</td>
+                      <td className="py-2 px-2 text-[10px] font-bold text-right border-r border-gray-900">{formatPeso(item.price)}</td>
+                      <td className="py-2 px-2 text-[10px] font-bold text-center border-r border-gray-900">{item.markupPercent ?? parseFloat(typeof window !== 'undefined' ? localStorage.getItem('global_markup_percent') || '0' : '0')}%</td>
+                      <td className="py-2 px-2 text-[10px] font-bold text-right">{formatPeso(getSellingPrice(item))}</td>
+                    </>
+                  )}
                 </>
               )}
             </tr>
           ))}
         </tbody>
       </table>
+
+      {showPricingCols && (
+        <div className="mb-8 p-4 border border-gray-200 rounded text-[9px] font-bold text-gray-500 uppercase">
+          Pricing details shown for audit purposes. Selling Price = Cost Price x (1 + Markup % / 100).
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-x-12 gap-y-8 pt-8">
         {(['preparedBy', 'checkedBy', 'receivedBy', 'approvedBy'] as const).filter(field => {
