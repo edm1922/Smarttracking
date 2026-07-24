@@ -30,6 +30,8 @@ interface EditProductModalProps {
   standardUnits: string[];
   isAddingCustomUnitEdit: boolean;
   setIsAddingCustomUnitEdit: (adding: boolean) => void;
+  isAddingCustomPurchaseUnitEdit: boolean;
+  setIsAddingCustomPurchaseUnitEdit: (adding: boolean) => void;
   locations: Location[];
 }
 
@@ -59,6 +61,8 @@ export function EditProductModal({
   standardUnits,
   isAddingCustomUnitEdit,
   setIsAddingCustomUnitEdit,
+  isAddingCustomPurchaseUnitEdit,
+  setIsAddingCustomPurchaseUnitEdit,
   locations
 }: EditProductModalProps) {
   const effectiveMarkup = editingProduct.markupPercent ?? parseFloat(typeof window !== 'undefined' ? localStorage.getItem('global_markup_percent') || '0' : '0');
@@ -192,9 +196,9 @@ export function EditProductModal({
                   </label>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Unit</label>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Unit (Stock)</label>
                     {!isAddingCustomUnitEdit ? (
                       <div className="relative">
                         <select 
@@ -233,6 +237,56 @@ export function EditProductModal({
                           onClick={() => {
                             setIsAddingCustomUnitEdit(false);
                             setEditingProduct({ ...editingProduct, unit: 'PCS' });
+                          }}
+                          className="p-2 text-gray-500 hover:text-red-500 transition-colors"
+                          title="Back to list"
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Purchase Unit</label>
+                    {!isAddingCustomPurchaseUnitEdit ? (
+                      <div className="relative">
+                        <select 
+                          value={editingProduct.purchaseUnit || ''} 
+                          onChange={(e) => {
+                            if (e.target.value === 'ADD_NEW') {
+                              setIsAddingCustomPurchaseUnitEdit(true);
+                              setEditingProduct({ ...editingProduct, purchaseUnit: '' });
+                            } else {
+                              setEditingProduct({ ...editingProduct, purchaseUnit: e.target.value });
+                            }
+                          }} 
+                          className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-5 py-4 text-sm font-bold outline-none focus:bg-white focus:border-primary appearance-none"
+                        >
+                          <option value="">None</option>
+                          {standardUnits.map(u => (
+                            <option key={u} value={u}>{u}</option>
+                          ))}
+                          {editingProduct.purchaseUnit && !standardUnits.includes(editingProduct.purchaseUnit) && (
+                            <option value={editingProduct.purchaseUnit}>{editingProduct.purchaseUnit}</option>
+                          )}
+                          <option value="ADD_NEW">+ Add New Unit...</option>
+                        </select>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input 
+                          autoFocus
+                          type="text" 
+                          placeholder="Enter purchase unit..." 
+                          value={editingProduct.purchaseUnit || ''} 
+                          onChange={(e) => setEditingProduct({...editingProduct, purchaseUnit: e.target.value.toUpperCase()})} 
+                          className="w-full rounded-2xl border border-primary bg-white px-5 py-4 text-sm font-bold outline-none" 
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            setIsAddingCustomPurchaseUnitEdit(false);
+                            setEditingProduct({ ...editingProduct, purchaseUnit: '' });
                           }}
                           className="p-2 text-gray-500 hover:text-red-500 transition-colors"
                           title="Back to list"
@@ -327,7 +381,7 @@ export function EditProductModal({
                           onChange={(e) => setEditableStock(parseInt(e.target.value) || 0)}
                           className={`w-full bg-transparent text-5xl font-bold outline-none transition-all ${bypassStockEdit ? 'text-primary' : 'text-gray-300'}`} 
                         />
-                        <span className="text-xl font-semibold text-gray-500 mb-2">{editingProduct.unit}</span>
+                        <span className="text-xl font-semibold text-gray-500 mb-2">{editingProduct.unit}{editingProduct.purchaseUnit ? ` (buy per ${editingProduct.purchaseUnit})` : ''}</span>
                       </div>
                       
                       {bypassStockEdit ? (

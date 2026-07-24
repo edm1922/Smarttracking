@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useDebounce } from '@/hooks/useDebounce';
 import { useRouter } from 'next/navigation';
 import { Search, Plus, Filter, Download, Trash2, Package, Tag, Database, History, Info, ChevronRight, Eye, ImageIcon, X, CheckCircle, Clock, AlertTriangle, User, Bell } from 'lucide-react';
 import { toast } from 'sonner';
@@ -24,6 +25,7 @@ export default function ProductsPage() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
@@ -45,7 +47,7 @@ export default function ProductsPage() {
   const [viewingLogProduct, setViewingLogProduct] = useState<Product | null>(null);
   const [systemLogs, setSystemLogs] = useState<any[]>([]);
   const [newProduct, setNewProduct] = useState({
-    name: '', sku: '', description: '', supplier: '', markupPercent: null, unit: 'PCS', price: 0, threshold: 0, showInInventory: true, initialStock: 0, initialLocationId: ''
+    name: '', sku: '', description: '', supplier: '', markupPercent: null, unit: 'PCS', purchaseUnit: '', price: 0, threshold: 0, showInInventory: true, initialStock: 0, initialLocationId: ''
   });
   const [releaseBulkForm, setReleaseBulkForm] = useState<{
     sourceLocationId: string;
@@ -81,6 +83,8 @@ export default function ProductsPage() {
   const [activeStockSubTab, setActiveStockSubTab] = useState<'inventory' | 'history'>('inventory');
   const [isAddingCustomUnit, setIsAddingCustomUnit] = useState(false);
   const [isAddingCustomUnitEdit, setIsAddingCustomUnitEdit] = useState(false);
+  const [isAddingCustomPurchaseUnit, setIsAddingCustomPurchaseUnit] = useState(false);
+  const [isAddingCustomPurchaseUnitEdit, setIsAddingCustomPurchaseUnitEdit] = useState(false);
   const [isSavingProduct, setIsSavingProduct] = useState(false);
   const [isReleasing, setIsReleasing] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -103,7 +107,7 @@ export default function ProductsPage() {
   // Effects
   useEffect(() => {
     fetchData();
-  }, [page, searchTerm]);
+  }, [page, debouncedSearchTerm]);
 
   // Auto-open product modal from ?selected=ID query param
   useEffect(() => {
@@ -139,7 +143,7 @@ export default function ProductsPage() {
     setError(null);
     try {
       const [prodRes, locRes] = await Promise.all([
-        api.get('/products', { params: { skip: (page - 1) * pageSize, take: pageSize, search: searchTerm } }),
+        api.get('/products', { params: { skip: (page - 1) * pageSize, take: pageSize, search: debouncedSearchTerm } }),
         api.get('/locations')
       ]);
       const data = prodRes.data.data || prodRes.data;
@@ -194,7 +198,7 @@ export default function ProductsPage() {
       await api.post('/products', { ...newProduct, name: newProduct.name.trim(), description: newProduct.description.trim() });
       const isFirst = isFirstVisit;
       setIsAddModalOpen(false);
-      setNewProduct({ name: '', sku: '', description: '', supplier: '', markupPercent: null, unit: 'PCS', price: 0, threshold: 0, showInInventory: true, initialStock: 0, initialLocationId: '' });
+      setNewProduct({ name: '', sku: '', description: '', supplier: '', markupPercent: null, unit: 'PCS', purchaseUnit: '', price: 0, threshold: 0, showInInventory: true, initialStock: 0, initialLocationId: '' });
       setHasEverHadProducts(true);
       fetchData();
       if (isFirst) {
@@ -606,6 +610,7 @@ export default function ProductsPage() {
         isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)}
         onSubmit={handleAddSubmit} form={newProduct} setForm={setNewProduct} isSaving={isSavingProduct}
         isAddingCustomUnit={isAddingCustomUnit} setIsAddingCustomUnit={setIsAddingCustomUnit} standardUnits={standardUnits}
+        isAddingCustomPurchaseUnit={isAddingCustomPurchaseUnit} setIsAddingCustomPurchaseUnit={setIsAddingCustomPurchaseUnit}
         locations={locations}
       />
 
@@ -622,6 +627,7 @@ export default function ProductsPage() {
         handleImageUpload={handleImageUpload} handleRemoveImage={handleRemoveImage}
         setPreviewImageUrl={setPreviewImageUrl} setIsPreviewOpen={setIsPreviewOpen}
         standardUnits={standardUnits} isAddingCustomUnitEdit={isAddingCustomUnitEdit} setIsAddingCustomUnitEdit={setIsAddingCustomUnitEdit}
+        isAddingCustomPurchaseUnitEdit={isAddingCustomPurchaseUnitEdit} setIsAddingCustomPurchaseUnitEdit={setIsAddingCustomPurchaseUnitEdit}
         locations={locations}
       />
       )}

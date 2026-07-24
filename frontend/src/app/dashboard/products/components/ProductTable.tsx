@@ -199,6 +199,9 @@ export function ProductTable({
                       }`}>
                         {getTotalStock(product)} / {product.threshold} {product.unit}
                       </span>
+                      {product.purchaseUnit && (
+                        <span className="text-[10px] font-medium text-gray-400 mt-0.5">per {product.purchaseUnit}</span>
+                      )}
                       {getTotalStock(product) < product.threshold && (
                         <span className="text-xs font-semibold text-red-500 mt-1 uppercase tracking-tighter animate-pulse">Needs Restock</span>
                       )}

@@ -41,6 +41,9 @@ export class ProductsService {
       name: true,
       description: true,
       unit: true,
+      purchaseUnit: true,
+      supplier: true,
+      markupPercent: true,
       price: true,
       threshold: true,
       imageUrl: true,
@@ -92,6 +95,7 @@ export class ProductsService {
         name: true,
         description: true,
         unit: true,
+        purchaseUnit: true,
         price: true,
         threshold: true,
         imageUrl: true,
@@ -123,6 +127,7 @@ export class ProductsService {
     supplier?: string;
     markupPercent?: number;
     unit?: string;
+    purchaseUnit?: string;
     price?: number;
     threshold?: number;
     initialStock?: number;
@@ -338,7 +343,7 @@ export class ProductsService {
       ];
     }
 
-    const safeTake = search ? 10000 : Math.min(take ? Number(take) : 20, 5000);
+    const safeTake = Math.min(take ? Number(take) : 20, 500);
     const start = Date.now();
 
     const [data, total] = await Promise.all([
@@ -354,7 +359,7 @@ export class ProductsService {
           createdAt: true,
           productId: true,
           locationId: true,
-          product: { select: { id: true, name: true, sku: true, unit: true, description: true } },
+          product: { select: { id: true, name: true, sku: true, unit: true, purchaseUnit: true, description: true } },
           location: { select: { id: true, name: true } },
           user: { select: { id: true, username: true } },
         },
@@ -456,6 +461,7 @@ export class ProductsService {
       price,
       threshold,
       unit,
+      purchaseUnit,
       imageUrl,
       imageUrl2,
       showInInventory,
@@ -471,6 +477,7 @@ export class ProductsService {
     if (price !== undefined) updateData.price = Number(price);
     if (threshold !== undefined) updateData.threshold = Number(threshold);
     if (unit !== undefined) updateData.unit = unit;
+    if (purchaseUnit !== undefined) updateData.purchaseUnit = purchaseUnit || null;
     if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
     if (imageUrl2 !== undefined) updateData.imageUrl2 = imageUrl2;
     if (showInInventory !== undefined) {

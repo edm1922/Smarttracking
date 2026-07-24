@@ -663,6 +663,7 @@ model Product {
   price              Float                @default(0)
   threshold          Float                @default(0)
   unit               String               @default("PCS")
+  purchaseUnit       String?
   supplier           String?
   markupPercent      Float?
   imageUrl           String?

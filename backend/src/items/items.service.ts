@@ -301,8 +301,15 @@ export class ItemsService {
       }
     };
 
-    // If there is a search term, we'll apply it to items first
-    // but the actual filtering of the groups will happen in JS to be more robust
+    // Pre-filter at DB level for name/slug to reduce rows fetched
+    // fieldValues JSON search still happens in JS below
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { slug: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
     const items = await this.prisma.item.findMany({
       where,
       select: {

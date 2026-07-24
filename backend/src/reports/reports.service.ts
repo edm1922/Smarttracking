@@ -11,60 +11,38 @@ export class ReportsService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
-  async getAnalytics(locationId?: string, startDate?: string, endDate?: string) {
-    const dateFilter: Prisma.InternalRequestWhereInput = {};
+  async getAnalytics(
+    locationId?: string,
+    startDate?: string,
+    endDate?: string,
+  ) {
+    const cacheKey = `analytics:${locationId || 'all'}:${startDate || ''}:${endDate || ''}`;
+    const cached = await this.cacheManager.get<any>(cacheKey);
+    if (cached) return cached;
+
+    // Date range setup (pure JS, no DB)
+    let filterDateStart: Date | undefined;
+    let filterDateEnd: Date | undefined;
     if (startDate || endDate) {
-      dateFilter.date = {};
       if (startDate) {
         const s = new Date(startDate);
         if (startDate.length <= 10) s.setHours(0, 0, 0, 0);
-        dateFilter.date.gte = s;
+        filterDateStart = s;
       }
       if (endDate) {
         const e = new Date(endDate);
         if (endDate.length <= 10) e.setHours(23, 59, 59, 999);
-        dateFilter.date.lte = e;
+        filterDateEnd = e;
       }
     }
 
-    // 1. Summary Stats
     const summaryWhere = {
       ...(locationId ? { locationId } : {}),
-      ...dateFilter,
+      ...(filterDateStart || filterDateEnd
+        ? { date: { gte: filterDateStart, lte: filterDateEnd } }
+        : {}),
     };
-    const totalRequests = await this.prisma.internalRequest.count({ where: summaryWhere });
-    const fulfilledRequests = await this.prisma.internalRequest.count({
-      where: { ...summaryWhere, status: 'FULFILLED' },
-    });
-    const pendingRequests = await this.prisma.internalRequest.count({
-      where: { ...summaryWhere, status: 'PENDING' },
-    });
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayRequests = await this.prisma.internalRequest.count({
-      where: {
-        ...(locationId ? { locationId } : {}),
-        createdAt: { gte: today },
-      },
-    });
-
-    // 2. Stock Distribution (Sufficient vs Need Restock) - Not affected by date range as it's current snapshot
-    const stockFilter = locationId ? Prisma.sql`WHERE ps."locationId" = ${locationId}` : Prisma.empty;
-    const stockRaw = await this.prisma.$queryRaw<any[]>`
-      SELECT 
-        COUNT(CASE WHEN ps.quantity <= p.threshold THEN 1 END)::int as "needRestock",
-        COUNT(CASE WHEN ps.quantity > p.threshold THEN 1 END)::int as "sufficient"
-      FROM "ProductStock" ps
-      JOIN "Product" p ON ps."productId" = p.id
-      ${stockFilter}
-    `;
-    const stockDistribution = [
-      { name: 'Sufficient', value: Number(stockRaw[0]?.sufficient || 0) },
-      { name: 'Need Restock', value: Number(stockRaw[0]?.needRestock || 0) },
-    ];
-
-    // 3. Monthly Issuance Trends
     let trendStartDate = new Date();
     trendStartDate.setMonth(trendStartDate.getMonth() - 6);
     if (startDate) {
@@ -78,168 +56,227 @@ export class ReportsService {
       if (endDate.length <= 10) trendEndDate.setHours(23, 59, 59, 999);
     }
 
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const monthNames = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     const monthlyDataMap: Record<string, number> = {};
-    
-    // Generate months between startDate and endDate
     let current = new Date(trendStartDate);
     current.setDate(1);
     const end = new Date(trendEndDate);
     end.setDate(1);
-
     while (current <= end) {
       const key = `${monthNames[current.getMonth()]} ${current.getFullYear()}`;
       monthlyDataMap[key] = 0;
       current.setMonth(current.getMonth() + 1);
     }
 
-    const irFilter = locationId ? Prisma.sql`AND "locationId" = ${locationId}` : Prisma.empty;
+    const irFilter = locationId
+      ? Prisma.sql`AND "locationId" = ${locationId}`
+      : Prisma.empty;
     const dateSqlFilter = Prisma.sql`AND date >= ${trendStartDate} AND date <= ${trendEndDate}`;
-    
-    const monthlyCountsRaw = await this.prisma.$queryRaw<any[]>`
-      SELECT 
-        TO_CHAR(date, 'FMMon YYYY') as month,
-        COUNT(*)::int as count
-      FROM "InternalRequest"
-      WHERE status = 'FULFILLED'
-      ${irFilter}
-      ${dateSqlFilter}
-      GROUP BY TO_CHAR(date, 'FMMon YYYY')
-    `;
+    const stockFilter = locationId
+      ? Prisma.sql`WHERE ps."locationId" = ${locationId}`
+      : Prisma.empty;
 
-    monthlyCountsRaw.forEach((row) => {
+    // Fire ALL DB queries in parallel
+    const [
+      summaryCounts,
+      stockRaw,
+      monthlyCountsRaw,
+      [transactions, internalReqs, purchaseReqs],
+      topDepartments,
+      topProductsRaw,
+      outTransactionsRaw,
+      topUsersRaw,
+      totalItems,
+      totalLocations,
+    ] = await Promise.all([
+      this.prisma.$queryRaw<any[]>`
+        SELECT
+          COUNT(*)::int as "totalRequests",
+          COUNT(*) FILTER (WHERE status = 'FULFILLED')::int as "fulfilledRequests",
+          COUNT(*) FILTER (WHERE status = 'PENDING')::int as "pendingRequests"
+        FROM "InternalRequest"
+        WHERE 1=1
+        ${locationId ? Prisma.sql`AND "locationId" = ${locationId}` : Prisma.empty}
+        ${filterDateStart ? Prisma.sql`AND date >= ${filterDateStart}` : Prisma.empty}
+        ${filterDateEnd ? Prisma.sql`AND date <= ${filterDateEnd}` : Prisma.empty}
+      `,
+      this.prisma.$queryRaw<any[]>`
+        SELECT
+          COUNT(CASE WHEN ps.quantity <= p.threshold THEN 1 END)::int as "needRestock",
+          COUNT(CASE WHEN ps.quantity > p.threshold THEN 1 END)::int as "sufficient"
+        FROM "ProductStock" ps
+        JOIN "Product" p ON ps."productId" = p.id
+        ${stockFilter}
+      `,
+      this.prisma.$queryRaw<any[]>`
+        SELECT
+          TO_CHAR(date, 'FMMon YYYY') as month,
+          COUNT(*)::int as count
+        FROM "InternalRequest"
+        WHERE status = 'FULFILLED'
+        ${irFilter}
+        ${dateSqlFilter}
+        GROUP BY TO_CHAR(date, 'FMMon YYYY')
+      `,
+      Promise.all([
+        this.prisma.productTransaction.findMany({
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          include: { product: true, location: true },
+        }),
+        this.prisma.internalRequest.findMany({
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          include: { product: true },
+        }),
+        this.prisma.purchaseRequest.findMany({
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+        }),
+      ]),
+      this.prisma.internalRequest.groupBy({
+        by: ['departmentArea'],
+        _count: { departmentArea: true },
+        where: summaryWhere,
+        orderBy: { _count: { departmentArea: 'desc' } },
+        take: 5,
+      }),
+      this.prisma.$queryRaw<any[]>`
+        SELECT p.name, SUM(ir.quantity)::int as count
+        FROM "InternalRequest" ir
+        JOIN "Product" p ON ir."productId" = p.id
+        WHERE ir.status = 'FULFILLED'
+        ${locationId ? Prisma.sql`AND ir."locationId" = ${locationId}` : Prisma.empty}
+        AND ir.date >= ${trendStartDate} AND ir.date <= ${trendEndDate}
+        GROUP BY p.name ORDER BY count DESC LIMIT 5
+      `,
+      this.prisma.$queryRaw<any[]>`
+        SELECT
+          p.id as "productId", p.name as "productName",
+          p.description as "productDescription",
+          SUM(pt.quantity)::int as count
+        FROM "ProductTransaction" pt
+        JOIN "Product" p ON pt."productId" = p.id
+        WHERE pt.type = 'OUT'
+        ${locationId ? Prisma.sql`AND pt."locationId" = ${locationId}` : Prisma.empty}
+        AND pt."createdAt" >= ${trendStartDate} AND pt."createdAt" <= ${trendEndDate}
+        GROUP BY p.id, p.name, p.description
+        ORDER BY count DESC LIMIT 5
+      `,
+      this.prisma.$queryRaw<any[]>`
+        SELECT
+          COALESCE(
+            (REGEXP_MATCH(pt.remarks, 'Req by:\\s*([^|]+)'))[1],
+            (REGEXP_MATCH(pt.remarks, 'To:\\s*([^|]+)'))[1],
+            'Admin (' || COALESCE(u.username, 'Unknown') || ')'
+          ) as name,
+          SUM(pt.quantity)::int as count
+        FROM "ProductTransaction" pt
+        LEFT JOIN "User" u ON pt."userId" = u.id
+        WHERE pt.type = 'OUT'
+        ${locationId ? Prisma.sql`AND pt."locationId" = ${locationId}` : Prisma.empty}
+        AND pt."createdAt" >= ${trendStartDate} AND pt."createdAt" <= ${trendEndDate}
+        GROUP BY name ORDER BY count DESC LIMIT 5
+      `,
+      this.prisma.product.count(),
+      this.prisma.location.count(),
+    ]);
+
+    // Compute todayRequests separately (needs createdAt filter, not date)
+    const todayRequests = await this.prisma.internalRequest.count({
+      where: {
+        ...(locationId ? { locationId } : {}),
+        createdAt: { gte: today },
+      },
+    });
+
+    // Process monthly trends
+    monthlyCountsRaw.forEach((row: any) => {
       if (monthlyDataMap[row.month] !== undefined) {
         monthlyDataMap[row.month] = row.count;
       }
     });
 
-    const monthlyTrends = Object.entries(monthlyDataMap)
-      .map(([name, count]) => ({ name, count }));
-
-    // 4. Activity Log (Combined) - Last 15 events (Snapshot)
-    const [transactions, internalReqs, purchaseReqs] = await Promise.all([
-      this.prisma.productTransaction.findMany({
-        take: 10,
-        orderBy: { createdAt: 'desc' },
-        include: { product: true, location: true },
-      }),
-      this.prisma.internalRequest.findMany({
-        take: 10,
-        orderBy: { createdAt: 'desc' },
-        include: { product: true },
-      }),
-      this.prisma.purchaseRequest.findMany({
-        take: 10,
-        orderBy: { createdAt: 'desc' },
-      }),
-    ]);
-
-    const activityLog = [
-      ...transactions.map((t) => ({
-        id: t.id,
-        type: 'STOCK',
-        title: `${t.type === 'IN' ? 'Stock In' : 'Stock Out'}: ${t.product.name}`,
-        description: `${t.quantity} ${t.product.unit} at ${t.location.name}`,
-        date: t.createdAt,
-      })),
-      ...internalReqs.map((r) => ({
-        id: r.id,
-        type: 'REQUEST',
-        title: `Internal Request: ${r.requestNo}`,
-        description: `${r.employeeName} requested ${r.quantity} ${r.product.name}`,
-        date: r.createdAt,
-      })),
-      ...purchaseReqs.map((p) => ({
-        id: p.id,
-        type: 'PR',
-        title: `Purchase Request: ${p.prNo}`,
-        description: `Dept: ${p.department} - End User: ${p.endUser}`,
-        date: p.createdAt,
-      })),
-    ]
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 15);
-
-    // 5. Employee/Dept Insights
-    const topDepartments = await this.prisma.internalRequest.groupBy({
-      by: ['departmentArea'],
-      _count: { departmentArea: true },
-      where: summaryWhere,
-      orderBy: { _count: { departmentArea: 'desc' } },
-      take: 5
-    }).then(res => res.map(d => ({ name: d.departmentArea, requests: d._count.departmentArea })));
-
-    const topProductsRaw = await this.prisma.$queryRaw<any[]>`
-      SELECT p.name, SUM(ir.quantity)::int as count
-      FROM "InternalRequest" ir
-      JOIN "Product" p ON ir."productId" = p.id
-      WHERE ir.status = 'FULFILLED' 
-      ${locationId ? Prisma.sql`AND ir."locationId" = ${locationId}` : Prisma.empty}
-      AND ir.date >= ${trendStartDate} AND ir.date <= ${trendEndDate}
-      GROUP BY p.name
-      ORDER BY count DESC
-      LIMIT 5
-    `;
-    const topProducts = topProductsRaw.map(p => ({ name: p.name, count: p.count }));
-
-    // 6. Admin Stock Transaction Summaries (OUT)
-    const outTransactionsRaw = await this.prisma.$queryRaw<any[]>`
-      SELECT 
-        p.id as "productId",
-        p.name as "productName",
-        p.description as "productDescription",
-        SUM(pt.quantity)::int as count
-      FROM "ProductTransaction" pt
-      JOIN "Product" p ON pt."productId" = p.id
-      WHERE pt.type = 'OUT' 
-      ${locationId ? Prisma.sql`AND pt."locationId" = ${locationId}` : Prisma.empty}
-      AND pt."createdAt" >= ${trendStartDate} AND pt."createdAt" <= ${trendEndDate}
-      GROUP BY p.id, p.name, p.description
-      ORDER BY count DESC
-      LIMIT 5
-    `;
-    const topConsumedStock = outTransactionsRaw.map(t => ({
-      name: t.productName,
-      description: t.productDescription || '',
-      count: t.count
-    }));
-
-    const topUsersRaw = await this.prisma.$queryRaw<any[]>`
-      SELECT 
-        COALESCE(
-          (REGEXP_MATCH(pt.remarks, 'Req by:\\s*([^|]+)'))[1],
-          (REGEXP_MATCH(pt.remarks, 'To:\\s*([^|]+)'))[1],
-          'Admin (' || COALESCE(u.username, 'Unknown') || ')'
-        ) as name,
-        SUM(pt.quantity)::int as count
-      FROM "ProductTransaction" pt
-      LEFT JOIN "User" u ON pt."userId" = u.id
-      WHERE pt.type = 'OUT' 
-      ${locationId ? Prisma.sql`AND pt."locationId" = ${locationId}` : Prisma.empty}
-      AND pt."createdAt" >= ${trendStartDate} AND pt."createdAt" <= ${trendEndDate}
-      GROUP BY name
-      ORDER BY count DESC
-      LIMIT 5
-    `;
-    const topStockUsers = topUsersRaw.map(u => ({ name: u.name, count: u.count }));
-
-    return {
+    const sc = summaryCounts[0] || {};
+    const result = {
       summary: {
-        totalRequests,
-        fulfilledRequests,
-        pendingRequests,
+        totalRequests: Number(sc.totalRequests || 0),
+        fulfilledRequests: Number(sc.fulfilledRequests || 0),
+        pendingRequests: Number(sc.pendingRequests || 0),
         todayRequests,
-        totalItems: await this.prisma.product.count(),
-        totalLocations: await this.prisma.location.count(),
+        totalItems,
+        totalLocations,
       },
-      stockDistribution,
-      monthlyTrends,
-      activityLog,
-      topDepartments,
-      topProducts,
-      topConsumedStock,
-      topStockUsers,
+      stockDistribution: [
+        { name: 'Sufficient', value: Number(stockRaw[0]?.sufficient || 0) },
+        { name: 'Need Restock', value: Number(stockRaw[0]?.needRestock || 0) },
+      ],
+      monthlyTrends: Object.entries(monthlyDataMap).map(([name, count]) => ({
+        name,
+        count,
+      })),
+      activityLog: [
+        ...transactions.map((t: any) => ({
+          id: t.id,
+          type: 'STOCK',
+          title: `${t.type === 'IN' ? 'Stock In' : 'Stock Out'}: ${t.product.name}`,
+          description: `${t.quantity} ${t.product.unit} at ${t.location.name}`,
+          date: t.createdAt,
+        })),
+        ...internalReqs.map((r: any) => ({
+          id: r.id,
+          type: 'REQUEST',
+          title: `Internal Request: ${r.requestNo}`,
+          description: `${r.employeeName} requested ${r.quantity} ${r.product.name}`,
+          date: r.createdAt,
+        })),
+        ...purchaseReqs.map((p: any) => ({
+          id: p.id,
+          type: 'PR',
+          title: `Purchase Request: ${p.prNo}`,
+          description: `Dept: ${p.department} - End User: ${p.endUser}`,
+          date: p.createdAt,
+        })),
+      ]
+        .sort(
+          (a: any, b: any) =>
+            new Date(b.date).getTime() - new Date(a.date).getTime(),
+        )
+        .slice(0, 15),
+      topDepartments: topDepartments.map((d) => ({
+        name: d.departmentArea,
+        requests: d._count.departmentArea,
+      })),
+      topProducts: topProductsRaw.map((p) => ({
+        name: p.name,
+        count: p.count,
+      })),
+      topConsumedStock: outTransactionsRaw.map((t: any) => ({
+        name: t.productName,
+        description: t.productDescription || '',
+        count: t.count,
+      })),
+      topStockUsers: topUsersRaw.map((u) => ({ name: u.name, count: u.count })),
     };
+
+    await this.cacheManager.set(cacheKey, result, 60000);
+    return result;
   }
 
   async getReportData(type: string, options: any = {}) {
@@ -263,7 +300,7 @@ export class ReportsService {
         `;
         return productsRaw.map((p) => ({
           ...p,
-          stocks: [{ quantity: p.totalStock }]
+          stocks: [{ quantity: p.totalStock }],
         }));
 
       case 'inventory-distribution':
@@ -304,7 +341,7 @@ export class ReportsService {
           WHERE ir.status = 'FULFILLED'
           GROUP BY ir."employeeName", ir."departmentArea", p.name
         `;
-        
+
         const analysis: Record<string, any> = {};
         analysisRaw.forEach((r) => {
           const key = `${r.employee} (${r.dept})`;
@@ -338,7 +375,7 @@ export class ReportsService {
         return outTransactionsRaw.map((t) => ({
           name: t.productName,
           description: t.productDescription || '',
-          count: t.count
+          count: t.count,
         }));
 
       case 'top-requesters':
@@ -363,22 +400,42 @@ export class ReportsService {
         const productIdsArr = options.productIds
           ? options.productIds.split(',').filter(Boolean)
           : [];
-        const productWhere = productIdsArr.length > 0 ? { id: { in: productIdsArr } } : {};
+        const productWhere =
+          productIdsArr.length > 0 ? { id: { in: productIdsArr } } : {};
 
-        const startDate = options.startDate ? (() => { const d = new Date(options.startDate); if (options.startDate.length <= 10) d.setHours(0, 0, 0, 0); return d; })() : undefined;
-        const endDate = options.endDate ? (() => { const d = new Date(options.endDate); if (options.endDate.length <= 10) d.setDate(d.getDate() + 1); else d.setDate(d.getDate() + 1); return d; })() : undefined;
-        const irDateFilter = startDate || endDate ? {
-          date: {
-            ...(startDate && { gte: startDate }),
-            ...(endDate && { lt: endDate }),
-          },
-        } : {};
-        const txDateFilter = startDate || endDate ? {
-          createdAt: {
-            ...(startDate && { gte: startDate }),
-            ...(endDate && { lt: endDate }),
-          },
-        } : {};
+        const startDate = options.startDate
+          ? (() => {
+              const d = new Date(options.startDate);
+              if (options.startDate.length <= 10) d.setHours(0, 0, 0, 0);
+              return d;
+            })()
+          : undefined;
+        const endDate = options.endDate
+          ? (() => {
+              const d = new Date(options.endDate);
+              if (options.endDate.length <= 10) d.setDate(d.getDate() + 1);
+              else d.setDate(d.getDate() + 1);
+              return d;
+            })()
+          : undefined;
+        const irDateFilter =
+          startDate || endDate
+            ? {
+                date: {
+                  ...(startDate && { gte: startDate }),
+                  ...(endDate && { lt: endDate }),
+                },
+              }
+            : {};
+        const txDateFilter =
+          startDate || endDate
+            ? {
+                createdAt: {
+                  ...(startDate && { gte: startDate }),
+                  ...(endDate && { lt: endDate }),
+                },
+              }
+            : {};
 
         const products = await this.prisma.product.findMany({
           where: productWhere,
@@ -397,14 +454,31 @@ export class ReportsService {
         });
         return products.map((p) => {
           const allIRs = (p as any).InternalRequest;
-          const fulfilledIRs = allIRs.filter((ir: any) => ir.status === 'FULFILLED');
-          const outTxs = (p as any).ProductTransaction.filter((t: any) => t.type === 'OUT');
-          const inTxs = (p as any).ProductTransaction.filter((t: any) => t.type === 'IN');
-          const endingStock = p.stocks.reduce((sum: number, s: any) => sum + s.quantity, 0);
-          const stockInQty = inTxs.reduce((sum: number, t: any) => sum + t.quantity, 0);
-          const allOutQty = outTxs.reduce((sum: number, t: any) => sum + t.quantity, 0);
+          const fulfilledIRs = allIRs.filter(
+            (ir: any) => ir.status === 'FULFILLED',
+          );
+          const outTxs = (p as any).ProductTransaction.filter(
+            (t: any) => t.type === 'OUT',
+          );
+          const inTxs = (p as any).ProductTransaction.filter(
+            (t: any) => t.type === 'IN',
+          );
+          const endingStock = p.stocks.reduce(
+            (sum: number, s: any) => sum + s.quantity,
+            0,
+          );
+          const stockInQty = inTxs.reduce(
+            (sum: number, t: any) => sum + t.quantity,
+            0,
+          );
+          const allOutQty = outTxs.reduce(
+            (sum: number, t: any) => sum + t.quantity,
+            0,
+          );
           const hasDateRange = !!(options.startDate || options.endDate);
-          const beginningStock = hasDateRange ? endingStock - stockInQty + allOutQty : endingStock;
+          const beginningStock = hasDateRange
+            ? endingStock - stockInQty + allOutQty
+            : endingStock;
           const stockIn = hasDateRange ? stockInQty : 0;
           const stockOut = hasDateRange ? allOutQty : 0;
           return {
@@ -419,17 +493,62 @@ export class ReportsService {
           };
         });
 
-      case 'frequency':
-        const freqStart = options.startDate ? (() => { const d = new Date(options.startDate); if (options.startDate.length <= 10) d.setHours(0, 0, 0, 0); return d; })() : null;
-        const freqEnd = options.endDate ? (() => { const d = new Date(options.endDate); if (options.endDate.length <= 10) d.setDate(d.getDate() + 1); else d.setDate(d.getDate() + 1); return d; })() : null;
+      case 'item-pricing':
+        const pricingIds = options.productIds
+          ? options.productIds.split(',').filter(Boolean)
+          : [];
+        const pricingWhere =
+          pricingIds.length > 0 ? { id: { in: pricingIds } } : {};
 
-        const freqDateSql = freqStart && freqEnd
-          ? Prisma.sql`AND ir.date >= ${freqStart} AND ir.date < ${freqEnd}`
-          : freqStart
-          ? Prisma.sql`AND ir.date >= ${freqStart}`
-          : freqEnd
-          ? Prisma.sql`AND ir.date < ${freqEnd}`
-          : Prisma.sql``;
+        const pricingProducts = await this.prisma.product.findMany({
+          where: pricingWhere,
+          select: {
+            sku: true,
+            name: true,
+            unit: true,
+            purchaseUnit: true,
+            price: true,
+            markupPercent: true,
+            supplier: true,
+          },
+          orderBy: { name: 'asc' },
+        });
+
+        return pricingProducts.map((p) => {
+          return {
+            sku: p.sku,
+            name: p.name,
+            price: p.price,
+            supplier: p.supplier || '',
+            purchaseUnit: p.purchaseUnit || '',
+          };
+        });
+
+      case 'frequency':
+        const freqStart = options.startDate
+          ? (() => {
+              const d = new Date(options.startDate);
+              if (options.startDate.length <= 10) d.setHours(0, 0, 0, 0);
+              return d;
+            })()
+          : null;
+        const freqEnd = options.endDate
+          ? (() => {
+              const d = new Date(options.endDate);
+              if (options.endDate.length <= 10) d.setDate(d.getDate() + 1);
+              else d.setDate(d.getDate() + 1);
+              return d;
+            })()
+          : null;
+
+        const freqDateSql =
+          freqStart && freqEnd
+            ? Prisma.sql`AND ir.date >= ${freqStart} AND ir.date < ${freqEnd}`
+            : freqStart
+              ? Prisma.sql`AND ir.date >= ${freqStart}`
+              : freqEnd
+                ? Prisma.sql`AND ir.date < ${freqEnd}`
+                : Prisma.sql``;
 
         const freqData = await this.prisma.$queryRaw<any[]>`
           SELECT
@@ -446,17 +565,26 @@ export class ReportsService {
           LIMIT 50
         `;
 
-        const rangeStart = freqStart || (freqData.length > 0 ? new Date(freqData[0].earliestDate) : new Date());
+        const rangeStart =
+          freqStart ||
+          (freqData.length > 0
+            ? new Date(freqData[0].earliestDate)
+            : new Date());
         const rangeEnd = freqEnd || new Date();
         const msInWeek = 7 * 24 * 60 * 60 * 1000;
-        const numberOfWeeks = Math.max(1, (rangeEnd.getTime() - rangeStart.getTime()) / msInWeek);
+        const numberOfWeeks = Math.max(
+          1,
+          (rangeEnd.getTime() - rangeStart.getTime()) / msInWeek,
+        );
 
         return freqData.map((t, idx) => ({
           rank: idx + 1,
           productName: t.productName,
           sku: t.sku,
           totalCount: t.totalCount,
-          frequencyPerWeek: parseFloat((t.totalCount / numberOfWeeks).toFixed(1)),
+          frequencyPerWeek: parseFloat(
+            (t.totalCount / numberOfWeeks).toFixed(1),
+          ),
         }));
 
       default:
@@ -482,7 +610,9 @@ export class ReportsService {
     const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
 
     const categoryStats = itemsByCategory.map((stat) => ({
-      name: stat.categoryId ? (categoryMap.get(stat.categoryId) || 'Uncategorized') : 'Uncategorized',
+      name: stat.categoryId
+        ? categoryMap.get(stat.categoryId) || 'Uncategorized'
+        : 'Uncategorized',
       count: stat._count,
     }));
 
@@ -502,7 +632,11 @@ export class ReportsService {
 
   // --- New Analytics Endpoints ---
 
-  private getWhereClause(startDate?: string, endDate?: string, dateField: string = 'createdAt') {
+  private getWhereClause(
+    startDate?: string,
+    endDate?: string,
+    dateField: string = 'createdAt',
+  ) {
     if (!startDate && !endDate) return {};
     return {
       [dateField]: {
@@ -551,10 +685,14 @@ export class ReportsService {
     const conditions = [];
 
     if (startDate) {
-      conditions.push(Prisma.sql`"createdAt" >= ${new Date(startDate + 'T00:00:00.000Z')}`);
+      conditions.push(
+        Prisma.sql`"createdAt" >= ${new Date(startDate + 'T00:00:00.000Z')}`,
+      );
     }
     if (endDate) {
-      conditions.push(Prisma.sql`"createdAt" <= ${new Date(endDate + 'T00:00:00.000Z')}`);
+      conditions.push(
+        Prisma.sql`"createdAt" <= ${new Date(endDate + 'T00:00:00.000Z')}`,
+      );
     }
 
     const whereClause =
@@ -629,14 +767,22 @@ export class ReportsService {
     return result;
   }
 
-  async getProductUsageTrend(productId: string, startDate?: string, endDate?: string) {
+  async getProductUsageTrend(
+    productId: string,
+    startDate?: string,
+    endDate?: string,
+  ) {
     const conditions = [Prisma.sql`"productId" = ${productId}`];
 
     if (startDate) {
-      conditions.push(Prisma.sql`"createdAt" >= ${new Date(startDate + 'T00:00:00.000Z')}`);
+      conditions.push(
+        Prisma.sql`"createdAt" >= ${new Date(startDate + 'T00:00:00.000Z')}`,
+      );
     }
     if (endDate) {
-      conditions.push(Prisma.sql`"createdAt" <= ${new Date(endDate + 'T00:00:00.000Z')}`);
+      conditions.push(
+        Prisma.sql`"createdAt" <= ${new Date(endDate + 'T00:00:00.000Z')}`,
+      );
     }
 
     const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
@@ -655,72 +801,73 @@ export class ReportsService {
   }
 
   async getLowStockAlertReport() {
-    const productsWithStock = await this.prisma.product.findMany({
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        threshold: true,
-        stocks: {
-          select: { quantity: true },
-        },
-      },
-    });
+    const cacheKey = 'low-stock';
+    const cached = await this.cacheManager.get<any[]>(cacheKey);
+    if (cached) return cached;
 
-    const lowStockItems = productsWithStock
-      .map((p) => ({
-        productId: p.id,
-        totalQuantity: p.stocks.reduce((sum, s) => sum + s.quantity, 0),
-        product: { name: p.name, description: p.description, threshold: p.threshold },
-      }))
-      .filter((item) => item.totalQuantity <= item.product.threshold);
+    // Single SQL query: find products where total stock <= threshold
+    const lowStockRaw = await this.prisma.$queryRaw<any[]>`
+      SELECT
+        p.id as "productId",
+        p.name, p.description, p.threshold,
+        COALESCE(SUM(ps.quantity), 0)::int as "totalQuantity"
+      FROM "Product" p
+      LEFT JOIN "ProductStock" ps ON ps."productId" = p.id
+      GROUP BY p.id, p.name, p.description, p.threshold
+      HAVING COALESCE(SUM(ps.quantity), 0) <= p.threshold
+    `;
 
-    if (lowStockItems.length === 0) return [];
+    if (lowStockRaw.length === 0) {
+      await this.cacheManager.set(cacheKey, [], 30000);
+      return [];
+    }
 
-    const requestCounts = await this.prisma.internalRequest.groupBy({
-      by: ['productId'],
-      where: {
-        productId: { in: lowStockItems.map((i) => i.productId) },
-      },
-      _count: { id: true },
-      _sum: { quantity: true },
-    });
+    const productIds = lowStockRaw.map((r) => r.productId);
 
-    const stockOutCounts = await this.prisma.productTransaction.groupBy({
-      by: ['productId'],
-      where: {
-        productId: { in: lowStockItems.map((i) => i.productId) },
-        type: 'OUT',
-      },
-      _count: { id: true },
-    });
+    const [requestCounts, stockOutCounts] = await Promise.all([
+      this.prisma.internalRequest.groupBy({
+        by: ['productId'],
+        where: { productId: { in: productIds } },
+        _count: { id: true },
+        _sum: { quantity: true },
+      }),
+      this.prisma.productTransaction.groupBy({
+        by: ['productId'],
+        where: { productId: { in: productIds }, type: 'OUT' },
+        _count: { id: true },
+      }),
+    ]);
 
     const stockOutCountMap = new Map(
-      stockOutCounts.map((s) => [s.productId, s._count.id])
+      stockOutCounts.map((s) => [s.productId, s._count.id]),
     );
-
     const requestCountMap = new Map(
       requestCounts.map((r) => [
         r.productId,
-        {
-          requestCount: r._count.id,
-          totalRequestedQty: r._sum.quantity ?? 0,
-        },
-      ])
+        { requestCount: r._count.id, totalRequestedQty: r._sum.quantity ?? 0 },
+      ]),
     );
 
-    return lowStockItems
+    const result = lowStockRaw
       .map((item) => ({
         productId: item.productId,
         quantity: item.totalQuantity,
-        product: item.product,
-        requestCount: (requestCountMap.get(item.productId)?.requestCount ?? 0) +
-                      (stockOutCountMap.get(item.productId) ?? 0),
+        product: {
+          name: item.name,
+          description: item.description,
+          threshold: item.threshold,
+        },
+        requestCount:
+          (requestCountMap.get(item.productId)?.requestCount ?? 0) +
+          (stockOutCountMap.get(item.productId) ?? 0),
         totalRequestedQty:
           requestCountMap.get(item.productId)?.totalRequestedQty ?? 0,
       }))
       .sort((a, b) => b.requestCount - a.requestCount)
       .slice(0, 50);
+
+    await this.cacheManager.set(cacheKey, result, 30000);
+    return result;
   }
 
   async getBatchLevelAnalytics() {

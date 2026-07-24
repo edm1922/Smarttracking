@@ -15,6 +15,8 @@ interface AddProductModalProps {
   standardUnits: string[];
   isAddingCustomUnit: boolean;
   setIsAddingCustomUnit: (adding: boolean) => void;
+  isAddingCustomPurchaseUnit: boolean;
+  setIsAddingCustomPurchaseUnit: (adding: boolean) => void;
 }
 
 export function AddProductModal({
@@ -27,7 +29,9 @@ export function AddProductModal({
   isSaving,
   standardUnits,
   isAddingCustomUnit,
-  setIsAddingCustomUnit
+  setIsAddingCustomUnit,
+  isAddingCustomPurchaseUnit,
+  setIsAddingCustomPurchaseUnit
 }: AddProductModalProps) {
   const effectiveMarkup = form.markupPercent ?? parseFloat(typeof window !== 'undefined' ? localStorage.getItem('global_markup_percent') || '0' : '0');
   const computedSellingPrice = form.price > 0 ? parseFloat((form.price * (1 + effectiveMarkup / 100)).toFixed(2)) : 0;
@@ -81,9 +85,9 @@ export function AddProductModal({
                   )}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Unit</label>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Unit (Stock)</label>
                   {!isAddingCustomUnit ? (
                     <div className="relative">
                       <select 
@@ -122,6 +126,56 @@ export function AddProductModal({
                         onClick={() => {
                           setIsAddingCustomUnit(false);
                           setForm({ ...form, unit: 'PCS' });
+                        }}
+                        className="p-2 text-gray-500 hover:text-red-500 transition-colors"
+                        title="Back to list"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Purchase Unit</label>
+                  {!isAddingCustomPurchaseUnit ? (
+                    <div className="relative">
+                      <select 
+                        value={form.purchaseUnit || ''} 
+                        onChange={(e) => {
+                          if (e.target.value === 'ADD_NEW') {
+                            setIsAddingCustomPurchaseUnit(true);
+                            setForm({ ...form, purchaseUnit: '' });
+                          } else {
+                            setForm({ ...form, purchaseUnit: e.target.value });
+                          }
+                        }} 
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary outline-none"
+                      >
+                        <option value="">None</option>
+                        {standardUnits.map(u => (
+                          <option key={u} value={u}>{u}</option>
+                        ))}
+                        {form.purchaseUnit && !standardUnits.includes(form.purchaseUnit) && (
+                          <option value={form.purchaseUnit}>{form.purchaseUnit}</option>
+                        )}
+                        <option value="ADD_NEW">+ Add New Unit...</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input 
+                        autoFocus
+                        type="text" 
+                        placeholder="Enter purchase unit..." 
+                        value={form.purchaseUnit || ''} 
+                        onChange={(e) => setForm({...form, purchaseUnit: e.target.value.toUpperCase()})} 
+                        className="w-full rounded-md border border-primary px-3 py-2 text-sm outline-none" 
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setIsAddingCustomPurchaseUnit(false);
+                          setForm({ ...form, purchaseUnit: '' });
                         }}
                         className="p-2 text-gray-500 hover:text-red-500 transition-colors"
                         title="Back to list"

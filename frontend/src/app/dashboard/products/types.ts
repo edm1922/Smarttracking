@@ -6,6 +6,7 @@ export interface Product {
   supplier: string | null;
   markupPercent: number | null;
   unit: string;
+  purchaseUnit?: string | null;
   price: number;
   threshold: number;
   imageUrl?: string | null;
