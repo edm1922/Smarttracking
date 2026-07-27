@@ -18,7 +18,7 @@ export class UsersController {
   }
 
   @Post()
-  create(@Request() req: any, @Body() data: { username: string; role: 'admin' | 'inventory' | 'super_admin' | 'payroll_admin' | 'payroll_staff' }) {
+  create(@Request() req: any, @Body() data: { username: string; role: 'admin' | 'inventory' | 'super_admin' | 'payroll_admin' | 'payroll_staff' | 'manager' }) {
     // Both super_admins and inventory admins can create new staff
     if (req.user.role !== 'super_admin' && req.user.role !== 'admin') {
       throw new ForbiddenException('Insufficient permissions to create users');

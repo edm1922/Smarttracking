@@ -35,7 +35,7 @@ export default function SystemUsersPage() {
   
   const [formData, setFormData] = useState({
     username: '',
-    role: 'inventory' as 'admin' | 'inventory' | 'super_admin' | 'payroll_staff' | 'payroll_admin',
+    role: 'inventory' as 'admin' | 'inventory' | 'super_admin' | 'payroll_staff' | 'payroll_admin' | 'manager',
   });
 
   const [generatedUser, setGeneratedUser] = useState<any | null>(null);
@@ -202,11 +202,13 @@ export default function SystemUsersPage() {
                             : user.role === 'payroll_staff'
                               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                               : user.role === 'admin' 
-                                ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' 
-                                : 'bg-slate-700/30 text-slate-400 border-slate-600/50'
+                                ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                                : user.role === 'manager'
+                                  ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
+                                  : 'bg-slate-700/30 text-slate-400 border-slate-600/50'
                       }`}>
-                        {user.role === 'payroll_staff' ? <CreditCard className="h-3 w-3 mr-2" /> : user.role === 'payroll_admin' ? <ShieldAlert className="h-3 w-3 mr-2" /> : user.role === 'super_admin' ? <ShieldCheck className="h-3 w-3 mr-2" /> : user.role === 'admin' ? <Shield className="h-3 w-3 mr-2" /> : <User className="h-3 w-3 mr-2" />}
-                        {user.role === 'payroll_staff' ? 'PAYROLL STAFF' : user.role === 'payroll_admin' ? 'PAYROLL ADMIN' : user.role === 'inventory' ? 'INVENTORY STAFF' : user.role === 'admin' ? 'INVENTORY ADMIN' : user.role === 'super_admin' ? 'SYSTEM ADMIN' : user.role.replace('_', ' ')}
+                        {user.role === 'payroll_staff' ? <CreditCard className="h-3 w-3 mr-2" /> : user.role === 'payroll_admin' ? <ShieldAlert className="h-3 w-3 mr-2" /> : user.role === 'super_admin' ? <ShieldCheck className="h-3 w-3 mr-2" /> : user.role === 'admin' ? <Shield className="h-3 w-3 mr-2" /> : user.role === 'manager' ? <UserCheck className="h-3 w-3 mr-2" /> : <User className="h-3 w-3 mr-2" />}
+                        {user.role === 'payroll_staff' ? 'PAYROLL STAFF' : user.role === 'payroll_admin' ? 'PAYROLL ADMIN' : user.role === 'inventory' ? 'INVENTORY STAFF' : user.role === 'admin' ? 'INVENTORY ADMIN' : user.role === 'super_admin' ? 'SYSTEM ADMIN' : user.role === 'manager' ? 'MANAGER' : user.role.replace('_', ' ')}
                       </span>
                     </td>
                     <td className="px-8 py-5">
@@ -315,6 +317,7 @@ export default function SystemUsersPage() {
                       {[
                         { id: 'inventory', name: 'Inv. Staff', icon: User, activeClass: 'bg-slate-500/10 border-slate-500/50 text-slate-400 shadow-lg shadow-slate-500/10' },
                         { id: 'admin', name: 'Inv. Admin', icon: Shield, activeClass: 'bg-indigo-500/10 border-indigo-500/50 text-indigo-400 shadow-lg shadow-indigo-500/10' },
+                        { id: 'manager', name: 'Manager', icon: UserCheck, activeClass: 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400 shadow-lg shadow-cyan-500/10' },
                         { id: 'payroll_staff', name: 'Pay. Staff', icon: CreditCard, activeClass: 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400 shadow-lg shadow-emerald-500/10' },
                         { id: 'payroll_admin', name: 'Pay. Admin', icon: ShieldCheck, activeClass: 'bg-blue-500/10 border-blue-500/50 text-blue-400 shadow-lg shadow-blue-500/10' },
                         { id: 'super_admin', name: 'Sys. Admin', icon: ShieldAlert, activeClass: 'bg-amber-500/10 border-amber-500/50 text-amber-400 shadow-lg shadow-amber-500/10' }

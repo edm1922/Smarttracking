@@ -102,6 +102,7 @@ export class ReportsService {
       topProductsRaw,
       outTransactionsRaw,
       topUsersRaw,
+      frequentItemsRaw,
       totalItems,
       totalLocations,
     ] = await Promise.all([
@@ -194,6 +195,20 @@ export class ReportsService {
         AND pt."createdAt" >= ${trendStartDate} AND pt."createdAt" <= ${trendEndDate}
         GROUP BY name ORDER BY count DESC LIMIT 5
       `,
+      this.prisma.$queryRaw<any[]>`
+        SELECT
+          p.name as "productName",
+          COUNT(*)::int as "totalCount",
+          MIN(ir.date) as "earliestDate",
+          MAX(ir.date) as "latestDate"
+        FROM "InternalRequest" ir
+        JOIN "Product" p ON ir."productId" = p.id
+        WHERE ir.status = 'FULFILLED'
+        ${locationId ? Prisma.sql`AND ir."locationId" = ${locationId}` : Prisma.empty}
+        GROUP BY p.name
+        ORDER BY "totalCount" DESC
+        LIMIT 5
+      `,
       this.prisma.product.count(),
       this.prisma.location.count(),
     ]);
@@ -273,6 +288,22 @@ export class ReportsService {
         count: t.count,
       })),
       topStockUsers: topUsersRaw.map((u) => ({ name: u.name, count: u.count })),
+      topFrequentItems: frequentItemsRaw.map((item: any) => {
+        const earliest = new Date(item.earliestDate);
+        const latest = new Date(item.latestDate);
+        const msInWeek = 7 * 24 * 60 * 60 * 1000;
+        const numberOfWeeks = Math.max(
+          1,
+          (latest.getTime() - earliest.getTime()) / msInWeek,
+        );
+        return {
+          name: item.productName,
+          count: item.totalCount,
+          frequencyPerWeek: parseFloat(
+            (item.totalCount / numberOfWeeks).toFixed(1),
+          ),
+        };
+      }),
     };
 
     await this.cacheManager.set(cacheKey, result, 60000);

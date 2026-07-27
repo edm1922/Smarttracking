@@ -68,6 +68,7 @@ useEffect(() => {
   const isSuperAdmin = role === 'super_admin';
   const isAdmin = role === 'admin';
   const isPayrollUser = role === 'payroll_admin' || role === 'payroll_staff';
+  const isManager = role === 'manager';
 
   useEffect(() => {
     if (!isStaff) return;
@@ -126,6 +127,7 @@ useEffect(() => {
         { name: 'Fabric & RSQ', href: '/dashboard/rsq' },
       ]
     },
+    { name: 'Reports', href: '/dashboard/reports', icon: FileText },
   ];
 
   const qrSystemItems = [
@@ -163,6 +165,7 @@ useEffect(() => {
   return (
     <div className="flex min-h-screen bg-[#e2e8f0] print:block print:bg-white">
       {/* Sidebar */}
+      {!isManager && (
       <aside className="fixed inset-y-0 left-0 w-64 border-r border-gray-200 bg-white no-print flex flex-col z-[40]">
         <div className="flex h-16 items-center border-b border-gray-200 px-6 shrink-0 justify-between">
           <span className="text-xl font-bold text-primary">Smart Tracking</span>
@@ -450,11 +453,26 @@ useEffect(() => {
           </button>
         </div>
       </aside>
+      )}
+
+      {/* Manager top bar */}
+      {isManager && (
+        <div className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-200 flex items-center justify-between px-8 z-[50]">
+          <span className="text-xl font-bold text-primary">Smart Tracking</span>
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-medium text-gray-700">{username}</span>
+            <span className="inline-flex items-center rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-black text-cyan-700 border border-cyan-200 uppercase tracking-widest">MANAGER</span>
+            <button onClick={handleLogout} className="flex items-center gap-1.5 text-xs font-bold text-red-600 hover:text-red-700 transition-colors">
+              <LogOut className="h-4 w-4" /> Logout
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main content */}
-      <main className="flex-1 pl-64 print:pl-0 print:block">
-        <div className="mx-auto max-w-7xl p-8 print:max-w-none print:p-0 print:m-0 w-full print:block">
-          <Breadcrumbs />
+      <main className={`flex-1 ${isManager ? 'pt-14' : 'pl-64'} print:pl-0 print:block`}>
+        <div className={`mx-auto ${isManager ? 'max-w-full' : 'max-w-7xl'} p-8 print:max-w-none print:p-0 print:m-0 w-full print:block`}>
+          {!isManager && <Breadcrumbs />}
           {children}
         </div>
       </main>

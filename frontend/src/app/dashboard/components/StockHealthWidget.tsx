@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Package, AlertTriangle, Clock, CheckCircle, RefreshCw, ChevronRight, TrendingUp } from 'lucide-react';
+import { Package, AlertTriangle, Clock, CheckCircle, RefreshCw, ChevronRight, TrendingUp, X, Search, ChevronLeft } from 'lucide-react';
 import api from '@/lib/api';
 
 interface StockHealthWidgetProps {
   totalItems: number;
   pendingRequests: number;
+  role?: string;
 }
 
 interface LowStockItem {
@@ -22,14 +23,31 @@ interface LowStockItem {
   };
 }
 
+interface ProductItem {
+  id: string;
+  name: string;
+  description: string | null;
+  sku: string;
+  threshold: number;
+  stocks: { locationId: string; quantity: number; location: { id: string; name: string } }[];
+}
+
 export const StockHealthWidget: React.FC<StockHealthWidgetProps> = ({
   totalItems,
   pendingRequests,
+  role,
 }) => {
   const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([]);
   const [lowStockLoading, setLowStockLoading] = useState(true);
   const [lowStockError, setLowStockError] = useState(false);
   const [filterMode, setFilterMode] = useState<'demand' | 'all'>('demand');
+
+  const [showAllProducts, setShowAllProducts] = useState(false);
+  const [allProducts, setAllProducts] = useState<ProductItem[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [productPage, setProductPage] = useState(1);
+  const PRODUCTS_PER_PAGE = 10;
 
   const fetchLowStock = async () => {
     setLowStockLoading(true);
@@ -44,15 +62,54 @@ export const StockHealthWidget: React.FC<StockHealthWidgetProps> = ({
     }
   };
 
+  const fetchAllProducts = async () => {
+    setProductsLoading(true);
+    try {
+      const res = await api.get('/products', { params: { take: 1000 } });
+      setAllProducts(res.data?.data ?? []);
+    } catch {
+      setAllProducts([]);
+    } finally {
+      setProductsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchLowStock();
   }, []);
+
+  useEffect(() => {
+    if (showAllProducts && allProducts.length === 0) {
+      fetchAllProducts();
+    }
+  }, [showAllProducts]);
 
   const demandItems = lowStockItems.filter((i) => i.requestCount > 0);
   const displayItems = filterMode === 'demand' ? demandItems.slice(0, 5) : lowStockItems;
 
   const lowCount = lowStockItems.length;
   const demandLowCount = Math.min(demandItems.length, 5);
+
+  const filteredProducts = allProducts.filter((p) => {
+    if (!productSearch) return true;
+    const q = productSearch.toLowerCase();
+    return (
+      p.name.toLowerCase().includes(q) ||
+      (p.description && p.description.toLowerCase().includes(q)) ||
+      (p.sku && p.sku.toLowerCase().includes(q))
+    );
+  });
+  const totalProductPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
+  const paginatedProducts = filteredProducts.slice(
+    (productPage - 1) * PRODUCTS_PER_PAGE,
+    productPage * PRODUCTS_PER_PAGE
+  );
+
+  const openAllProducts = () => {
+    setProductSearch('');
+    setProductPage(1);
+    setShowAllProducts(true);
+  };
 
   return (
     <section className="space-y-6">
@@ -138,12 +195,21 @@ export const StockHealthWidget: React.FC<StockHealthWidgetProps> = ({
               </button>
             )}
             {lowCount > 0 && (
-              <Link
-                href="/dashboard/products"
-                className="flex items-center gap-1 text-[10px] font-bold text-primary/80 hover:text-primary transition-colors"
-              >
-                VIEW ALL <ChevronRight className="h-3 w-3" />
-              </Link>
+              role === 'manager' ? (
+                <button
+                  onClick={openAllProducts}
+                  className="flex items-center gap-1 text-[10px] font-bold text-primary/80 hover:text-primary transition-colors"
+                >
+                  VIEW ALL <ChevronRight className="h-3 w-3" />
+                </button>
+              ) : (
+                <Link
+                  href="/dashboard/products"
+                  className="flex items-center gap-1 text-[10px] font-bold text-primary/80 hover:text-primary transition-colors"
+                >
+                  VIEW ALL <ChevronRight className="h-3 w-3" />
+                </Link>
+              )
             )}
           </div>
         </div>
@@ -256,6 +322,121 @@ export const StockHealthWidget: React.FC<StockHealthWidgetProps> = ({
           )}
         </div>
       </div>
+
+      {/* All Products Modal */}
+      {showAllProducts && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 animate-in fade-in">
+          <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between px-8 py-6 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                  <Package className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-gray-900 tracking-tight uppercase">All Products</h2>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{filteredProducts.length} products</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAllProducts(false)}
+                className="h-10 w-10 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="px-8 py-4 border-b border-gray-50">
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by name, description, or SKU..."
+                  value={productSearch}
+                  onChange={(e) => { setProductSearch(e.target.value); setProductPage(1); }}
+                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {productsLoading ? (
+                <div className="p-8 space-y-3">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="h-14 animate-pulse rounded-xl bg-gray-100/60" />
+                  ))}
+                </div>
+              ) : paginatedProducts.length === 0 ? (
+                <div className="py-16 text-center">
+                  <Package className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                  <p className="text-sm font-bold text-gray-500">No products found</p>
+                </div>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gray-50/80 sticky top-0">
+                      <th className="text-left text-[10px] font-bold uppercase tracking-wider text-gray-500 py-3 px-8">Product</th>
+                      <th className="text-left text-[10px] font-bold uppercase tracking-wider text-gray-500 py-3 px-4">SKU</th>
+                      <th className="text-center text-[10px] font-bold uppercase tracking-wider text-gray-500 py-3 px-4">Stock</th>
+                      <th className="text-center text-[10px] font-bold uppercase tracking-wider text-gray-500 py-3 px-4">Threshold</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {paginatedProducts.map((product) => {
+                      const totalStock = product.stocks?.reduce((sum, s) => sum + s.quantity, 0) ?? 0;
+                      const isLow = totalStock <= product.threshold;
+                      return (
+                        <tr key={product.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="py-3 px-8">
+                            <span className="text-sm font-bold text-gray-900">{product.name}</span>
+                            {product.description && (
+                              <p className="text-[11px] text-gray-500 mt-0.5 truncate max-w-xs">{product.description}</p>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="text-xs font-mono text-gray-500">{product.sku || '—'}</span>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className={`text-sm font-bold ${isLow ? 'text-red-600' : 'text-gray-900'}`}>
+                              {totalStock}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className="text-sm font-bold text-gray-500">{product.threshold}</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {totalProductPages > 1 && (
+              <div className="px-8 py-4 border-t border-gray-100 flex items-center justify-between">
+                <p className="text-xs font-bold text-gray-400">
+                  Page {productPage} of {totalProductPages}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setProductPage((p) => Math.max(1, p - 1))}
+                    disabled={productPage === 1}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft className="h-3 w-3" /> Prev
+                  </button>
+                  <button
+                    onClick={() => setProductPage((p) => Math.min(totalProductPages, p + 1))}
+                    disabled={productPage === totalProductPages}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next <ChevronRight className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </section>
   );
 };
