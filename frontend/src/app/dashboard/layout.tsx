@@ -165,7 +165,7 @@ useEffect(() => {
   return (
     <div className="flex min-h-screen bg-[#e2e8f0] print:block print:bg-white">
       {/* Sidebar */}
-      {!isManager && (
+      {!isManager && !pathname.startsWith('/dashboard/payroll') && (
       <aside className="fixed inset-y-0 left-0 w-64 border-r border-gray-200 bg-white no-print flex flex-col z-[40]">
         <div className="flex h-16 items-center border-b border-gray-200 px-6 shrink-0 justify-between">
           <span className="text-xl font-bold text-primary">Smart Tracking</span>
@@ -470,9 +470,9 @@ useEffect(() => {
       )}
 
       {/* Main content */}
-      <main className={`flex-1 ${isManager ? 'pt-14' : 'pl-64'} print:pl-0 print:block`}>
-        <div className={`mx-auto ${isManager ? 'max-w-full' : 'max-w-7xl'} p-8 print:max-w-none print:p-0 print:m-0 w-full print:block`}>
-          {!isManager && <Breadcrumbs />}
+      <main className={`flex-1 ${isManager ? 'pt-14' : pathname.startsWith('/dashboard/payroll') ? '' : 'pl-64'} print:pl-0 print:block`}>
+        <div className={`mx-auto ${isManager ? 'max-w-full' : pathname.startsWith('/dashboard/payroll') ? 'max-w-full' : 'max-w-7xl'} p-8 print:max-w-none print:p-0 print:m-0 w-full print:block`}>
+          {!isManager && !pathname.startsWith('/dashboard/payroll') && <Breadcrumbs />}
           {children}
         </div>
       </main>

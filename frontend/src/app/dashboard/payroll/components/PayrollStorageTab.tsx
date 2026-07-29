@@ -69,7 +69,7 @@ export const PayrollStorageTab: React.FC<PayrollStorageTabProps> = ({
     <div className="space-y-10 animate-in fade-in duration-500">
       {/* Admin Approval Queue */}
       {isAdmin && pendingRequests.length > 0 && (
-        <div className="bg-orange-50 border-2 border-orange-100 rounded-[2.5rem] p-8 space-y-6">
+        <div className="bg-orange-50 border-2 border-orange-100 rounded-3xl p-8 space-y-6">
           <div className="flex items-center gap-4">
             <div className="h-12 w-12 bg-orange-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-orange-200">
               <ShieldAlert className="h-6 w-6" />
@@ -85,7 +85,7 @@ export const PayrollStorageTab: React.FC<PayrollStorageTabProps> = ({
               <div key={req.id} className="bg-white border border-orange-100 rounded-2xl p-5 shadow-sm flex items-center justify-between">
                 <div className="space-y-1">
                   <p className="text-xs font-black text-gray-900 uppercase tracking-tight">{req.user?.username} • {req.type}</p>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter italic">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter italic">
                     {req.type === 'UPLOAD' ? `For ${req.clientName}` : `Revoke Batch ${req.batchId}`}
                   </p>
                 </div>
@@ -101,7 +101,7 @@ export const PayrollStorageTab: React.FC<PayrollStorageTabProps> = ({
 
       {/* Processing Banner */}
       {(uploading || processingBatchIds.length > 0) && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-[2.5rem] p-8 space-y-4 animate-in fade-in duration-500">
+        <div className="bg-blue-50 border-2 border-blue-200 rounded-3xl p-8 space-y-4 animate-in fade-in duration-500">
           <div className="flex items-center gap-5">
             <div className="h-14 w-14 bg-blue-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
               <Loader2 className="h-7 w-7 animate-spin" />
@@ -153,7 +153,7 @@ export const PayrollStorageTab: React.FC<PayrollStorageTabProps> = ({
               <History className="h-8 w-8" />
             </div>
             <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Archived Batches</p>
+              <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Archived Batches</p>
               <p className="text-3xl font-black text-gray-900">{runs.length}</p>
             </div>
           </div>
@@ -162,7 +162,7 @@ export const PayrollStorageTab: React.FC<PayrollStorageTabProps> = ({
               <CheckCircle2 className="h-8 w-8" />
             </div>
             <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Disbursements</p>
+              <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Disbursements</p>
               <p className="text-3xl font-black text-gray-900">{runs.reduce((acc, r) => acc + (r._count?.documents || 0), 0)}</p>
             </div>
           </div>
@@ -181,12 +181,13 @@ export const PayrollStorageTab: React.FC<PayrollStorageTabProps> = ({
         </div>
 
         {/* Filters Section */}
-        <div className="lg:col-span-12 flex flex-col md:flex-row items-end gap-6 bg-gray-50/50 p-8 rounded-[2.5rem] border border-gray-100">
+        <div className="lg:col-span-12 flex flex-col md:flex-row items-end gap-6 bg-gray-50/50 p-8 rounded-3xl border border-gray-100">
           <div className="flex-1 space-y-3">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Search Archives</label>
+            <label htmlFor="archive-search" className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Search Archives</label>
             <div className="relative group">
               <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-300 group-focus-within:text-primary transition-colors" />
               <input 
+                id="archive-search"
                 type="text" 
                 placeholder="BY CLIENT OR LABEL..." 
                 value={historySearch}
@@ -196,8 +197,9 @@ export const PayrollStorageTab: React.FC<PayrollStorageTabProps> = ({
             </div>
           </div>
           <div className="w-full md:w-auto space-y-3">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">From</label>
+            <label htmlFor="history-from" className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">From</label>
             <input 
+              id="history-from"
               type="date" 
               value={historyStart}
               onChange={e => setHistoryStart(e.target.value)}
@@ -205,8 +207,9 @@ export const PayrollStorageTab: React.FC<PayrollStorageTabProps> = ({
             />
           </div>
           <div className="w-full md:w-auto space-y-3">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">To</label>
+            <label htmlFor="history-to" className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">To</label>
             <input 
+              id="history-to"
               type="date" 
               value={historyEnd}
               onChange={e => setHistoryEnd(e.target.value)}
@@ -216,15 +219,15 @@ export const PayrollStorageTab: React.FC<PayrollStorageTabProps> = ({
         </div>
 
         {/* History Table */}
-        <div className="lg:col-span-12 bg-white rounded-[2.5rem] border border-gray-200 shadow-xl shadow-gray-200/20 overflow-hidden">
+        <div className="lg:col-span-12 bg-white rounded-3xl border border-gray-200 shadow-xl shadow-gray-200/20 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-100">
-                  <th className="px-10 py-6 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Batch Identity</th>
-                  <th className="px-10 py-6 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Payroll Period</th>
-                  <th className="px-10 py-6 text-right text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Docs</th>
-                  <th className="px-10 py-6 text-right text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Actions</th>
+                  <th className="px-10 py-6 text-[9px] font-black text-gray-500 uppercase tracking-[0.2em]">Batch Identity</th>
+                  <th className="px-10 py-6 text-[9px] font-black text-gray-500 uppercase tracking-[0.2em]">Payroll Period</th>
+                  <th className="px-10 py-6 text-right text-[9px] font-black text-gray-500 uppercase tracking-[0.2em]">Docs</th>
+                  <th className="px-10 py-6 text-right text-[9px] font-black text-gray-500 uppercase tracking-[0.2em]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -240,7 +243,7 @@ export const PayrollStorageTab: React.FC<PayrollStorageTabProps> = ({
                       <td className="px-10 py-6">
                         <div className="flex flex-col">
                           <span className="text-sm font-black text-gray-900 uppercase tracking-tight">{run.label || run.client_name || 'Standard Run'}</span>
-                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter mt-1">Ingested {new Date(run.created_at).toLocaleDateString()}</span>
+                          <span className="text-[9px] font-bold text-gray-500 uppercase tracking-tighter mt-1">Ingested {new Date(run.created_at).toLocaleDateString()}</span>
                         </div>
                       </td>
                       <td className="px-10 py-6">
@@ -259,12 +262,12 @@ export const PayrollStorageTab: React.FC<PayrollStorageTabProps> = ({
                             return processingBatchIds.includes(run.id) ? (
                               <div className="flex items-center gap-2 group/stop">
                                 <Loader2 className="h-3 w-3 animate-spin text-primary group-hover/stop:hidden" />
-                                <span className="text-[10px] font-black text-primary group-hover/stop:hidden">
+                                <span className="text-[10px] font-black text-gray-600 group-hover/stop:hidden">
                                   {totalPages ? `${done} / ${totalPages}` : `${done} done`} <span className="animate-pulse uppercase">Syncing...</span>
                                 </span>
                                 <button 
                                   onClick={() => onStop(run.id)}
-                                  className="hidden group-hover/stop:flex items-center gap-2 bg-red-50 text-red-600 px-3 py-1 rounded-xl border border-red-100 hover:bg-red-600 hover:text-white transition-all text-[9px] font-black uppercase"
+                                  className="hidden group-hover/stop:flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-xl border border-red-100 hover:bg-red-600 hover:text-white transition-all text-[9px] font-black uppercase"
                                 >
                                   Stop
                                 </button>
@@ -279,16 +282,16 @@ export const PayrollStorageTab: React.FC<PayrollStorageTabProps> = ({
                         <div className="flex items-center justify-end gap-3">
                           <button 
                             onClick={() => onResume(run)}
-                            className="p-3 bg-gray-50 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-2xl transition-all"
-                            title="Resume Import"
+                            className="p-4 bg-gray-50 text-gray-500 hover:text-primary hover:bg-primary/5 rounded-2xl transition-all"
+                            aria-label="Resume Import"
                           >
                             <Upload className="h-4 w-4" />
                           </button>
                           {!isStaff && (
                             <button 
                               onClick={() => onDelete(run.id)}
-                              className="p-3 bg-gray-50 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"
-                              title="Revoke Batch"
+                              className="p-4 bg-gray-50 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"
+                              aria-label="Revoke Batch"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -301,10 +304,10 @@ export const PayrollStorageTab: React.FC<PayrollStorageTabProps> = ({
                   <tr>
                     <td colSpan={4} className="px-10 py-24 text-center">
                       <div className="max-w-xs mx-auto space-y-4">
-                        <div className="h-20 w-20 bg-gray-50 rounded-[2.5rem] flex items-center justify-center mx-auto border-2 border-dashed border-gray-100">
+                        <div className="h-20 w-20 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto border-2 border-dashed border-gray-100">
                           <History className="h-8 w-8 text-gray-200" />
                         </div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest italic">No archived payroll runs found</p>
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest italic">No archived payroll runs found</p>
                       </div>
                     </td>
                   </tr>

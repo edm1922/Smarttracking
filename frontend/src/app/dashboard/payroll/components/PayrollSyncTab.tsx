@@ -40,7 +40,7 @@ export const PayrollSyncTab: React.FC<PayrollSyncTabProps> = ({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-in fade-in duration-500">
       {/* Bulk Account Sync */}
-      <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-xl shadow-gray-200/50 overflow-hidden flex flex-col">
+      <div className="bg-white rounded-3xl border border-gray-200 shadow-xl shadow-gray-200/50 overflow-hidden flex flex-col">
         <div className="bg-primary px-10 py-8 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="h-12 w-12 bg-white/20 rounded-2xl flex items-center justify-center">
@@ -55,21 +55,23 @@ export const PayrollSyncTab: React.FC<PayrollSyncTabProps> = ({
 
         <div className="p-10 space-y-8 flex-1">
           <div className="space-y-4">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+            <label htmlFor="sync-text" className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-2">
               <AlertCircle className="h-3 w-3" /> Data Input Schema
             </label>
             <textarea 
+              id="sync-text"
               placeholder="PASTE PERSONNEL LIST HERE... (ONE NAME PER LINE)"
               value={syncText}
               onChange={e => setSyncText(e.target.value.toUpperCase())}
-              className="w-full bg-gray-50 border-2 border-transparent rounded-[2rem] px-8 py-6 text-xs font-black text-gray-900 outline-none focus:bg-white focus:border-primary transition-all min-h-[300px] resize-none shadow-inner"
+              className="w-full bg-gray-50 border-2 border-transparent rounded-2xl px-8 py-6 text-xs font-black text-gray-900 outline-none focus:bg-white focus:border-primary transition-all min-h-[300px] resize-none shadow-inner"
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-3">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Entity Label</label>
+              <label htmlFor="sync-label" className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Entity Label</label>
               <select 
+                id="sync-label"
                 value={syncLabel}
                 onChange={e => setSyncLabel(e.target.value)}
                 className="w-full bg-gray-50 border-2 border-transparent rounded-2xl px-6 py-4 text-xs font-black text-gray-900 outline-none focus:bg-white focus:border-primary transition-all appearance-none uppercase shadow-sm"
@@ -109,7 +111,7 @@ export const PayrollSyncTab: React.FC<PayrollSyncTabProps> = ({
       </div>
 
       {/* Entity Dictionary */}
-      <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-xl shadow-gray-200/50 overflow-hidden flex flex-col">
+      <div className="bg-white rounded-3xl border border-gray-200 shadow-xl shadow-gray-200/50 overflow-hidden flex flex-col">
         <div className="bg-gray-900 px-10 py-8">
           <div className="flex items-center gap-4">
             <div className="h-12 w-12 bg-white/10 rounded-2xl flex items-center justify-center">
@@ -124,9 +126,10 @@ export const PayrollSyncTab: React.FC<PayrollSyncTabProps> = ({
 
         <div className="p-10 space-y-10 flex-1">
           <div className="space-y-4">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">New Client Identity</label>
+            <label htmlFor="new-company-name" className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">New Client Identity</label>
             <div className="flex gap-4">
               <input 
+                id="new-company-name"
                 type="text" 
                 placeholder="ENTITY NAME..."
                 value={newCompanyName}
@@ -144,9 +147,10 @@ export const PayrollSyncTab: React.FC<PayrollSyncTabProps> = ({
           </div>
 
           <div className="space-y-4">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Entity Management</label>
+            <label htmlFor="entity-management" className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Entity Management</label>
             <div className="flex gap-4">
               <select 
+                id="entity-management"
                 value={clientLabel}
                 onChange={e => setClientLabel(e.target.value)}
                 className="flex-1 bg-gray-50 border-2 border-transparent rounded-2xl px-8 py-4 text-xs font-black text-gray-900 outline-none focus:bg-white focus:border-primary transition-all appearance-none uppercase shadow-sm"

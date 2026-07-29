@@ -21,7 +21,7 @@ export default async function CredentialStripsPage() {
     sys_id: u.sys_id,
     name: u.fullName || 'Unknown Employee',
     username: u.username,
-    password: u.sys_id?.replace(/-/g, '')
+    password: u.sys_id?.replace(/-/g, '').toLowerCase()
   }));
 
   return (
@@ -65,22 +65,22 @@ export default async function CredentialStripsPage() {
 
                     <div className="w-1/3 px-8">
                       <div className="mb-4">
-                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest mb-1 block">Employee Name</label>
+                        <label className="text-[9px] font-black uppercase text-gray-500 tracking-widest mb-1 block">Employee Name</label>
                         <div className="text-sm font-bold text-gray-900 truncate">{emp.name}</div>
                       </div>
                       <div>
-                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest mb-1 block">Username</label>
+                        <label className="text-[9px] font-black uppercase text-gray-500 tracking-widest mb-1 block">Username</label>
                         <div className="flex items-center gap-2 text-sm font-bold text-gray-900 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
-                          <User className="h-3 w-3 text-gray-400" />
+                          <User className="h-3 w-3 text-gray-500" />
                           {emp.username}
                         </div>
                       </div>
                     </div>
 
                     <div className="w-1/3 pl-8">
-                      <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest mb-1 block">Portal Password</label>
+                      <label className="text-[9px] font-black uppercase text-gray-500 tracking-widest mb-1 block">Portal Password</label>
                       <div className="flex items-center gap-3 text-sm font-mono font-bold text-black bg-gray-100 px-4 py-3 rounded-xl border border-gray-200 shadow-inner">
-                        <Lock className="h-4 w-4 text-gray-400" />
+                        <Lock className="h-4 w-4 text-gray-500" />
                         {emp.password}
                       </div>
                     </div>

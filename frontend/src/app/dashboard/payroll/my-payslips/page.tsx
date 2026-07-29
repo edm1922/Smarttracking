@@ -187,12 +187,12 @@ export default function IntegratedEmployeePayslips() {
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <motion.div 
               initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-              className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden"
+              className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden"
             >
               <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
                 <div>
                   <h2 className="text-xl font-black text-gray-900 tracking-tight">Revise Documents</h2>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Replacing {selectedDocs.length} selected records</p>
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-1">Replacing {selectedDocs.length} selected records</p>
                 </div>
                 <button onClick={() => setIsRevisionModalOpen(false)} className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-red-50 hover:text-red-500 transition-all">
                   <X className="h-5 w-5" />
@@ -250,7 +250,7 @@ export default function IntegratedEmployeePayslips() {
         <div>
           <div className="flex items-center gap-2 text-primary mb-1">
             <ShieldCheck className="h-4 w-4" />
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em]">{isAdminView ? 'Payroll Management' : 'Employee Benefits'}</span>
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em]">{isAdminView ? 'Payroll Management' : 'Employee Benefits'}</span>
           </div>
           <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
             {isAdminView ? 'Manage Payslips' : 'My Documents'}
@@ -259,8 +259,9 @@ export default function IntegratedEmployeePayslips() {
 
         <div className="flex flex-wrap gap-3">
           <div className="relative group">
-            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
+            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 group-focus-within:text-primary transition-colors" />
             <select 
+              id="period-select"
               value={selectedRunId}
               onChange={(e) => setSelectedRunId(e.target.value)}
               className="pl-12 pr-10 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-black focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all appearance-none min-w-[180px]"
@@ -275,8 +276,9 @@ export default function IntegratedEmployeePayslips() {
           </div>
 
           <div className="relative group">
-            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
+            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 group-focus-within:text-primary transition-colors" />
             <select 
+              id="client-filter"
               value={selectedLabel}
               onChange={(e) => setSelectedLabel(e.target.value)}
               className="pl-12 pr-10 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-black focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all appearance-none min-w-[180px]"
@@ -289,7 +291,7 @@ export default function IntegratedEmployeePayslips() {
           </div>
 
           <div className="relative group">
-            <ArrowUpDown className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
+            <ArrowUpDown className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 group-focus-within:text-primary transition-colors" />
             <select 
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
@@ -302,8 +304,9 @@ export default function IntegratedEmployeePayslips() {
 
           {isAdminView && (
             <div className="relative group flex-1 min-w-[200px]">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 group-focus-within:text-primary transition-colors" />
               <input 
+                id="payslip-search"
                 type="text"
                 placeholder="Search Name or ID..."
                 value={searchTerm}
@@ -325,8 +328,8 @@ export default function IntegratedEmployeePayslips() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-primary rounded-[2.5rem] p-8 text-white shadow-xl shadow-primary/20 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12 blur-xl"></div>
+          <div className="bg-primary rounded-3xl p-8 text-white shadow-xl shadow-primary/20 relative overflow-hidden group">
+            
             <p className="text-[10px] font-black uppercase tracking-widest text-blue-100 mb-4 opacity-70">Filtered Documents</p>
             <h3 className="text-4xl font-black mb-1 leading-none tracking-tight">{filteredSlips.length}</h3>
             
@@ -351,8 +354,8 @@ export default function IntegratedEmployeePayslips() {
                   initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                   className="py-20 px-8 text-center"
                 >
-                  <div className="h-24 w-24 bg-blue-50 rounded-[2rem] flex items-center justify-center mx-auto mb-8 relative">
-                    <div className="absolute inset-0 bg-blue-100 rounded-[2rem] animate-ping opacity-20"></div>
+                  <div className="h-24 w-24 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-8 relative">
+                    
                     <Users className="h-10 w-10 text-primary relative z-10" />
                   </div>
                   <h3 className="text-2xl font-black text-gray-900 mb-3 tracking-tight">Complete Your Setup</h3>
@@ -371,7 +374,7 @@ export default function IntegratedEmployeePayslips() {
                     </Link>
                     <button 
                       onClick={() => setShowRawIds(true)}
-                      className="text-gray-400 hover:text-gray-900 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-colors"
+                      className="text-gray-500 hover:text-gray-900 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-colors"
                     >
                       Show technical IDs anyway
                     </button>
@@ -390,7 +393,7 @@ export default function IntegratedEmployeePayslips() {
                         />
                       )}
                       <div className="flex items-center gap-6">
-                        <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${selectedDocs.includes(slip.id) ? 'bg-primary text-white' : 'bg-gray-100 text-gray-400'}`}>
+                        <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${selectedDocs.includes(slip.id) ? 'bg-primary text-white' : 'bg-gray-100 text-gray-500'}`}>
                           {isAdminView ? <UserIcon className="h-6 w-6" /> : <Calendar className="h-6 w-6" />}
                         </div>
                         <div>
@@ -401,7 +404,7 @@ export default function IntegratedEmployeePayslips() {
                                 : `${formatDate(slip.batch?.period_start)} — ${formatDate(slip.batch?.period_end)}`}
                             </h4>
                             <div className="flex items-center gap-2">
-                              {isAdminView && <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tight">{slip.sys_id}</span>}
+                              {isAdminView && <span className="text-[9px] font-bold text-gray-500 uppercase tracking-tight">{slip.sys_id}</span>}
                               {isAdminView && <span className="text-[9px] font-black bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded uppercase">{formatDate(slip.batch?.period_start)}</span>}
                             </div>
                           </div>
@@ -413,7 +416,7 @@ export default function IntegratedEmployeePayslips() {
                           )}
                           <div className="flex items-center gap-4 mt-1">
                              <span className="text-xs font-bold text-primary">{slip.file_name}</span>
-                             <span className="text-[10px] text-gray-400 font-medium border-l border-gray-200 pl-4 uppercase tracking-widest">
+                             <span className="text-[10px] text-gray-500 font-medium border-l border-gray-200 pl-4 uppercase tracking-widest">
                                {isAdminView ? 'PDF Document' : `Released: ${slip.batch?.release_date ? formatDate(slip.batch.release_date) : formatDate(slip.created_at)}`}
                              </span>
                           </div>
@@ -435,7 +438,7 @@ export default function IntegratedEmployeePayslips() {
               )) : (
                 <div className="py-20 text-center">
                   <FileText className="h-12 w-12 text-gray-200 mx-auto mb-4" />
-                  <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">
+                  <p className="text-gray-500 text-xs font-bold uppercase tracking-widest">
                     {searchTerm ? `No records found for "${searchTerm}"` : 'No documents available yet.'}
                   </p>
                 </div>
