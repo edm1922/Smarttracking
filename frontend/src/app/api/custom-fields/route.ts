@@ -10,7 +10,8 @@ export async function GET() {
     
     const { data: fields, error } = await supabase
       .from('CustomField')
-      .select('id, name, batchId')
+      .select('id, name, batchId, orderIndex')
+      .order('orderIndex', { ascending: true })
       .order('createdAt', { ascending: true });
 
     if (error) {

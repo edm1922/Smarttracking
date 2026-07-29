@@ -9,6 +9,7 @@ import {
 import { TableSkeleton, CardSkeleton } from '@/components/ui/LoadingSkeletons';
 import { toast } from 'sonner';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 interface Batch {
   id: string;
@@ -39,6 +40,8 @@ interface Item {
 }
 
 export default function StoragePage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [batches, setBatches] = useState<Batch[]>([]);
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
   const [fields, setFields] = useState<CustomField[]>([]);
@@ -59,23 +62,35 @@ export default function StoragePage() {
         fetch('/api/batches').then(r => r.json()),
         fetch('/api/custom-fields').then(r => r.json())
       ]);
-      setBatches(Array.isArray(batchesRes) ? batchesRes : []);
+      const batchList = Array.isArray(batchesRes) ? batchesRes : [];
+      setBatches(batchList);
       setFields(Array.isArray(fieldsRes) ? fieldsRes : []);
+      return batchList;
     } catch (err) {
       console.error('Failed to fetch storage data', err);
+      return [];
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    fetchData().then((batchList) => {
+      const batchId = searchParams.get('batchId');
+      if (batchId) {
+        const match = batchList.find((b: Batch) => b.id === batchId);
+        if (match) {
+          handleSelectBatch(match);
+        }
+      }
+    });
   }, []);
 
   const handleSelectBatch = async (batch: Batch) => {
     setLoading(true);
     setSelectedBatch(batch);
     setViewMode('details');
+    router.push(`/dashboard/storage?batchId=${batch.id}`, { scroll: false });
     try {
       const itemsRes = await fetch(`/api/items?batchId=${batch.id}`).then(r => r.json());
       setItems(Array.isArray(itemsRes) ? itemsRes : []);
@@ -125,6 +140,7 @@ export default function StoragePage() {
       if (selectedBatch?.id === batchToDelete.id) {
         setSelectedBatch(null);
         setViewMode('grid');
+        router.push('/dashboard/storage', { scroll: false });
       }
       fetchData();
     } catch (err: any) {
@@ -174,8 +190,8 @@ export default function StoragePage() {
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="bg-gray-900 text-white">
-                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest border border-gray-800">QR Code</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest border border-gray-800">Reference</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest border border-gray-800 no-print">QR Code</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest border border-gray-800 no-print">Reference</th>
                     {batchFields.map(f => (
                       <th key={f.id} className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest border border-gray-800">{f.name}</th>
                     ))}
@@ -193,8 +209,8 @@ export default function StoragePage() {
                     return hasName || hasContent;
                   }).map((item, idx) => (
                     <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="px-4 py-3 text-[10px] font-mono font-black border border-gray-100 text-gray-900">{item.slug}</td>
-                      <td className="px-4 py-3 text-xs font-bold border border-gray-100 text-gray-900">{item.name || 'Untitled'}</td>
+                      <td className="px-4 py-3 text-[10px] font-mono font-black border border-gray-100 text-gray-900 no-print">{item.slug}</td>
+                      <td className="px-4 py-3 text-xs font-bold border border-gray-100 text-gray-900 no-print">{item.name || 'Untitled'}</td>
                       {batchFields.map(f => (
                         <td key={f.id} className="px-4 py-3 text-xs font-medium border border-gray-100 text-gray-600">{getFieldValue(item, f.id)}</td>
                       ))}
@@ -255,7 +271,7 @@ export default function StoragePage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <button 
-              onClick={() => setViewMode('grid')}
+              onClick={() => { setViewMode('grid'); setSelectedBatch(null); router.push('/dashboard/storage', { scroll: false }); }}
               className="p-2 hover:bg-gray-100 rounded-full transition-colors"
             >
               <ArrowLeft className="h-6 w-6 text-gray-500" />
@@ -303,9 +319,9 @@ export default function StoragePage() {
         </div>
 
         <div className="bg-white rounded-[2rem] border border-gray-200 overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
+          <div className="max-h-[500px] overflow-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
                 <tr>
                   <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">QR Code</th>
                   <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Reference</th>
