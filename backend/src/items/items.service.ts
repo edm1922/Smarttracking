@@ -58,6 +58,10 @@ export class ItemsService {
         categoryId: categoryId || null,
         batchId: batchId || null,
         name: itemData.name || null, // Force null if empty string
+        // Keep the item-level carrier in sync with the JSON marker in fieldValues
+        hasUnitQuantity:
+          itemData.hasUnitQuantity === true ||
+          !!fieldValues?.find((fv: any) => fv.value?.useUnitQty),
       };
 
       const item = await this.prisma.item.create({
@@ -208,6 +212,17 @@ export class ItemsService {
       }
     }
 
+    // Deterministic carrier write: a JSON marker in the payload forces the item-level
+    // hasUnitQuantity flag on; an explicit flag is honored; otherwise leave unchanged.
+    const newFieldValuesPayload = data.fieldValues || [];
+    const newUnitField = newFieldValuesPayload.find((fv: any) => fv.value?.useUnitQty);
+    const hasUnitQuantity =
+      newUnitField
+        ? true
+        : cleanItemData.hasUnitQuantity === undefined
+          ? undefined
+          : cleanItemData.hasUnitQuantity;
+
     const updatedItem = await this.prisma.item.update({
       where: { slug },
       data: {
@@ -218,6 +233,7 @@ export class ItemsService {
         imageUrl: cleanItemData.imageUrl,
         unit: cleanItemData.unit,
         trackingType: cleanItemData.trackingType,
+        hasUnitQuantity,
         categoryId: finalData.categoryId,
         batchId: finalData.batchId,
         statusId: itemData.statusId, // Use original statusId if present
@@ -259,12 +275,12 @@ export class ItemsService {
     // Auto-detect stock movement from unit-tracking field qty changes
     try {
       const oldUnitField = item.fieldValues?.find((fv: any) => fv.value && typeof fv.value === 'object' && (fv.value as any).useUnitQty);
-      const newFieldValuesPayload = data.fieldValues || [];
-      const newUnitField = newFieldValuesPayload.find((fv: any) => fv.value?.useUnitQty);
+      const newFieldValuesPayloadForLog = data.fieldValues || [];
+      const newUnitFieldForLog = newFieldValuesPayloadForLog.find((fv: any) => fv.value?.useUnitQty);
 
-      if (newUnitField || oldUnitField) {
+      if (newUnitFieldForLog || oldUnitField) {
         const oldQty = oldUnitField ? Number((oldUnitField.value as any).qty) || 0 : 0;
-        const newQty = newUnitField ? Number(newUnitField.value.qty) || 0 : 0;
+        const newQty = newUnitFieldForLog ? Number(newUnitFieldForLog.value.qty) || 0 : 0;
         const qtyDiff = newQty - oldQty;
 
         if (qtyDiff !== 0) {
@@ -290,15 +306,9 @@ export class ItemsService {
 
     // Fetch ALL items that match the unit tracking criteria
     // We do this because we need to group them by name first before we can reliably paginate or search by group name
+    // Deterministic read: use the item-level hasUnitQuantity carrier column instead of a JSON path scan.
     const where: any = {
-      fieldValues: {
-        some: {
-          value: {
-            path: ['useUnitQty'],
-            equals: true
-          }
-        }
-      }
+      hasUnitQuantity: true,
     };
 
     // Pre-filter at DB level for name/slug to reduce rows fetched
@@ -502,7 +512,7 @@ export class ItemsService {
         MAX(fv.value->>'unit') as unit
       FROM "Item" i
       JOIN "ItemFieldValue" fv ON fv."itemId" = i.id
-      WHERE fv.value::text LIKE '%useUnitQty%'
+      WHERE i."hasUnitQuantity" = true
       GROUP BY i."name"
       ORDER BY i."name"
       LIMIT 100
@@ -519,11 +529,16 @@ export class ItemsService {
 
     const { fieldValues, name } = data;
 
+    // Keep the item-level carrier in sync with the submitted JSON marker
+    const submittedUnitField = (fieldValues || []).find((fv: any) => fv.value?.useUnitQty);
+
     const result = await this.prisma.item.update({
       where: { slug },
       data: {
         locked: true, // Automatically lock upon submission
         name: name || item.name, // Save the assigned name if provided
+        hasUnitQuantity: submittedUnitField ? true : (item.hasUnitQuantity ?? false),
+        unit: submittedUnitField?.value?.unit ?? data.unit ?? item.unit,
         fieldValues: fieldValues
           ? {
               deleteMany: {},

@@ -88,36 +88,41 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
       setAvailableFields(relevantFields);
 
       const values: Record<string, any> = {};
-      let foundUnitData = false;
-      
+
       // Initialize with existing values
       itemData.fieldValues?.forEach((fv: any) => {
         values[fv.fieldId] = fv.value;
-        const val = fv.value;
-        if (val && typeof val === 'object' && val.useUnitQty && !foundUnitData) {
-          setUnitTracking({
-            useUnitQty: true,
-            unit: val.unit || 'Pair',
-            qty: val.qty || 0,
-            threshold: val.threshold || 5
-          });
-          setPullOutQty(val.qty || 0);
-          foundUnitData = true;
-        }
       });
-      
+
       // Ensure all available fields are in dynamicValues even if they have no stored value yet
       relevantFields.forEach((f: any) => {
         if (values[f.id] === undefined) {
           values[f.id] = '';
         }
       });
-      
-      if (!foundUnitData) {
+
+      // NORMALIZE UNIT TRACKING ON LOAD: prefer the item-level hasUnitQuantity carrier
+      // (Item column), fall back to the legacy JSON marker inside a field value for old records.
+      const carrierField = itemData.fieldValues?.find((fv: any) => {
+        const val = fv.value;
+        return val && typeof val === 'object' && (val.useUnitQty === true || val.hasUnitQuantity === true);
+      });
+      const carrierValue = carrierField?.value || {};
+      const hasUnitQuantity = itemData.hasUnitQuantity === true || !!carrierField;
+
+      if (hasUnitQuantity) {
+        setUnitTracking({
+          useUnitQty: true,
+          unit: itemData.unit || carrierValue.unit || 'Pair',
+          qty: Number(carrierValue.qty) || 0,
+          threshold: Number(carrierValue.threshold) || 5
+        });
+        setPullOutQty(Number(carrierValue.qty) || 0);
+      } else {
         setUnitTracking({ useUnitQty: false, unit: 'Pair', qty: 15, threshold: 5 });
         setPullOutQty(0);
       }
-      
+
       setDynamicValues(values);
 
       // SMART AUTOFILL: Defer this so the main form renders immediately
@@ -251,12 +256,16 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     const entries = Object.entries(baseValues);
     if (entries.length === 0) return [];
 
-    return entries.map(([fieldId, value], index) => {
+    // Attach the unit-tracking carrier to the first AVAILABLE field, so the marker
+    // is never dropped when the first entry's field is not in availableFields.
+    let carrierAttached = false;
+    return entries.map(([fieldId, value]) => {
       // Find the field info to see if it's currently relevant
       const fieldInfo = availableFields.find(f => f.id === fieldId);
       if (!fieldInfo) return null;
 
-      if (index === 0 && activeUnitTracking.useUnitQty) {
+      if (!carrierAttached && activeUnitTracking.useUnitQty) {
+        carrierAttached = true;
         const mainValue = typeof value === 'object' && value !== null ? value.main : value;
         return {
           fieldId,
@@ -319,6 +328,8 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     try {
       const payload: any = {
         ...formData,
+        hasUnitQuantity: unitTracking.useUnitQty,
+        unit: unitTracking.useUnitQty ? unitTracking.unit : undefined,
         fieldValues: prepareFieldValues(dynamicValues)
       };
 
@@ -347,6 +358,8 @@ export default function ItemPage({ params }: { params: Promise<{ slug: string }>
     try {
       const payload = {
         name: formData.name,
+        hasUnitQuantity: unitTracking.useUnitQty,
+        unit: unitTracking.useUnitQty ? unitTracking.unit : undefined,
         fieldValues: prepareFieldValues(dynamicValues),
       };
       await api.post(`/items/${slug}/submit-form`, payload);

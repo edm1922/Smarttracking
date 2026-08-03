@@ -84,6 +84,28 @@ function UnitTrackingContent() {
 
   const [modalConfig, setModalConfig] = useState<any>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
+  const buildSpecKey = (fieldValues?: any[]): string => {
+    if (!fieldValues || fieldValues.length === 0) return 'Standard';
+    const parts = fieldValues
+      .map((fv: any) => {
+        const v = fv?.value;
+        const fieldName = fv?.field?.name || fv?.name || '';
+        let display: string | null = null;
+        if (v && typeof v === 'object') {
+          if (v.main !== undefined && v.main !== null && String(v.main).trim() !== '') {
+            display = String(v.main).trim();
+          }
+        } else if (v !== undefined && v !== null && String(v).trim() !== '') {
+          display = String(v).trim();
+        }
+        return display ? (fieldName ? `${fieldName}: ${display}` : display) : '';
+      })
+      .filter(Boolean)
+      .sort()
+      .join(', ');
+    return parts || 'Standard';
+  };
+
   // Data Aggregation
   const productSummary = useMemo(() => {
     const summary: Record<string, any> = {};
@@ -94,14 +116,19 @@ function UnitTrackingContent() {
       }
       summary[pName].totalInStock += p.totalQty;
       p.items.forEach((item: any) => {
-        item.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).forEach((fv: any) => {
-          const v = fv.value;
-          const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
+        item.fieldValues?.forEach((fv: any) => {
+          const v = fv?.value;
+          let val: any = null;
+          if (v && typeof v === 'object') {
+            if (v.main !== undefined && v.main !== null && String(v.main).trim() !== '') val = v.main;
+          } else if (v !== undefined && v !== null && String(v).trim() !== '') {
+            val = v;
+          }
           if (val != null && String(val).trim() !== '') {
-            const fieldName = fv.field?.name || fv.name || '';
+            const fieldName = fv?.field?.name || fv?.name || '';
             const key = fieldName || '__value__';
             if (!summary[pName].specs[key]) summary[pName].specs[key] = new Set();
-            summary[pName].specs[key].add(String(val));
+            summary[pName].specs[key].add(String(val).trim());
           }
         });
       });
@@ -157,22 +184,12 @@ function UnitTrackingContent() {
       if (qty > 0) {
         if (log.action === 'STOCK_OUT') {
           summary[pName].outToday += qty;
-          const specString = log.item?.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).map((fv: any) => {
-            const v = fv.value;
-            const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-            const fieldName = fv.field?.name || '';
-            return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
-          }).filter(Boolean).sort().join(', ') || 'Standard';
+          const specString = buildSpecKey(log.item?.fieldValues);
           if (!summary[pName].movementBreakdown[specString]) summary[pName].movementBreakdown[specString] = [];
           summary[pName].movementBreakdown[specString].push({ qty, date: log.createdAt, slug: log.item?.slug });
         } else {
           summary[pName].inToday += qty;
-          const specString = log.item?.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).map((fv: any) => {
-            const v = fv.value;
-            const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-            const fieldName = fv.field?.name || '';
-            return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
-          }).filter(Boolean).sort().join(', ') || 'Standard';
+          const specString = buildSpecKey(log.item?.fieldValues);
           if (!summary[pName].inBreakdown[specString]) summary[pName].inBreakdown[specString] = [];
           summary[pName].inBreakdown[specString].push({ qty, date: log.createdAt, slug: log.item?.slug });
         }
@@ -482,12 +499,7 @@ function UnitTrackingContent() {
       if (p.name !== pName) return;
       totalInStock += p.totalQty;
       p.items?.forEach((item: any) => {
-        const specString = item.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).map((fv: any) => {
-          const v = fv.value;
-          const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-          const fieldName = fv.field?.name || fv.name || '';
-          return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
-        }).filter(Boolean).sort().join(', ') || 'Standard';
+        const specString = buildSpecKey(item.fieldValues);
         specCurrentStock[specString] = (specCurrentStock[specString] || 0) + (item.qty || 0);
       });
     });
@@ -500,12 +512,7 @@ function UnitTrackingContent() {
       const isUnitTracked = req.item.fieldValues?.some((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty);
       if (!isUnitTracked) return;
       outToday += req.qty;
-      const specString = req.item.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).map((fv: any) => {
-        const v = fv.value;
-        const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-        const fieldName = fv.field?.name || fv.name || '';
-        return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
-      }).filter(Boolean).sort().join(', ') || 'Standard';
+      const specString = buildSpecKey(req.item.fieldValues);
       if (!movementBreakdown[specString]) movementBreakdown[specString] = [];
       movementBreakdown[specString].push({ qty: req.qty, date: req.createdAt });
     });
@@ -543,22 +550,12 @@ function UnitTrackingContent() {
       if (qty > 0) {
         if (log.action === 'STOCK_OUT') {
           outToday += qty;
-          const specString = log.item?.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).map((fv: any) => {
-            const v = fv.value;
-            const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-            const fieldName = fv.field?.name || '';
-            return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
-          }).filter(Boolean).sort().join(', ') || 'Standard';
+          const specString = buildSpecKey(log.item?.fieldValues);
           if (!movementBreakdown[specString]) movementBreakdown[specString] = [];
           movementBreakdown[specString].push({ qty, date: log.createdAt });
         } else {
           inToday += qty;
-          const specString = log.item?.fieldValues?.filter((fv: any) => fv.value && typeof fv.value === 'object' && fv.value.useUnitQty).map((fv: any) => {
-            const v = fv.value;
-            const val = v && typeof v === 'object' ? (v.main ?? v.qty) : v;
-            const fieldName = fv.field?.name || '';
-            return val ? `${fieldName ? fieldName + ': ' : ''}${val}` : '';
-          }).filter(Boolean).sort().join(', ') || 'Standard';
+          const specString = buildSpecKey(log.item?.fieldValues);
           if (!inBreakdown[specString]) inBreakdown[specString] = [];
           inBreakdown[specString].push({ qty, date: log.createdAt });
         }

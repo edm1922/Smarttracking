@@ -597,6 +597,7 @@ model Item {
   supplierId     String?
   unit           String?          @default("pcs")
   trackingType   String           @default("INDIVIDUAL")
+  hasUnitQuantity Boolean         @default(false)
   activityLogs   ActivityLog[]
   batch          Batch?           @relation(fields: [batchId], references: [id], onDelete: Cascade)
   category       Category?        @relation(fields: [categoryId], references: [id])

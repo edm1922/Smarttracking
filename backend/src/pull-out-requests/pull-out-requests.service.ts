@@ -49,17 +49,14 @@ export class PullOutRequestsService {
       if (!item) throw new NotFoundException(`Item with slug ${data.itemSlug} not found`);
       itemId = item.id;
       
-      // If unit is not provided, try to find the tracked unit
+      // If unit is not provided, resolve it deterministically: carrier JSON first,
+      // then the item-level `unit` column.
       if (!unit) {
         const unitField = item.fieldValues.find((fv: any) => {
           const val = fv.value as any;
-          return val && typeof val === 'object' && val.useUnitQty === true;
+          return val && typeof val === 'object' && (val.useUnitQty === true || val.hasUnitQuantity === true);
         });
-        if (unitField) {
-          unit = (unitField.value as any).unit || 'pcs';
-        } else {
-          unit = 'pcs';
-        }
+        unit = (unitField?.value as any)?.unit || item.unit || 'pcs';
       }
     }
 
@@ -257,11 +254,15 @@ export class PullOutRequestsService {
     if (!request) throw new NotFoundException('Request not found');
     if (request.status !== 'PENDING' && request.status !== 'SUBMITTED') throw new BadRequestException('Request is already processed');
 
-    // Deduct qty from the item's unit-tracking field value
-    const unitField = request.item.fieldValues.find(fv => {
-      const val = fv.value as any;
-      return val && typeof val === 'object' && val.useUnitQty === true;
-    });
+    // Deduct qty from the item's unit-tracking field value.
+    // Guard on the deterministic item-level carrier, then locate the JSON marker field.
+    const isUnitTracked = (request.item as any).hasUnitQuantity === true;
+    const unitField = isUnitTracked
+      ? request.item.fieldValues.find((fv: any) => {
+          const val = fv.value as any;
+          return val && typeof val === 'object' && (val.useUnitQty === true || val.hasUnitQuantity === true);
+        })
+      : undefined;
 
     if (unitField) {
       const currentQty = Number((unitField.value as any).qty) || 0;
@@ -285,7 +286,7 @@ export class PullOutRequestsService {
           userId: request.userId,
           itemId: request.itemId,
           action: 'STOCK_OUT',
-          changes: { quantity: request.qty, unit: request.unit },
+          changes: { quantity: request.qty, unit: request.unit || (unitField.value as any).unit },
         },
       });
     }
@@ -453,7 +454,7 @@ export class PullOutRequestsService {
     for (const [itemId, { totalQty, requestIds }] of itemDeductions) {
       const item = await this.prisma.item.findUnique({
         where: { id: itemId },
-        select: { fieldValues: true },
+        select: { hasUnitQuantity: true, fieldValues: true },
       });
 
       if (!item) {
@@ -461,10 +462,12 @@ export class PullOutRequestsService {
         continue;
       }
 
-      const unitField = item.fieldValues.find((fv) => {
-        const val = fv.value as any;
-        return val && typeof val === 'object' && val.useUnitQty === true;
-      });
+      const unitField = item.hasUnitQuantity
+        ? item.fieldValues.find((fv) => {
+            const val = fv.value as any;
+            return val && typeof val === 'object' && (val.useUnitQty === true || val.hasUnitQuantity === true);
+          })
+        : undefined;
 
       if (!unitField) {
         results.push({ itemId, status: 'skipped', reason: 'No unit-tracking field' });
